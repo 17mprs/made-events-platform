@@ -1,0 +1,2583 @@
+================================================================================
+MADE EVENT PLATFORM — DOCUMENTAZIONE TECNICA COMPLETA v2.0
+================================================================================
+
+INDICE
+  1.  Product Vision
+  2.  PRD (Product Requirements Document)
+  3.  MVP Scope
+  4.  User Flow / User Journey
+  5.  Data Model
+  6.  Technical Architecture
+  7.  Event & Automation Logic
+  8.  System Architecture & Workflow
+  9.  Security Architecture                          [NUOVO]
+  10. API Specification                              [NUOVO]
+  11. Permission Matrix                              [NUOVO]
+  12. Error Handling & Failure Strategy              [NUOVO]
+  13. Conflict Management                            [NUOVO]
+  14. Data Governance & Data Lifecycle               [NUOVO]
+  15. Document Management System                     [NUOVO]
+  16. Performance & Scalability Plan                 [NUOVO]
+  17. Audit & Logging System                         [NUOVO]
+  18. Job Scheduler / Cron System                    [NUOVO]
+  19. Integration Layer                              [NUOVO]
+  20. Configuration System                           [NUOVO]
+  21. Testing Strategy                               [NUOVO]
+  22. Deployment & Versioning                        [NUOVO]
+
+================================================================================
+1. PRODUCT VISION — MADE EVENT PLATFORM
+================================================================================
+
+PERCHE' ESISTE IL PRODOTTO
+--------------------------------------------------------------------------------
+Il prodotto nasce per risolvere un problema critico nel settore eventi:
+la gestione del personale (hostess/steward) e' frammentata, manuale e inefficiente.
+
+Oggi il processo e':
+  - Disperso tra email, WhatsApp e fogli
+  - Non tracciato
+  - Difficile da scalare
+  - Soggetto a errori (assegnazioni, disponibilita', pagamenti)
+
+Risultato:
+  - Perdita di tempo
+  - Inefficienze operative
+  - Scarsa qualita' del servizio
+  - Difficolta' nel crescere
+
+
+PROBLEMA PRINCIPALE
+--------------------------------------------------------------------------------
+1. Disorganizzazione operativa
+   - Nessuna struttura centralizzata
+   - Informazioni sparse
+
+2. Matching inefficiente
+   - Difficile trovare il personale giusto
+   - Mancanza di filtri intelligenti
+
+3. Comunicazione caotica
+   - Contatti manuali
+   - Follow-up non tracciati
+
+4. Assenza di automazioni
+   - Assegnazioni manuali
+   - Zero workflow strutturati
+
+
+SOLUZIONE
+--------------------------------------------------------------------------------
+Una piattaforma centralizzata per la gestione completa del ciclo di staffing eventi.
+
+La piattaforma consente di:
+
+  [TALENT]        Registrazione guidata, scoring automatico, profili strutturati,
+                  documentazione e scadenze.
+
+  [CLIENTI]       Gestione aziende ed eventi, richieste di personale,
+                  storico collaborazioni.
+
+  [EVENTI/TURNI]  Creazione eventi, gestione shift, posti disponibili.
+
+  [MATCHING]      Candidature, selezione, assegnazioni automatiche.
+
+  [CAMPO]         Check-in / Check-out, tracking lavoro, validazione.
+
+  [AUTOMAZIONI]   Workflow stati, creazione automatica assignment,
+                  onboarding automatico talent.
+
+
+TARGET UTENTI
+--------------------------------------------------------------------------------
+1. ADMIN (Made Event)
+   - Gestione completa sistema
+   - Creazione eventi e richieste
+   - Selezione e validazione personale
+
+2. USER (Hostess / Steward)
+   - Creazione profilo
+   - Candidatura agli eventi
+   - Gestione disponibilita'
+   - Check-in / Check-out
+
+3. CLIENTE (Aziende)
+   - Richiesta personale
+   - Monitoraggio eventi
+   - Validazione attivita'
+
+
+VALORE CREATO
+--------------------------------------------------------------------------------
+Per Made Event:
+  - Riduzione drastica del lavoro manuale
+  - Scalabilita' del business
+  - Controllo totale delle operazioni
+
+Per i Clienti:
+  - Personale qualificato e filtrato
+  - Tempi piu' rapidi
+  - Maggiore affidabilita'
+
+Per i Talent:
+  - Accesso a piu' opportunita'
+  - Onboarding semplice
+  - Esperienza professionale strutturata
+
+
+DIFFERENZIAZIONE
+--------------------------------------------------------------------------------
+A differenza di agenzie tradizionali (manuali) e CRM generici (non verticali),
+questo sistema e':
+  - Verticale sul settore eventi (non generico)
+  - Basato su workflow reali (stati, transizioni, automazioni)
+  - Data-driven (scoring, ranking, profiling)
+  - Multi-tenant (scalabile -> vendibile in futuro)
+
+
+COSA NON E' IL PRODOTTO
+--------------------------------------------------------------------------------
+  - NON e' un semplice CRM
+  - NON e' una piattaforma freelance tipo marketplace
+  - NON e' solo un gestionale eventi
+  - NON e' un tool di messaggistica
+
+E': una piattaforma operativa end-to-end per staffing eventi.
+
+
+PRINCIPI DI PRODOTTO
+--------------------------------------------------------------------------------
+1. Automazione prima di tutto   ogni processo deve essere automatizzabile
+2. Single source of truth       tutti i dati devono vivere nel sistema
+3. Workflow-driven              ogni entita' ha stati e transizioni
+4. Scalabilita'                 deve funzionare con 10 eventi come con 1.000
+5. Ruoli chiari                 ogni utente vede solo cio' che deve vedere
+
+
+VISIONE FUTURA
+--------------------------------------------------------------------------------
+Questo NON e' solo un tool interno. Puo' evolvere in:
+  - Piattaforma nazionale per staffing eventi
+  - Network di talent certificati
+  - Matching intelligente e automazioni avanzate
+  - SaaS per altre agenzie
+
+
+================================================================================
+2. PRD — PRODUCT REQUIREMENTS DOCUMENT
+================================================================================
+
+PANORAMICA PRODOTTO
+--------------------------------------------------------------------------------
+La piattaforma MADE EVENT e' un sistema operativo centralizzato per la gestione
+completa del ciclo di staffing eventi. Il sistema e' multi-tenant, role-based,
+workflow-driven, data-centric.
+
+
+FUNZIONALITA' PRINCIPALI
+--------------------------------------------------------------------------------
+
+AUTH & USER MANAGEMENT
+  - Registrazione tenant + admin
+  - Login / logout
+  - Gestione utenti (creazione, aggiornamento, disattivazione)
+  - Gestione ruoli: ADMIN, USER (talent), CLIENTE
+
+ENTITY MANAGEMENT (CORE SISTEMA)
+  Entita' gestite: TALENT_PROFILE, CLIENT_COMPANY, EVENT, SHIFT,
+  APPLICATION, ASSIGNMENT, LEAD_TALENT, JOB_ANNOUNCEMENT, MESSAGE/THREAD
+  Funzionalita': creazione, modifica, eliminazione (soft), ricerca, filtraggio
+
+TALENT MANAGEMENT
+  - Onboarding step-by-step (3 step)
+  - Raccolta dati personali e caricamento documenti
+  - Scoring automatico e ranking (A/B/C/D)
+  - Stato profilo (pending, approved, active, inactive)
+
+CLIENT MANAGEMENT
+  - Gestione aziende clienti con anagrafica completa
+  - Storico eventi e gestione richieste personale
+
+EVENT & SHIFT MANAGEMENT
+  - Creazione evento e gestione dettagli
+  - Creazione turni (shift), gestione posti disponibili
+  - Chiusura / cancellazione
+
+APPLICATION & MATCHING
+  - Candidatura talent agli shift
+  - Validazione, approvazione / rifiuto candidature
+  - Generazione automatica assignment
+
+ASSIGNMENT & OPERATIVITA'
+  - Gestione assegnazioni
+  - Check-in (con timestamp e posizione), Check-out
+  - Calcolo ore lavorate, validazione finale, stato pagamento
+
+JOB ANNOUNCEMENT
+  - Creazione, attivazione/disattivazione, distribuzione ai talent
+
+MESSAGING (base previsto)
+  - Thread comunicazione, messaggi tra utenti, notifiche operative
+
+
+RUOLI E PERMESSI
+--------------------------------------------------------------------------------
+  SUPER ADMIN      Accesso globale, gestione tenant, visione completa
+  ADMIN            Gestione completa proprio tenant, eventi, approvazioni
+  USER (talent)    Gestione profilo, candidatura, check-in/out
+  CLIENTE          Visualizzazione eventi assegnati, validazione
+
+
+REGOLE OPERATIVE
+--------------------------------------------------------------------------------
+  - Ogni utente appartiene a un tenant (accesso limitato ai propri dati)
+  - Ogni entita' ha stati definiti con transizioni vincolate a ruoli
+  - Talent non puo' candidarsi senza profilo approvato
+  - Candidatura possibile solo su shift OPEN
+  - Candidatura approvata genera assignment automaticamente
+  - Check-in solo se CONFIRMED, Check-out solo se CHECKED_IN
+  - Cliente puo' accedere solo ai propri eventi
+
+
+AUTOMAZIONI
+--------------------------------------------------------------------------------
+Di sistema:
+  - Approvazione candidatura -> crea assignment
+  - Approvazione lead -> crea utente + profilo
+  - Cambio stato -> trigger azioni
+
+Operative (previste):
+  - Reminder eventi imminenti
+  - Reminder check-in
+  - Alert task non completati
+  - Notifiche cambio stato
+
+
+ECCEZIONI DA GESTIRE
+--------------------------------------------------------------------------------
+  - Email duplicata -> blocco registrazione
+  - Utente non attivo -> blocco accesso
+  - Transizione non valida -> errore bloccante
+  - Accesso cross-tenant -> negato
+  - Candidatura duplicata -> da definire (vedi sezione 13)
+
+
+REMINDER (DA IMPLEMENTARE)
+--------------------------------------------------------------------------------
+  - Reminder evento (24h prima)
+  - Reminder shift (2h prima)
+  - Reminder check-in
+  - Reminder approvazione admin
+  - Reminder documenti scaduti
+
+
+MONITORAGGIO
+--------------------------------------------------------------------------------
+KPI principali:
+  - Numero eventi, numero talent attivi
+  - Tasso approvazione candidature
+  - Presenze effettive, ore lavorate
+
+Dashboard:
+  - Overview operativa, attivita' giornaliere, alert critici
+
+
+VERSIONING / ROADMAP
+--------------------------------------------------------------------------------
+  FASE 1  Core entity system, workflow base, gestione utenti,
+          eventi + shift, candidature + assignment
+  FASE 2  Notifiche avanzate, messaging completo, dashboard evolute
+  FASE 3  AI matching, scoring avanzato, automazioni marketing
+  FASE 4  SaaS esterno, multi-agenzia, marketplace
+
+
+================================================================================
+3. MVP SCOPE — MADE EVENT PLATFORM
+================================================================================
+
+OBIETTIVO MVP
+--------------------------------------------------------------------------------
+Validare che Made Event riesce a gestire in modo strutturato e scalabile:
+reclutamento talent, gestione eventi, assegnazione personale.
+
+Riducendo drasticamente: caos operativo, comunicazioni manuali, errori.
+
+
+FUNZIONALITA' INCLUSE NELL'MVP
+--------------------------------------------------------------------------------
+
+  [x] AUTH & ACCESSO
+      Login, gestione utenti base (ADMIN / USER / CLIENTE), multi-tenant attivo
+
+  [x] TALENT (CORE CRITICO)
+      Registrazione a 3 step, creazione LEAD_TALENT, scoring automatico,
+      approvazione ADMIN, creazione automatica USER + TALENT_PROFILE
+
+  [x] CLIENT MANAGEMENT (BASE)
+      Creazione CLIENT_COMPANY, associazione eventi al cliente
+      [ ] CRM avanzato (non in scope)
+
+  [x] EVENTI & SHIFT
+      Creazione EVENT e SHIFT, gestione posti disponibili,
+      stati base (DRAFT / PLANNING / LIVE)
+
+  [x] CANDIDATURE
+      Talent puo' candidarsi, validazione ADMIN,
+      stato (PENDING / APPROVED / REJECTED)
+
+  [x] ASSIGNMENT (OPERATIVITA' REALE)
+      Creazione automatica, check-in, check-out, calcolo ore lavorate
+
+  [x] WORKFLOW ENGINE
+      Transizioni di stato, controllo ruoli, hook automatici
+
+  [x] DASHBOARD MINIMA (ADMIN)
+      Lista eventi, shift, candidature, assegnazioni
+      [ ] Analytics avanzati (non in scope)
+
+
+FUNZIONALITA' ESCLUSE DAL MVP
+--------------------------------------------------------------------------------
+  - Messaging interno
+  - Automazioni avanzate (reminder, notifiche complesse)
+  - Marketing / campagne
+  - AI Matching
+  - Pagamenti / fatturazione
+  - Dashboard avanzate
+  - Mobile app nativa
+
+
+CRITERI DI SUCCESSO MVP
+--------------------------------------------------------------------------------
+  Operativi:     1 evento gestito interamente, 5+ talent candidati,
+                 2+ assegnazioni completate, check-in/out funzionanti
+  Efficienza:    riduzione gestione evento >= 50%, messaggi manuali >= 60%
+  Adozione:      admin usa sistema per 1 evento reale, 3+ talent completano onboarding
+  Tecnici:       nessun blocco critico, workflow senza errori, dati coerenti
+
+
+================================================================================
+4. USER FLOW / USER JOURNEY — MADE EVENT PLATFORM
+================================================================================
+
+STRUTTURA LOGICA
+--------------------------------------------------------------------------------
+Richiesta personale -> Evento -> Shift -> Candidature -> Selezione -> Lavoro -> Chiusura
+
+
+USER (HOSTESS / STEWARD)
+--------------------------------------------------------------------------------
+Registrazione:
+  Step 1 -> Dati base
+  Step 2 -> Profilazione
+  Step 3 -> Upload materiali
+  Sistema crea: LEAD_TALENT (PARTIAL -> COMPLETED_PENDING_APPROVAL)
+
+Dopo approvazione:
+  Sistema crea USER + TALENT_PROFILE
+
+Operativita':
+  - Visualizza lista shift disponibili
+  - Si candida -> sistema crea APPLICATION (PENDING)
+  - Stato: PENDING -> APPROVED / REJECTED
+
+Giorno evento:
+  CHECK-IN:  apre assegnazione, clicca check-in
+             sistema salva timestamp + posizione
+  CHECK-OUT: clicca check-out, sistema calcola ore + salva timesheet
+
+
+ADMIN (MADE EVENT)
+--------------------------------------------------------------------------------
+Ingresso: arriva richiesta cliente
+
+Creazione struttura:
+  EVENT: nome, cliente, location
+  SHIFT: data, orario, numero persone
+
+Gestione candidature:
+  Scenario 1 - Candidature passive: vede lista APPLICATION, filtra e valuta
+  Scenario 2 - Selezione attiva: admin seleziona talent manualmente,
+               crea assignment diretto
+
+Approvazione:
+  APPLICATION -> APPROVED -> sistema crea ASSIGNMENT automaticamente
+
+Post evento:
+  Controlla ore, valida assignment
+  Stato: CHECKED_OUT -> VALIDATED -> PAID
+
+
+CLIENTE (AZIENDA)
+--------------------------------------------------------------------------------
+  - Visualizza eventi assegnati e personale coinvolto
+  - Conferma presenza e valida servizio
+
+
+FLUSSO COMPLETO END-TO-END
+--------------------------------------------------------------------------------
+  1.  Cliente richiede personale
+  2.  Admin crea evento
+  3.  Admin crea shift
+  4.  Talent si candidano
+  5.  Admin approva
+  6.  Sistema crea assignment
+  7.  Talent lavora
+  8.  Check-in / Check-out
+  9.  Admin valida
+  10. Evento completato
+
+
+================================================================================
+5. DATA MODEL — MADE EVENT PLATFORM
+================================================================================
+
+STRUTTURA GENERALE
+--------------------------------------------------------------------------------
+3 livelli dati:
+  - Core Tables:        Users, Tenants, Entities
+  - Entity Layer:       tutte le entita' business
+  - Computed/Derived:   score, ranking, ore lavorate, stati
+
+
+CORE ENTITIES
+--------------------------------------------------------------------------------
+
+USERS
+  user_id (PK), email (unique), password_hash, role,
+  status, tenant_id (FK), created_at, last_login
+
+TENANTS
+  tenant_id (PK), name, product, slug, status, created_at
+
+ENTITIES (tabella centrale)
+  entity_id (PK), tenant_id (FK), type, data (JSON),
+  created_by, created_at, updated_at, status
+
+
+ENTITY TYPES (BUSINESS)
+--------------------------------------------------------------------------------
+
+TALENT_PROFILE
+  nome, cognome, telefono, email_contatto, citta',
+  province_operativita[], lingue[], altezza, taglia,
+  skills[], esperienza_anni, rating, stato_verifica,
+  documenti{}, score, ranking
+
+LEAD_TALENT
+  nome, cognome, email, telefono, citta', step_completed,
+  lingue, esperienza, disponibilita', foto, cv_uploaded,
+  score, ranking, registration timestamps
+
+CLIENT_COMPANY
+  ragione_sociale, piva, referenti[], sede_legale, note
+
+EVENT
+  client_company_id (FK), nome_evento, citta', location, note_admin
+
+SHIFT
+  event_id (FK), data, orario_inizio, orario_fine,
+  posti_disponibili, ruolo, dress_code, meeting_point,
+  note_operational
+
+APPLICATION
+  shift_id (FK), talent_profile_id (FK),
+  messaggio, disponibilita_confermata
+
+ASSIGNMENT
+  shift_id (FK), talent_profile_id (FK),
+  note_admin, checkin{}, checkout{}, timesheet{}
+
+JOB_ANNOUNCEMENT
+  titolo, descrizione, target, validita'
+
+
+RELAZIONI
+--------------------------------------------------------------------------------
+  Tenant         -> Users (1:N)
+  Tenant         -> Entities (1:N)
+  CLIENT_COMPANY -> EVENT (1:N)
+  EVENT          -> SHIFT (1:N)
+  SHIFT          -> APPLICATION (1:N)
+  SHIFT          -> ASSIGNMENT (1:N)
+  LEAD_TALENT    -> TALENT_PROFILE (1:1)
+  TALENT_PROFILE -> APPLICATION (1:N)
+  TALENT_PROFILE -> ASSIGNMENT (1:N)
+
+
+STATI (STATE MACHINE)
+--------------------------------------------------------------------------------
+  APPLICATION:  PENDING | APPROVED | REJECTED | WITHDRAWN
+  ASSIGNMENT:   CONFIRMED | CHECKED_IN | CHECKED_OUT | VALIDATED | PAID | NO_SHOW
+  EVENT:        DRAFT | PLANNING | LIVE | COMPLETED | CANCELLED
+  SHIFT:        OPEN | FULL | CLOSED | CANCELLED
+  LEAD_TALENT:  PARTIAL | COMPLETED_PENDING_APPROVAL | APPROVED | REJECTED
+  TALENT:       PENDING_REVIEW | APPROVED | ACTIVE | INACTIVE | REJECTED
+
+
+DATI DERIVATI
+--------------------------------------------------------------------------------
+  Timesheet:     calcolato da check-in e check-out
+  Score Talent:  basato su esperienza, foto, CV, lingue
+  Ranking:       A / B / C / D
+
+
+================================================================================
+6. TECHNICAL ARCHITECTURE — MADE EVENT PLATFORM
+================================================================================
+
+OBIETTIVO ARCHITETTURALE
+--------------------------------------------------------------------------------
+Centralizzazione dati, separazione ruoli, scalabilita' funzionale,
+velocita' di sviluppo, facilita' di manutenzione, automazione flussi operativi.
+
+
+STACK TECNOLOGICO
+--------------------------------------------------------------------------------
+  Backend:       Google Apps Script (GAS) — application layer e API layer
+  Database:      Google Sheets — persistence layer (Tenants, Users, Entities)
+  Frontend:      Web dashboard custom collegata via fetch/API al backend GAS
+  Storage:       Google Drive per CV, foto profilo, documenti identita'
+  Integrazioni:  Gmail, Make.com (potenziale), WordPress/landing esterna
+
+
+MACRO-ARCHITETTURA
+--------------------------------------------------------------------------------
+  Landing / Dashboard / Portali
+          |
+  Frontend Web (Admin / User / Cliente)
+          |
+  API Layer — Google Apps Script (doPost router)
+          |
+  Business Logic Modules
+  (Auth, Users, Entities, Workflows, Registration, Special Actions)
+          |
+  Google Sheets Database (Tenants, Users, Entities)
+          |
+  Storage + Integrazioni (Google Drive, Gmail, automazioni future)
+
+
+MODULI GAS
+--------------------------------------------------------------------------------
+  CODE.gs              Router centrale e configurazione globale
+  UTILS.gs             Funzioni condivise (hash, token, parsing, utility fogli)
+  TENANTS.gs           Gestione tenant e logica multi-tenant
+  AUTH.gs              Autenticazione (register, login, reset, getMe, CRUD)
+  WORKFLOWS.gs         Motore transizioni di stato e side effects
+  SPECIAL_ACTIONS.gs   Azioni speciali (candidatura, check-in, check-out)
+  REGISTRATION_FLOW.gs Onboarding progressivo talent (Step 1/2/3)
+  SETUP.gs             Bootstrap tecnico (creazione fogli, seed, init)
+
+
+AUTHENTICATION
+--------------------------------------------------------------------------------
+  - Verifica email, password hashata, stato utente
+  - Genera token con: userId, tenantId, role, timestamp
+  Ruoli:   SUPER_ADMIN_MASTER | SUPER_ADMIN_RESELLER | ADMIN | USER | CLIENTE
+  Scope:   GLOBAL | OWN_TENANT | OWN_USER | PUBLIC
+
+
+PATTERN FRONTEND-BACKEND
+--------------------------------------------------------------------------------
+  Frontend action -> fetch() POST
+  -> { action, payload, token }
+  -> GAS Router
+  -> Modulo applicativo
+  -> Response JSON { success, message, data }
+  -> Aggiornamento UI
+
+
+================================================================================
+7. EVENT & AUTOMATION LOGIC — MADE EVENT PLATFORM
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Il sistema e' event-driven. Ogni azione genera un evento che puo' attivare
+una o piu' automazioni.
+
+
+CATEGORIE DI EVENTI
+--------------------------------------------------------------------------------
+  A. SISTEMA:    creazione entity, aggiornamento, cambio stato
+  B. UTENTE:     registrazione, candidatura, check-in/out
+  C. ADMIN:      approvazioni, creazione eventi, assegnazioni
+  D. TEMPORALI:  reminder, scadenze, no-show
+  E. ESTERNI:    email ricevute, webhook, form esterni (futuro)
+
+
+EVENTI + AUTOMAZIONI CORE
+--------------------------------------------------------------------------------
+
+REGISTRAZIONE TALENT:
+  Evento: LEAD creato (Step 1)        -> Salva lead, stato PARTIAL
+  Evento: Step 3 completato           -> Calcola score, ranking,
+                                         stato COMPLETED_PENDING_APPROVAL
+  Evento: Lead approvato              -> Crea USER, password temporanea,
+                                         crea TALENT_PROFILE, invia email
+
+CANDIDATURE:
+  Evento: APPLICATION creata          -> Stato PENDING, notifica admin (futuro)
+  Evento: APPLICATION APPROVED        -> Crea ASSIGNMENT, stato CONFIRMED
+  Evento: APPLICATION REJECTED        -> Aggiornamento stato, notifica user
+
+ASSIGNMENT:
+  Evento: CHECK-IN                    -> Timestamp, posizione, stato CHECKED_IN
+  Evento: CHECK-OUT                   -> Timestamp, calcolo ore, timesheet,
+                                         stato CHECKED_OUT
+  Evento: VALIDAZIONE                 -> Stato VALIDATED
+  Evento: PAGAMENTO                   -> Stato PAID
+
+SHIFT/EVENT:
+  Evento: SHIFT creato                -> Stato OPEN
+  Evento: SHIFT pieno                 -> Stato FULL
+  Evento: EVENT attivato              -> Stato LIVE
+
+
+EVENTI TEMPORALI (AUTOMAZIONI FUTURE)
+--------------------------------------------------------------------------------
+  24h prima evento      -> Reminder talent + admin
+  2h prima shift        -> Reminder check-in
+  Inizio turno + Xmin   -> Verifica check-in; se assente: NO_SHOW + alert admin
+  Documento in scadenza -> Reminder talent + alert admin
+
+
+REGOLE FONDAMENTALI
+--------------------------------------------------------------------------------
+  1. Automazioni SEMPRE idempotenti (no duplicati)
+  2. NESSUNA logica nel frontend (tutto nel backend)
+  3. Stati = fonte di verita'
+  4. Hook isolati e modificabili indipendentemente
+
+
+================================================================================
+8. SYSTEM ARCHITECTURE & WORKFLOW
+================================================================================
+
+7 PILASTRI DEL SISTEMA
+--------------------------------------------------------------------------------
+  1. Role-based access        Ogni utente vede solo il proprio perimetro
+  2. Multi-tenant logic       Ogni dato appartiene a un tenant
+  3. Entity-driven model      Logica business su entita' uniformi
+  4. Workflow-driven logic    Ogni entita' evolve per stati e transizioni
+  5. Event-driven automation  Ogni evento puo' attivare azioni automatiche
+  6. Dashboard-driven ops     Il sistema e' guidato da dashboard operative
+  7. Progressive scalability  Predisposto per evoluzioni future
+
+
+WORKFLOW PRINCIPALE END-TO-END
+--------------------------------------------------------------------------------
+  FASE 1  Acquisizione talent
+          Candidato si registra (Step 1/2/3)
+          Sistema crea LEAD_TALENT (PARTIAL -> COMPLETED_PENDING_APPROVAL)
+
+  FASE 2  Validazione talent
+          Admin approva o rifiuta il lead
+          Se approvato: creazione USER + TALENT_PROFILE
+
+  FASE 3  Creazione richiesta operativa
+          Admin registra CLIENT_COMPANY, crea EVENT, crea SHIFT
+
+  FASE 4  Copertura turni
+          Talent si candidano (APPLICATION)
+          Admin approva -> sistema crea ASSIGNMENT (CONFIRMED)
+
+  FASE 5  Esecuzione sul campo
+          Talent: CHECK-IN (ora + posizione)
+          Talent: CHECK-OUT (sistema calcola ore, genera timesheet)
+
+  FASE 6  Chiusura operativa
+          Admin / Cliente validano
+          ASSIGNMENT -> VALIDATED -> PAID
+
+
+PATTERN OPERATIVO
+--------------------------------------------------------------------------------
+  Input -> Validazione -> Creazione/modifica entita' -> Transizione stato
+  -> Hook automatici -> Aggiornamento dashboard / output comunicativo
+
+  Questo pattern deve restare coerente in tutto il progetto.
+
+
+PRINCIPI GUIDA
+--------------------------------------------------------------------------------
+  1. Il backend e' l'unica sede della logica critica
+  2. Il frontend presenta e guida, ma non decide
+  3. Gli stati sono la grammatica del sistema
+  4. Le automazioni nascono dagli eventi, non da scorciatoie manuali
+  5. Ogni entita' ha scopo, ciclo di vita e relazioni chiare
+  6. Nessun dato operativo importante vive fuori dal sistema
+  7. Ogni estensione futura riutilizza i pattern gia' definiti
+
+
+================================================================================
+9. SECURITY ARCHITECTURE                                              [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+La sicurezza del sistema e' stratificata: autenticazione, autorizzazione,
+isolamento dati, protezione endpoint, tracciabilita'. Nessuno strato e'
+sufficiente da solo. Tutti devono essere presenti.
+
+
+TOKEN MANAGEMENT
+--------------------------------------------------------------------------------
+Struttura del token (attuale):
+  {
+    userId:    string,
+    tenantId:  string,
+    role:      string,
+    issuedAt:  timestamp,
+    expiresAt: timestamp    (default: +8 ore dalla emissione)
+  }
+  Encoding: base64 (attuale) -> obiettivo: HMAC-SHA256 firmato
+
+Ciclo di vita del token:
+  Emissione:      al login, dopo verifica credenziali e stato utente
+  Validazione:    ad ogni richiesta API (action)
+  Scadenza:       token rifiutato se expiresAt < now()
+  Invalidazione:  al logout esplicito, al cambio password,
+                  alla disattivazione utente
+  Refresh:        non previsto in MVP; da implementare in Fase 2
+                  (logica: se expiresAt - now() < 30min -> rinnova)
+
+Controlli obbligatori su ogni endpoint:
+  [x] Token presente
+  [x] Token non scaduto
+  [x] userId esiste e e' attivo
+  [x] tenantId corrisponde all'utente
+  [x] role autorizzato per l'action richiesta
+
+
+PROTEZIONE ENDPOINT GAS
+--------------------------------------------------------------------------------
+Il backend GAS espone un singolo endpoint pubblico (doPost).
+La protezione avviene tramite logica applicativa interna.
+
+Livelli di protezione:
+  1. Token validation        ogni richiesta deve avere token valido
+  2. Action whitelist        solo action note vengono processate
+  3. Role check              action mappata al ruolo minimo richiesto
+  4. Tenant scope            tutti gli accessi filtrati per tenantId
+  5. Input sanitization      tutti i campi vengono validati prima dell'uso
+
+Regole anti-abuso:
+  Rate limiting (da implementare):
+    Strategia: contatore per userId + finestra temporale (es. 60 req/min)
+    Storage: foglio RateLimits o Properties GAS
+    Risposta al superamento: errore 429 con messaggio standard
+
+  Blocco IP (futuro):
+    Gestibile tramite CDN o proxy se il sistema viene esposto pubblicamente
+
+
+GESTIONE SESSIONI MULTIPLE
+--------------------------------------------------------------------------------
+Scenario: stesso utente fa login da due dispositivi diversi.
+
+Comportamento attuale (MVP):
+  Entrambe le sessioni sono valide. Non c'e' singleton di sessione.
+
+Comportamento consigliato (Fase 2):
+  Opzione A: sessioni multiple permesse (default, semplice)
+  Opzione B: una sessione attiva per volta
+             (al nuovo login, invalida tutti i token precedenti)
+             Implementazione: campo last_token_id su Users
+
+Nota: per uso interno MVP, l'Opzione A e' sufficiente.
+
+
+LOGGING DEGLI ACCESSI
+--------------------------------------------------------------------------------
+Ogni evento di autenticazione deve essere loggato (vedi sezione 17).
+
+Da loggare obbligatoriamente:
+  - Login riuscito:       userId, tenantId, timestamp, IP (se disponibile)
+  - Login fallito:        email tentata, motivo, timestamp
+  - Logout:              userId, timestamp
+  - Token invalido:       action tentata, timestamp
+  - Accesso negato:       userId, action, motivo
+
+
+GESTIONE ERRORI DI SICUREZZA
+--------------------------------------------------------------------------------
+  Errore                   Codice    Comportamento
+  -----------------------  --------  ------------------------------------------
+  Token mancante           AUTH_001  Blocca, risposta errore standard
+  Token scaduto            AUTH_002  Blocca, richiedi nuovo login
+  Token non valido         AUTH_003  Blocca, log tentativo
+  Utente non attivo        AUTH_004  Blocca, no dettagli nel messaggio
+  Ruolo insufficiente      AUTH_005  Blocca, log action tentata
+  Tenant mismatch          AUTH_006  Blocca, log CRITICO
+  Troppi tentativi         AUTH_007  Blocca temporaneamente (rate limit)
+
+Principio: i messaggi di errore di sicurezza NON devono rivelare dettagli
+interni (es. "utente non trovato" e "password errata" devono dare la
+stessa risposta generica al frontend).
+
+
+HARDENING PROGRESSIVO
+--------------------------------------------------------------------------------
+  MVP (ora):     token base64, validazione manuale, ruoli e tenant check
+  Fase 2:        HMAC-SHA256, refresh token, rate limiting, session control
+  Fase 3:        JWT standard, 2FA per admin, audit log completo
+  Fase 4:        OAuth provider esterno se il sistema diventa SaaS pubblico
+
+
+================================================================================
+10. API SPECIFICATION                                                  [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Il sistema espone un singolo entry point (doPost) con routing interno
+basato sul campo "action". Ogni richiesta segue un contratto standard.
+
+
+CONTRATTO RICHIESTA (REQUEST CONTRACT)
+--------------------------------------------------------------------------------
+Ogni richiesta verso il backend deve avere questa struttura:
+
+  {
+    "action":  "string (obbligatorio)",
+    "token":   "string (obbligatorio tranne per login/register)",
+    "payload": { ...dati specifici dell'action... }
+  }
+
+Regole:
+  - action:   stringa in camelCase, namespace opzionale (es. "talent.approve")
+  - token:    assente solo per action pubbliche (login, registerStep1)
+  - payload:  oggetto JSON con i dati necessari all'action
+              campo vuoto {} se l'action non richiede dati aggiuntivi
+
+
+CONTRATTO RISPOSTA (RESPONSE CONTRACT)
+--------------------------------------------------------------------------------
+Risposta in caso di successo:
+
+  {
+    "success": true,
+    "message": "string descrittiva (opzionale)",
+    "data":    { ...payload risposta... }
+  }
+
+Risposta in caso di errore:
+
+  {
+    "success": false,
+    "error": {
+      "code":    "STRING_CODE",
+      "message": "Descrizione leggibile",
+      "field":   "campo_specifico (opzionale, per errori di validazione)"
+    }
+  }
+
+Regole:
+  - success e' sempre presente e sempre booleano
+  - data e' presente solo in risposta positiva
+  - error e' presente solo in risposta negativa
+  - Il frontend non deve mai fare parsing del campo message per logica
+
+
+NAMING CONVENTION ACTIONS
+--------------------------------------------------------------------------------
+  Formato:    [entita'].[verbo] oppure [verbo][Entita'] (legacy)
+
+  Esempi corretti:
+    auth.login
+    auth.logout
+    auth.register
+    talent.create
+    talent.approve
+    talent.updateProfile
+    event.create
+    event.updateStatus
+    shift.create
+    application.submit
+    application.approve
+    application.reject
+    assignment.checkin
+    assignment.checkout
+    assignment.validate
+    user.create
+    user.deactivate
+    entity.get
+    entity.list
+    entity.update
+
+
+CATALOGO ENDPOINT (ACTIONS)
+--------------------------------------------------------------------------------
+
+AUTH
+  auth.login
+    Payload:  { email, password }
+    Response: { token, user: { userId, role, tenantId } }
+
+  auth.logout
+    Payload:  {}
+    Response: { success: true }
+
+  auth.getMe
+    Payload:  {}
+    Response: { user: { userId, email, role, tenantId, status } }
+
+  auth.changePassword
+    Payload:  { currentPassword, newPassword }
+    Response: { success: true }
+
+TALENT / LEAD
+  talent.registerStep1
+    Payload:  { nome, cognome, email, telefono, citta' }
+    Response: { leadId }
+    Auth:     PUBLIC
+
+  talent.registerStep2
+    Payload:  { leadId, lingue[], esperienza, disponibilita', ... }
+    Response: { success: true }
+    Auth:     PUBLIC (con leadId come identificativo temporaneo)
+
+  talent.registerStep3
+    Payload:  { leadId, foto_url, cv_url, ... }
+    Response: { success: true, score, ranking }
+    Auth:     PUBLIC
+
+  talent.approve
+    Payload:  { leadId }
+    Response: { userId, talentProfileId }
+    Auth:     ADMIN
+
+  talent.reject
+    Payload:  { leadId, motivo }
+    Response: { success: true }
+    Auth:     ADMIN
+
+  talent.list
+    Payload:  { filters: { status, ranking, citta' }, page, limit }
+    Response: { items: [...], total, page }
+    Auth:     ADMIN
+
+  talent.get
+    Payload:  { talentId }
+    Response: { profile: {...} }
+    Auth:     ADMIN | OWN_USER
+
+  talent.updateProfile
+    Payload:  { talentId, ...campi aggiornabili }
+    Response: { success: true }
+    Auth:     ADMIN | OWN_USER
+
+CLIENT
+  client.create
+    Payload:  { ragione_sociale, piva, referenti[], sede_legale, note }
+    Response: { clientId }
+    Auth:     ADMIN
+
+  client.list
+    Payload:  { filters: {}, page, limit }
+    Response: { items: [...], total }
+    Auth:     ADMIN
+
+  client.get
+    Payload:  { clientId }
+    Response: { company: {...} }
+    Auth:     ADMIN | CLIENTE (solo proprio)
+
+EVENT
+  event.create
+    Payload:  { clientId, nome_evento, citta', location, note_admin }
+    Response: { eventId }
+    Auth:     ADMIN
+
+  event.list
+    Payload:  { filters: { status, clientId }, page, limit }
+    Response: { items: [...], total }
+    Auth:     ADMIN | CLIENTE (solo propri)
+
+  event.get
+    Payload:  { eventId }
+    Response: { event: {...}, shifts: [...] }
+    Auth:     ADMIN | CLIENTE (solo proprio)
+
+  event.updateStatus
+    Payload:  { eventId, newStatus }
+    Response: { success: true }
+    Auth:     ADMIN
+
+SHIFT
+  shift.create
+    Payload:  { eventId, data, orario_inizio, orario_fine,
+                posti_disponibili, ruolo, dress_code,
+                meeting_point, note_operational }
+    Response: { shiftId }
+    Auth:     ADMIN
+
+  shift.list
+    Payload:  { eventId, filters: { status } }
+    Response: { items: [...] }
+    Auth:     ADMIN | USER (solo OPEN) | CLIENTE (solo propri)
+
+  shift.get
+    Payload:  { shiftId }
+    Response: { shift: {...}, applications: [...], assignments: [...] }
+    Auth:     ADMIN
+
+  shift.updateStatus
+    Payload:  { shiftId, newStatus }
+    Response: { success: true }
+    Auth:     ADMIN
+
+APPLICATION
+  application.submit
+    Payload:  { shiftId, messaggio, disponibilita_confermata }
+    Response: { applicationId }
+    Auth:     USER
+
+  application.approve
+    Payload:  { applicationId }
+    Response: { assignmentId }
+    Auth:     ADMIN
+
+  application.reject
+    Payload:  { applicationId, motivo }
+    Response: { success: true }
+    Auth:     ADMIN
+
+  application.withdraw
+    Payload:  { applicationId }
+    Response: { success: true }
+    Auth:     USER (solo proprie)
+
+  application.list
+    Payload:  { filters: { shiftId, status, talentId }, page, limit }
+    Response: { items: [...], total }
+    Auth:     ADMIN | USER (solo proprie)
+
+ASSIGNMENT
+  assignment.list
+    Payload:  { filters: { shiftId, talentId, status }, page, limit }
+    Response: { items: [...], total }
+    Auth:     ADMIN | USER (solo proprie) | CLIENTE (solo propri eventi)
+
+  assignment.checkin
+    Payload:  { assignmentId, lat, lng, timestamp }
+    Response: { success: true }
+    Auth:     USER (solo propria)
+
+  assignment.checkout
+    Payload:  { assignmentId, lat, lng, timestamp }
+    Response: { success: true, ore_lavorate }
+    Auth:     USER (solo propria)
+
+  assignment.validate
+    Payload:  { assignmentId, note_validazione }
+    Response: { success: true }
+    Auth:     ADMIN | CLIENTE (solo propri)
+
+  assignment.updatePaymentStatus
+    Payload:  { assignmentId, newStatus }
+    Response: { success: true }
+    Auth:     ADMIN
+
+
+ERROR CODES STANDARD
+--------------------------------------------------------------------------------
+  Categoria AUTH (autenticazione/autorizzazione):
+    AUTH_001   Token mancante
+    AUTH_002   Token scaduto
+    AUTH_003   Token non valido
+    AUTH_004   Utente non attivo
+    AUTH_005   Permesso insufficiente per questa action
+    AUTH_006   Accesso cross-tenant negato
+    AUTH_007   Troppi tentativi, riprova piu' tardi
+
+  Categoria VAL (validazione input):
+    VAL_001    Campo obbligatorio mancante
+    VAL_002    Formato campo non valido
+    VAL_003    Valore fuori range
+    VAL_004    Email gia' esistente
+
+  Categoria WF (workflow / stato):
+    WF_001     Transizione di stato non consentita
+    WF_002     Entita' non in stato corretto per questa operazione
+    WF_003     Shift non disponibile (non OPEN)
+    WF_004     Shift gia' pieno
+
+  Categoria BIZ (regole business):
+    BIZ_001    Candidatura gia' esistente per questo shift
+    BIZ_002    Talent non approvato
+    BIZ_003    Profilo non completo
+    BIZ_004    Overlap orario rilevato
+
+  Categoria SYS (sistema):
+    SYS_001    Errore interno generico
+    SYS_002    Entita' non trovata
+    SYS_003    Timeout operazione
+    SYS_004    Quota GAS raggiunta
+
+
+================================================================================
+11. PERMISSION MATRIX                                                  [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+La Permission Matrix definisce formalmente quali action ogni ruolo puo'
+eseguire. E' la fonte di verita' per il controllo accessi nel backend.
+Ogni nuova action deve essere aggiunta qui prima di essere implementata.
+
+Legenda:
+  [Y] = permesso completo
+  [O] = permesso parziale (solo sui propri dati)
+  [N] = non permesso
+
+
+MATRIX COMPLETA
+--------------------------------------------------------------------------------
+
+Action                          SUPER_ADMIN   ADMIN   USER    CLIENTE
+--------------------------------------------------------------------
+AUTH
+auth.login                          Y           Y       Y       Y
+auth.logout                         Y           Y       Y       Y
+auth.getMe                          Y           Y       Y       Y
+auth.changePassword                 Y           Y       Y       Y
+
+TENANT
+tenant.create                       Y           N       N       N
+tenant.list                         Y           N       N       N
+tenant.get                          Y           O       N       N
+tenant.update                       Y           N       N       N
+
+USER MANAGEMENT
+user.create                         Y           Y       N       N
+user.list                           Y           Y       N       N
+user.get                            Y           Y       O       N
+user.update                         Y           Y       O       N
+user.deactivate                     Y           Y       N       N
+
+TALENT / LEAD
+talent.registerStep1                Y           Y       Y       N
+talent.registerStep2                Y           Y       Y       N
+talent.registerStep3                Y           Y       Y       N
+talent.approve                      Y           Y       N       N
+talent.reject                       Y           Y       N       N
+talent.list                         Y           Y       N       N
+talent.get                          Y           Y       O       N
+talent.updateProfile                Y           Y       O       N
+
+CLIENT
+client.create                       Y           Y       N       N
+client.list                         Y           Y       N       N
+client.get                          Y           Y       N       O
+client.update                       Y           Y       N       N
+
+EVENT
+event.create                        Y           Y       N       N
+event.list                          Y           Y       N       O
+event.get                           Y           Y       N       O
+event.updateStatus                  Y           Y       N       N
+event.cancel                        Y           Y       N       N
+
+SHIFT
+shift.create                        Y           Y       N       N
+shift.list                          Y           Y       Y       O
+shift.get                           Y           Y       O       O
+shift.updateStatus                  Y           Y       N       N
+
+APPLICATION
+application.submit                  N           N       Y       N
+application.approve                 Y           Y       N       N
+application.reject                  Y           Y       N       N
+application.withdraw                N           N       O       N
+application.list                    Y           Y       O       N
+
+ASSIGNMENT
+assignment.list                     Y           Y       O       O
+assignment.checkin                  N           N       O       N
+assignment.checkout                 N           N       O       N
+assignment.validate                 Y           Y       N       O
+assignment.updatePaymentStatus      Y           Y       N       N
+
+SYSTEM / LOG
+log.view                            Y           Y       N       N
+config.get                          Y           Y       N       N
+config.update                       Y           N       N       N
+
+
+NOTE SULLA MATRIX
+--------------------------------------------------------------------------------
+1. [O] per USER su talent.get / talent.updateProfile:
+   il talent puo' vedere e modificare solo il proprio profilo
+
+2. [O] per USER su assignment.checkin / assignment.checkout:
+   solo sulle proprie assegnazioni, e solo nelle transizioni corrette
+
+3. [O] per CLIENTE su event.list / shift.list / assignment.list:
+   il cliente vede solo le entita' collegate ai propri eventi
+
+4. [O] per CLIENTE su assignment.validate:
+   solo sugli assignment dei propri eventi
+
+5. application.submit non e' permessa ad ADMIN per design:
+   l'admin crea assignment direttamente, non passa per la candidatura
+
+
+CONTROLLO NEL BACKEND
+--------------------------------------------------------------------------------
+Il controllo deve avvenire in questo ordine ad ogni richiesta:
+  1. Token valido e non scaduto
+  2. Utente attivo
+  3. Ruolo autorizzato per l'action (dalla matrix)
+  4. Scope check (se [O]: verificare che l'entita' appartenga all'utente)
+  5. Tenant check (entita' richiesta appartiene al tenant dell'utente)
+
+Se uno qualsiasi dei check fallisce -> blocco immediato, nessuna logica eseguita.
+
+
+================================================================================
+12. ERROR HANDLING & FAILURE STRATEGY                                  [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Ogni errore deve essere: rilevato, categorizzato, loggato, restituito in
+formato standard al frontend. Il sistema non deve mai andare in stato
+inconsistente a causa di un errore non gestito.
+
+
+STRUTTURA RISPOSTA ERRORE (STANDARD)
+--------------------------------------------------------------------------------
+  {
+    "success": false,
+    "error": {
+      "code":    "CATEGORIA_NNN",
+      "message": "Descrizione leggibile per il frontend",
+      "field":   "nome_campo (solo per errori di validazione, opzionale)",
+      "detail":  "dettaglio tecnico (solo in log interno, mai al client)"
+    }
+  }
+
+Regola critica: il campo "detail" non deve mai essere esposto al client.
+               Serve solo per logging interno.
+
+
+LIVELLI DI ERRORE
+--------------------------------------------------------------------------------
+  CRITICAL   Rottura del sistema. Richiede intervento immediato.
+             Esempi: scrittura su Sheets fallita, quota GAS esaurita,
+                     corruzione dati, accesso cross-tenant non bloccato.
+             Azione: log immediato + alert admin + risposta SYS_001
+
+  ERROR      Operazione fallita, sistema integro.
+             Esempi: transizione non valida, entita' non trovata,
+                     validazione fallita.
+             Azione: log + risposta con codice specifico
+
+  WARNING    Situazione anomala ma non bloccante.
+             Esempi: token vicino alla scadenza, dati parziali,
+                     performance degradata.
+             Azione: log warning + eventuale notifica differita
+
+  INFO       Evento normale di sistema.
+             Esempi: login, creazione entita', transizione di stato.
+             Azione: log standard
+
+
+GESTIONE ERRORI PER MODULO
+--------------------------------------------------------------------------------
+
+AUTH.gs:
+  - Credenziali errate:        AUTH_003 (no distinzione tra utente/password)
+  - Token scaduto:             AUTH_002 + istruzioni re-login
+  - Ruolo insufficiente:       AUTH_005 + log action tentata
+
+WORKFLOWS.gs:
+  - Transizione non valida:    WF_001 + stato attuale nell'errore
+  - Entita' non trovata:       SYS_002
+  - Side effect fallito:       CRITICAL + log + rollback se possibile
+
+SPECIAL_ACTIONS.gs:
+  - Check-in fuori stato:      WF_002
+  - Checkout senza check-in:   WF_002
+  - Candidatura duplicata:     BIZ_001
+
+REGISTRATION_FLOW.gs:
+  - Email gia' esistente:      VAL_004
+  - Step non completato:       VAL_001
+  - Scoring fallito:           WARNING + score default
+
+
+RETRY LOGIC
+--------------------------------------------------------------------------------
+Scenario: scrittura su Google Sheets fallisce (timeout, lock temporaneo).
+
+Strategia:
+  Tentativo 1:  esecuzione normale
+  Tentativo 2:  dopo 500ms (se errore di lock o timeout)
+  Tentativo 3:  dopo 1500ms
+  Fallimento:   dopo 3 tentativi -> CRITICAL log + risposta SYS_003
+
+Operazioni con retry abilitato:
+  - Scrittura entita' (entity create/update)
+  - Aggiornamento stato (transizioni critiche)
+
+Operazioni senza retry (idempotenti non garantite):
+  - Invio email (rischio duplicati)
+  - Creazione utente (rischio duplicati)
+
+
+GESTIONE QUOTE GAS
+--------------------------------------------------------------------------------
+Google Apps Script ha limiti di esecuzione:
+  - Tempo massimo per esecuzione: 6 minuti (script web: 30 secondi)
+  - Operazioni Sheets: limite giornaliero su lettura/scrittura
+  - Email Gmail: 100/giorno (account free), 1500/giorno (Workspace)
+
+Strategia:
+  - Operazioni critiche devono completarsi entro 20 secondi
+  - Batch di scritture dove possibile (una sola apertura foglio)
+  - Caching in memoria GAS per letture ripetute nella stessa esecuzione
+  - Monitor quota: log giornaliero utilizzo stimato
+
+Risposta al superamento:
+  - Quota GAS raggiunta -> SYS_004 + log CRITICAL + notifica admin
+
+
+FALLBACK STRATEGY
+--------------------------------------------------------------------------------
+Se il sistema backend e' irraggiungibile o in errore:
+  - Il frontend mostra un messaggio di errore generico
+  - Nessuna logica viene eseguita lato client
+  - Nessun dato viene modificato localmente
+  - L'utente viene invitato a riprovare
+
+Non sono previsti fallback offline o modalita' degradata nell'MVP.
+In Fase 3: valutare caching frontend per read-only in caso di downtime.
+
+
+LOGGING ERRORI CENTRALIZZATO
+--------------------------------------------------------------------------------
+Tutti gli errori di livello ERROR e CRITICAL devono essere scritti
+nel foglio ErrorLog con la struttura:
+
+  log_id, timestamp, level, module, action, error_code,
+  error_message, user_id, tenant_id, payload_summary
+
+Il foglio ErrorLog deve essere:
+  - Accessibile solo a SUPER_ADMIN e ADMIN
+  - Consultabile dalla dashboard admin
+  - Archiviato mensilmente (vedi sezione 14)
+
+(Vedi sezione 17 per il sistema di logging completo)
+
+
+================================================================================
+13. CONFLICT MANAGEMENT                                                [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+I conflitti nascono quando piu' operazioni concorrenti o condizioni
+ambigue generano stati inconsistenti. Ogni tipo di conflitto deve avere
+una regola chiara: chi vince, cosa si blocca, come si risolve.
+
+
+TIPOLOGIE DI CONFLITTO E RISOLUZIONE
+--------------------------------------------------------------------------------
+
+1. DOPPIA CANDIDATURA (APPLICATION DUPLICATA)
+   Scenario: talent si candida due volte allo stesso shift.
+
+   Regola:
+     Un talent puo' avere UNA SOLA application attiva per shift.
+     "Attiva" = stato PENDING o APPROVED.
+
+   Implementazione:
+     Al momento di application.submit, verificare se esiste
+     gia' una application con:
+       shift_id = quello richiesto
+       talent_profile_id = talent corrente
+       status IN (PENDING, APPROVED)
+     Se trovata -> errore BIZ_001, blocco immediato.
+
+   Eccezione permessa:
+     Il talent puo' candidarsi di nuovo se la precedente application
+     e' in stato REJECTED o WITHDRAWN.
+
+
+2. DOPPIA ASSEGNAZIONE (ASSIGNMENT DUPLICATO)
+   Scenario: due admin approvano due application diverse dello stesso
+   talent sullo stesso shift quasi contemporaneamente.
+
+   Regola:
+     Un talent puo' avere UN SOLO assignment attivo per shift.
+     "Attivo" = stato CONFIRMED, CHECKED_IN, CHECKED_OUT.
+
+   Implementazione:
+     Al momento di assignment.create (trigger di approvazione),
+     verificare se esiste gia' un assignment attivo per quella coppia
+     (shift_id, talent_profile_id). Se trovato -> blocco + errore WF_002.
+     La seconda approvazione fallisce, la application torna PENDING
+     per revisione admin.
+
+   Priorita': chi arriva prima (first write wins).
+
+
+3. OVERLAP ORARIO (TALENT GIA' OCCUPATO)
+   Scenario: talent viene assegnato a due shift con orari sovrapposti.
+
+   Regola:
+     Un talent non puo' avere due assignment CONFERMATI con overlap di orario.
+
+   Implementazione:
+     Al momento di creare l'assignment, verificare se il talent ha gia'
+     assignment attivi in data uguale con orari che si sovrappongono.
+     Sovrapposizione: shift_A.inizio < shift_B.fine AND shift_A.fine > shift_B.inizio
+     Se trovata -> warning admin (non blocco hard in MVP).
+     In Fase 2: blocco hard configurabile per tenant.
+
+   Nota: in MVP il controllo e' manuale. Il sistema segnala, l'admin decide.
+
+
+4. RACE CONDITION: DUE ADMIN APPROVANO CONTEMPORANEAMENTE
+   Scenario: due admin aprono la stessa application e cliccano
+   "approva" quasi nello stesso momento.
+
+   Regola:
+     La seconda approvazione deve essere idempotente o bloccata.
+
+   Implementazione:
+     Prima di creare l'assignment, ri-leggere lo stato attuale
+     dell'application direttamente da Sheets (no cache).
+     Se status != PENDING -> blocco, risposta con stato attuale.
+     Google Sheets non garantisce locking transazionale:
+     mitigare con lock ottimistico (timestamp + check stato).
+
+   Nota GAS: il rischio di race condition e' basso con pochi admin,
+   ma deve essere gestito esplicitamente.
+
+
+5. SHIFT CHE DIVENTA FULL MENTRE CI SONO CANDIDATURE PENDING
+   Scenario: shift raggiunge i posti_disponibili mentre alcune
+   application sono ancora PENDING.
+
+   Regola:
+     Quando i posti sono tutti coperti da assignment CONFIRMED,
+     il sistema imposta lo shift su FULL.
+     Le application PENDING rimaste vengono lasciate nello stato
+     attuale e segnalate come "shift pieno" all'admin.
+     L'admin decide se rifiutarle o aumentare i posti.
+
+   Implementazione:
+     Dopo ogni creazione di assignment, ricalcolare:
+       posti_residui = posti_disponibili - COUNT(assignment CONFIRMED su shift)
+     Se posti_residui <= 0 -> transizione shift OPEN -> FULL.
+
+
+6. CHECK-IN MULTIPLO (STESSO ASSIGNMENT)
+   Scenario: talent clicca check-in due volte (bug frontend, doppio tap).
+
+   Regola:
+     Il check-in e' idempotente se l'assignment e' gia' CHECKED_IN.
+     La seconda chiamata restituisce successo senza modificare dati.
+
+   Implementazione:
+     Se assignment.status == CHECKED_IN al momento di assignment.checkin
+     -> risposta success:true senza scrittura.
+     Se assignment.status != CONFIRMED -> errore WF_002.
+
+
+7. CHECK-OUT SENZA CHECK-IN
+   Scenario: check-out chiamato su assignment ancora in stato CONFIRMED.
+
+   Regola: Non permesso. Errore WF_002.
+   Il talent deve prima fare check-in.
+
+
+PRINCIPIO GENERALE DI RISOLUZIONE
+--------------------------------------------------------------------------------
+  1. First write wins:  il primo ad arrivare ha priorita' (per race conditions)
+  2. Block on conflict: in caso di duplicato, blocco con errore esplicito
+  3. Warn and log:      per i conflitti soft (overlap orario in MVP),
+                        segnala e logga senza bloccare
+  4. Idempotency:       le operazioni idempotenti (check-in doppio) non
+                        devono mai generare errori visibili all'utente
+
+
+================================================================================
+14. DATA GOVERNANCE & DATA LIFECYCLE                                   [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Ogni dato nel sistema ha un ciclo di vita definito: creazione, utilizzo,
+archiviazione, eliminazione. La governance dei dati e' obbligatoria per
+rispettare il GDPR (Reg. UE 2016/679), applicabile a tutti i dati
+personali di talent residenti in Italia / UE.
+
+
+CLASSIFICAZIONE DATI
+--------------------------------------------------------------------------------
+  CLASSE A — Dati personali sensibili (GDPR Art. 9)
+    Documenti identita', dati sanitari (se presenti), foto profilo
+    -> Retention minima, accesso ristretto, consenso esplicito richiesto
+
+  CLASSE B — Dati personali comuni (GDPR Art. 4)
+    Nome, cognome, email, telefono, indirizzo, data di nascita, CV
+    -> Retention definita, accesso role-based, consenso al momento
+       della registrazione
+
+  CLASSE C — Dati operativi
+    Events, shifts, applications, assignments, timesheets
+    -> Retention lunga (necessita' operativa), accesso limitato al tenant
+
+  CLASSE D — Dati di sistema
+    Log, audit trail, token, configurazioni
+    -> Retention tecnica, accesso admin/superadmin
+
+
+GDPR — ADEMPIMENTI MINIMI
+--------------------------------------------------------------------------------
+Obblighi applicabili al sistema:
+
+  1. Consenso esplicito
+     Al momento della registrazione del talent, raccogliere:
+     - Consenso al trattamento dati personali (obbligatorio)
+     - Consenso all'invio comunicazioni (separato, opzionale)
+     Implementazione: checkbox in Step 1 registrazione,
+                      flag salvato su LEAD_TALENT.data.gdpr_consent
+                      con timestamp del consenso
+
+  2. Diritto all'accesso (Art. 15)
+     Il talent puo' richiedere l'export di tutti i propri dati.
+     Implementazione: action talent.exportMyData (Fase 2)
+     Output: JSON o CSV con tutti i dati dell'utente
+
+  3. Diritto alla cancellazione / "oblio" (Art. 17)
+     Il talent puo' richiedere la cancellazione dei propri dati.
+     Implementazione: pseudonimizzazione (non hard delete)
+     -> nome/cognome/email sostituiti con "[RIMOSSO]"
+     -> foto e CV rimossi da Drive
+     -> dati operativi (timesheet, ore) mantenuti anonimi per obblighi
+        contabili
+
+  4. Minimizzazione dati (Art. 5)
+     Raccogliere solo i dati necessari. Non chiedere dati non usati.
+
+  5. Data breach notification (Art. 33)
+     In caso di violazione dei dati: obbligo di notifica al Garante
+     entro 72 ore.
+
+  Nota: questo documento non sostituisce una valutazione legale.
+  Consultare un DPO (Data Protection Officer) prima del lancio pubblico.
+
+
+RETENTION POLICY
+--------------------------------------------------------------------------------
+  Tipo dato                          Retention          Azione alla scadenza
+  --------------------------------   ----------------   ----------------------
+  LEAD_TALENT non approvato          12 mesi            Soft delete + log
+  TALENT_PROFILE inattivo            36 mesi            Notifica + archiviazione
+  TALENT_PROFILE cancellato          Immediata          Pseudonimizzazione
+  EVENT completato                   60 mesi            Archiviazione
+  SHIFT e APPLICATION                36 mesi            Archiviazione
+  ASSIGNMENT e TIMESHEET             60 mesi            Archiviazione (obblighi
+                                                        contabili)
+  Documenti identita' (Drive)        Durata rapporto    Eliminazione su richiesta
+                                     + 12 mesi
+  Log di sistema                     12 mesi            Eliminazione
+  Log di sicurezza (accessi)         24 mesi            Eliminazione
+  Token (invalidati)                 30 giorni          Pulizia automatica
+
+
+SOFT DELETE vs HARD DELETE
+--------------------------------------------------------------------------------
+Regola generale: il sistema usa SOFT DELETE per tutte le entita'.
+
+Soft delete:
+  - Il record rimane nel foglio
+  - status -> DELETED o ARCHIVED
+  - deleted_at: timestamp
+  - deleted_by: userId
+  - Non appare nelle query normali (filtro su status)
+  - Recuperabile da ADMIN entro retention period
+
+Hard delete:
+  - Usato SOLO per:
+    a. Scadenza retention period (pulizia automatica)
+    b. Richiesta GDPR di cancellazione (con pseudonimizzazione)
+    c. Pulizia dati di test in ambiente di sviluppo
+
+Implementazione soft delete su Entities:
+  Aggiungere a entity.data: { deleted: true, deleted_at, deleted_by }
+  Tutte le query devono includere il filtro: deleted != true
+
+
+VERSIONING DATI
+--------------------------------------------------------------------------------
+Il sistema non ha un sistema nativo di versioning su Sheets.
+
+Approccio MVP:
+  - Ogni modifica significativa di un'entita' viene loggata nell'ActivityLog
+    con old_value e new_value (JSON)
+  - Questo permette di ricostruire la storia di un'entita'
+
+Approccio Fase 2:
+  - Entity Versions: tabella separata con snapshot dell'entita' ad ogni
+    modifica critica (approvazioni, cambi stato, aggiornamento profilo)
+
+
+ARCHIVIAZIONE EVENTI VECCHI
+--------------------------------------------------------------------------------
+Processo mensile (da schedulare con cron, vedi sezione 18):
+  1. Identificare eventi con status COMPLETED o CANCELLED
+     e updated_at > soglia retention
+  2. Spostare nel foglio Entities_Archive
+  3. Mantenere nel foglio principale solo un record "placeholder"
+     con entity_id, type, status: ARCHIVED, archive_date
+
+Beneficio: mantiene il foglio Entities principale leggero e performante.
+
+
+================================================================================
+15. DOCUMENT MANAGEMENT SYSTEM                                         [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+I documenti (CV, foto, documenti identita') sono file binari che non vivono
+su Google Sheets. Vivono su Google Drive con una struttura definita.
+Sheets contiene solo i riferimenti (URL o file_id) ai documenti su Drive.
+
+
+STRUTTURA CARTELLE SU GOOGLE DRIVE
+--------------------------------------------------------------------------------
+  /MADE_EVENT_ROOT/
+    /[tenant_id]/
+      /talent/
+        /[talent_profile_id]/
+          /cv/
+            cv_[talent_id]_v1.[ext]
+            cv_[talent_id]_v2.[ext]       (versione aggiornata)
+          /foto/
+            foto_[talent_id]_[timestamp].[ext]
+          /documenti/
+            ci_[talent_id].[ext]          (carta identita')
+            cf_[talent_id].[ext]          (codice fiscale)
+            [tipo]_[talent_id].[ext]      (altri documenti)
+      /eventi/
+        /[event_id]/
+          [documenti evento, brief, contratti]
+      /system/
+        /log/                             (export log periodici)
+        /backup/                          (snapshot Sheets mensili)
+
+Regole di naming:
+  - Tutto lowercase, underscore come separatore
+  - Nessuno spazio nel nome file
+  - Versione esplicita per documenti aggiornabili (cv_v1, cv_v2)
+  - Timestamp per file che possono essere multipli (foto)
+
+
+METADATI DOCUMENTO (SU SHEETS)
+--------------------------------------------------------------------------------
+I riferimenti ai documenti vivono in TALENT_PROFILE.data.documenti:
+
+  {
+    "cv": {
+      "file_id":    "google_drive_file_id",
+      "url":        "https://drive.google.com/...",
+      "filename":   "cv_talent123_v2.pdf",
+      "version":    2,
+      "uploaded_at": "2025-01-15T10:30:00Z",
+      "uploaded_by": "user_id",
+      "status":     "valid"    // valid | expired | pending_review
+    },
+    "foto": {
+      "file_id":    "...",
+      "url":        "...",
+      "uploaded_at": "..."
+    },
+    "carta_identita": {
+      "file_id":    "...",
+      "url":        "...",
+      "scadenza":   "2028-06-30",
+      "status":     "valid"
+    }
+  }
+
+
+VERSIONING DOCUMENTI
+--------------------------------------------------------------------------------
+Scenario: talent aggiorna il CV.
+
+Comportamento:
+  1. Il nuovo file viene caricato con nome incrementato (_v2, _v3)
+  2. Il vecchio file NON viene eliminato immediatamente
+  3. Il riferimento in TALENT_PROFILE.data.documenti.cv viene aggiornato
+     al nuovo file_id e url
+  4. Il vecchio file rimane su Drive per 90 giorni, poi viene eliminato
+     dal processo di cleanup
+
+Motivo: evitare cancellazioni accidentali, permettere rollback rapido.
+
+
+ACCESS CONTROL DOCUMENTI
+--------------------------------------------------------------------------------
+  Chi puo' caricare:
+    ADMIN:  qualsiasi documento di qualsiasi talent nel proprio tenant
+    USER:   solo i propri documenti (proprie cartelle su Drive)
+
+  Chi puo' leggere:
+    ADMIN:  tutti i documenti del proprio tenant
+    USER:   solo i propri documenti
+    CLIENTE: nessun accesso ai documenti talent (privacy)
+
+  Implementazione:
+    Le cartelle Drive vengono create con permessi espliciti.
+    I link nei metadati sono diretti, non pubblici.
+    L'accesso avviene tramite autenticazione GAS, non link pubblici.
+
+
+SCADENZE E VALIDITA' DOCUMENTI
+--------------------------------------------------------------------------------
+Ogni documento con scadenza (es. carta identita') ha il campo:
+  scadenza: "YYYY-MM-DD"
+  status:   "valid" | "expiring_soon" | "expired"
+
+Il job di controllo scadenze (vedi sezione 18) aggiorna lo status
+e genera i reminder appropriati.
+
+Soglie di alert:
+  - 60 giorni prima della scadenza: reminder al talent
+  - 30 giorni prima: reminder al talent + alert admin
+  - Scaduto: status -> "expired", admin allertato, talent bloccato
+    dall'accettare nuove assegnazioni fino al rinnovo
+
+
+================================================================================
+16. PERFORMANCE & SCALABILITY PLAN                                     [NUOVO]
+================================================================================
+
+LIMITI REALI GOOGLE SHEETS
+--------------------------------------------------------------------------------
+  Limite                            Valore             Impatto
+  --------------------------------  -----------------  ------------------------
+  Celle per foglio                  10.000.000         Ok per anni di uso
+  Righe per foglio (pratico)        ~50.000 righe      Entita' foglio principale
+  Tempo esecuzione GAS (web)        30 secondi         Ogni richiesta API
+  Tempo esecuzione GAS (trigger)    6 minuti           Job schedulati
+  Scritture simultanee              Non supportate     Race conditions
+  Letture API Sheets (quota)        300 req/min        Alto traffico
+  Script runs/giorno                Non documentato    Limite pratico ~500-1000
+
+Soglia critica per MADE EVENT MVP:
+  Il sistema e' stabile e performante fino a circa:
+    - 5.000 entita' nel foglio Entities
+    - 500 utenti registrati
+    - 50 eventi attivi contemporaneamente
+    - 20 richieste API al minuto
+
+
+STRATEGIE DI CACHING
+--------------------------------------------------------------------------------
+  Caching in memoria GAS (PropertiesService / CacheService):
+    Candidati al caching (letture frequenti, dati stabili):
+      - Lista tenant attivi
+      - Configurazioni sistema
+      - Permission map (ruoli e azioni)
+      - Dati talent approvati (lista base, non completa)
+
+    Non memorizzabili in cache:
+      - Stati operativi (assignments, check-in)
+      - Candidature (cambiano frequentemente)
+
+    Durata cache consigliata: 5-15 minuti
+
+  Caching frontend:
+    Il frontend puo' mantenere in memoria i dati dell'utente corrente
+    (profilo, assegnazioni attive) per la durata della sessione.
+    Al logout: pulizia completa del cache frontend.
+
+
+BATCHING OPERAZIONI
+--------------------------------------------------------------------------------
+  Regola: ogni esecuzione GAS deve aprire ogni foglio UNA SOLA volta.
+
+  Pattern corretto:
+    1. Leggi tutto il foglio Entities una volta
+    2. Filtra e lavora in memoria
+    3. Scrivi tutte le modifiche in un'unica operazione batch
+
+  Anti-pattern da evitare:
+    Aprire il foglio per ogni entita' in un loop
+    (genera decine di richieste API Sheets per operazione singola)
+
+  Implementazione pratica su GAS:
+    - Usare getValues() e setValues() invece di getRange() per cella
+    - Preparare array di modifiche, poi scrivere tutto insieme
+
+
+GESTIONE CONCURRENCY
+--------------------------------------------------------------------------------
+  Google Sheets non ha locking transazionale nativo.
+
+  Mitigation MVP:
+    - Operazioni critiche (creazione assignment, approvazione)
+      devono ri-leggere lo stato aggiornato prima di scrivere
+    - LockService di GAS per operazioni sensibili:
+      const lock = LockService.getScriptLock();
+      lock.tryLock(10000);  // attendi fino a 10 secondi
+      // ... operazione critica ...
+      lock.releaseLock();
+    - Accettare un basso rischio di race condition per uso interno
+      con pochi admin simultanei
+
+  Fase 3 (se necessario):
+    Migrare le operazioni critiche a un database con transazioni native.
+
+
+SOGLIE DI MIGRAZIONE STACK
+--------------------------------------------------------------------------------
+  Indicatore                    Soglia          Azione consigliata
+  ----------------------------  --------------- --------------------------------
+  Entita' foglio > 10.000       Valutare        Attivare archiviazione mensile
+  Entita' foglio > 30.000       Urgente         Migrazione a database esterno
+  Response time API > 5s        Valutare        Ottimizzazione query + caching
+  Response time API > 10s       Urgente         Migrazione stack backend
+  Errori quota > 10/giorno      Urgente         Ottimizzazione o migrazione
+  Utenti attivi > 500           Pianificare     Valutare infrastruttura
+  Utenti attivi > 2.000         Urgente         Nuovo stack obbligatorio
+
+  Stack alternativo consigliato per scala superiore:
+    Backend:    Node.js / Python su Cloud Run o App Engine
+    Database:   Firestore (NoSQL, document-based) o PostgreSQL su Cloud SQL
+    Auth:       Firebase Auth o Auth0
+    Storage:    Google Cloud Storage
+
+
+OTTIMIZZAZIONI IMMEDIATE (DA IMPLEMENTARE)
+--------------------------------------------------------------------------------
+  1. Lazy loading dashboard:
+     Le dashboard non caricano tutti i dati al login.
+     Caricano solo i dati della vista corrente.
+
+  2. Paginazione su tutte le liste:
+     Ogni entity.list deve supportare page e limit.
+     Default: limit = 50.
+
+  3. Indici simulati:
+     Tenere una colonna separata per i campi piu' interrogati
+     (type, status, tenant_id) cosi' il filtro e' rapido senza
+     leggere il JSON completo.
+
+  4. Risposta compressa:
+     Restituire solo i campi necessari per ogni vista,
+     non l'entity completa in ogni response.
+
+
+================================================================================
+17. AUDIT & LOGGING SYSTEM                                             [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Il sistema mantiene due tipi di log separati:
+  ActivityLog:   cosa e' successo alle entita' (chi ha fatto cosa)
+  AccessLog:     chi ha acceduto al sistema e come
+
+Entrambi sono fondamentali per: debugging, audit interno, accountability,
+sicurezza e conformita' GDPR.
+
+
+STRUTTURA ACTIVITYLOG
+--------------------------------------------------------------------------------
+Foglio: ActivityLog
+
+Campi:
+  log_id        UUID generato al momento della scrittura
+  timestamp     ISO 8601, UTC
+  level         INFO | WARNING | ERROR | CRITICAL
+  module        nome del modulo GAS (AUTH, WORKFLOWS, SPECIAL_ACTIONS, etc.)
+  action        action eseguita (es. "application.approve")
+  entity_type   tipo entita' coinvolta (APPLICATION, ASSIGNMENT, etc.)
+  entity_id     id entita' coinvolta
+  user_id       chi ha eseguito l'azione
+  tenant_id     tenant di appartenenza
+  old_status    stato precedente (per transizioni)
+  new_status    nuovo stato (per transizioni)
+  old_value     JSON con campi modificati (valore precedente)
+  new_value     JSON con campi modificati (nuovo valore)
+  ip_address    se disponibile dal contesto GAS
+  note          campo libero per dettagli aggiuntivi
+
+
+STRUTTURA ACCESSLOG
+--------------------------------------------------------------------------------
+Foglio: AccessLog
+
+Campi:
+  log_id        UUID
+  timestamp     ISO 8601, UTC
+  event_type    LOGIN | LOGOUT | LOGIN_FAILED | TOKEN_INVALID |
+                TOKEN_EXPIRED | ACCESS_DENIED
+  user_id       utente coinvolto (null se login fallito)
+  email         email tentata (per login falliti)
+  tenant_id     tenant (se identificabile)
+  ip_address    se disponibile
+  user_agent    se disponibile
+  detail        motivo del blocco (per eventi negativi)
+
+
+COSA LOGGARE (OBBLIGATORIO)
+--------------------------------------------------------------------------------
+  [CRITICO — sempre loggare]
+    - Login riuscito e fallito
+    - Logout
+    - Token invalido o scaduto
+    - Accesso cross-tenant negato
+    - Approvazione talent
+    - Creazione assignment
+    - Check-in e check-out
+    - Cambio stato entita' (tutte le transizioni)
+    - Creazione, modifica, eliminazione entita'
+    - Cambio password
+    - Attivazione / disattivazione utente
+
+  [RACCOMANDATO]
+    - Tutte le action eseguite con successo
+    - Errori di validazione input
+    - Operazioni di archiviazione / eliminazione dati
+
+  [OPZIONALE]
+    - Letture di dati (entity.get, entity.list)
+    - Accesso dashboard
+
+
+ACCESSO AI LOG
+--------------------------------------------------------------------------------
+  AccessLog:    solo SUPER_ADMIN e ADMIN
+  ActivityLog:  SUPER_ADMIN (tutto), ADMIN (solo proprio tenant)
+
+  Le dashboard devono includere:
+    - Vista ultimi 50 log per sessione corrente (admin)
+    - Filtro per entity_id (storico entita' specifica)
+    - Filtro per user_id (storico azioni utente)
+    - Filtro per level (solo ERROR e CRITICAL)
+
+
+LOG ROTATION E ARCHIVIAZIONE
+--------------------------------------------------------------------------------
+  Frequenza:    mensile
+  Processo:
+    1. Esporta righe con timestamp < (oggi - retention period)
+       su foglio di archivio (ActivityLog_Archive_YYYY_MM)
+    2. Elimina le righe archiviate dal foglio principale
+    3. Logga l'operazione di archiviazione stessa
+
+  Retention:    12 mesi (AccessLog), 24 mesi (ActivityLog)
+
+
+================================================================================
+18. JOB SCHEDULER / CRON SYSTEM                                        [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Google Apps Script supporta trigger temporali (time-based triggers).
+Questi sono il meccanismo nativo per schedulare job ricorrenti.
+Ogni job deve essere: idempotente, loggato, con gestione failure.
+
+
+IMPLEMENTAZIONE TRIGGER GAS
+--------------------------------------------------------------------------------
+I trigger vengono creati in SETUP.gs o tramite console GAS:
+
+  ScriptApp.newTrigger('jobReminderCheck')
+    .timeBased()
+    .everyMinutes(30)
+    .create();
+
+  ScriptApp.newTrigger('jobDailyMaintenance')
+    .timeBased()
+    .everyDays(1)
+    .atHour(3)    // 3:00 AM
+    .create();
+
+Ogni funzione job deve:
+  1. Iniziare con log INFO: "Job [nome] avviato"
+  2. Eseguire la logica
+  3. Terminare con log INFO: "Job [nome] completato in Xms"
+  4. In caso di errore: log CRITICAL + continua (non bloccare altri job)
+
+
+CATALOGO JOB SCHEDULATI
+--------------------------------------------------------------------------------
+
+JOB: reminderEventCheck
+  Frequenza:      ogni 30 minuti
+  Funzione:       verifica eventi nelle prossime 24h e 2h
+  Azioni:
+    - Trova shift con data_inizio tra now() e now()+24h
+      e nessun reminder 24h gia' inviato
+      -> Invia reminder ai talent assegnati
+      -> Imposta flag reminder_24h_sent = true sull'assignment
+    - Trova shift con data_inizio tra now() e now()+2h
+      e nessun reminder 2h gia' inviato
+      -> Invia reminder check-in
+      -> Imposta flag reminder_2h_sent = true
+  Log:            conta reminder inviati, segnala errori invio email
+  Failure:        se email fallisce, log WARNING, riprova al prossimo ciclo
+
+JOB: noShowCheck
+  Frequenza:      ogni 15 minuti
+  Funzione:       verifica assenze dopo inizio turno
+  Azioni:
+    - Trova assignment CONFIRMED con shift.orario_inizio < now() - 30min
+    - Se check-in non effettuato -> status NO_SHOW, alert admin
+  Log:            conta no-show rilevati
+  Failure:        log ERROR, non blocca altri check
+
+JOB: documentExpiryCheck
+  Frequenza:      ogni giorno (ore 9:00)
+  Funzione:       verifica scadenza documenti talent
+  Azioni:
+    - Trova documenti con scadenza tra oggi e oggi+60gg -> reminder talent
+    - Trova documenti con scadenza tra oggi e oggi+30gg -> alert admin
+    - Trova documenti con scadenza < oggi -> status expired, blocco
+  Log:            conta documenti in scadenza e scaduti
+
+JOB: dailyMaintenance
+  Frequenza:      ogni giorno (ore 3:00)
+  Funzione:       manutenzione sistema
+  Azioni:
+    - Pulizia token scaduti (se tabella token attiva)
+    - Archiviazione log vecchi (se retention superata)
+    - Ricalcolo contatori (posti_residui su shift)
+    - Report giornaliero: entita' attive, errori del giorno
+  Log:            dettaglio operazioni eseguite
+
+JOB: monthlyArchive
+  Frequenza:      primo giorno del mese (ore 2:00)
+  Funzione:       archiviazione dati vecchi
+  Azioni:
+    - Archivia eventi completati oltre retention (vedi sezione 14)
+    - Archivia log oltre retention
+    - Pulizia file Drive (documenti versioni obsolete, > 90 giorni)
+  Log:            conta entita' archiviate, spazio recuperato (stimato)
+
+
+GESTIONE FAILURE DEI JOB
+--------------------------------------------------------------------------------
+  Principio: il fallimento di un job NON deve bloccare altri job.
+
+  Ogni job wrappa la propria logica in try/catch:
+    function jobReminderCheck() {
+      try {
+        // logica
+        logInfo('jobReminderCheck', 'completato');
+      } catch(e) {
+        logCritical('jobReminderCheck', 'fallito: ' + e.message);
+        // non rilanciare l'errore: il trigger continuera' il prossimo ciclo
+      }
+    }
+
+  Se un job critico fallisce piu' di 3 volte consecutive:
+    -> Notifica email all'admin
+    -> Log CRITICAL nel sistema
+
+
+================================================================================
+19. INTEGRATION LAYER                                                  [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Le integrazioni esterne non devono mai diventare parte della logica core.
+Sono canali di input/output, non database, non fonte di verita'.
+Il sistema funziona anche senza di esse.
+
+
+GMAIL INTEGRATION
+--------------------------------------------------------------------------------
+Livelli di integrazione (come da architettura):
+
+  Livello 1 — Comunicazione operativa (MVP attivo):
+    Trigger:        evento di sistema (creazione utente, approvazione, etc.)
+    Mittente:       account Gmail configurato per il tenant
+    Destinatari:    talent, admin, clienti (secondo il tipo di evento)
+    Template:
+      - credenziali nuovo utente
+      - conferma approvazione talent
+      - dettagli assignment confermato
+      - reminder evento (futuro)
+
+    Implementazione GAS:
+      GmailApp.sendEmail(destinatario, oggetto, corpo, { htmlBody: ... })
+
+    Limiti:
+      Account free:      100 email/giorno
+      Google Workspace:  1.500 email/giorno
+      -> Monitorare nel dailyMaintenance job
+
+  Livello 2 — Parsing email in entrata (Fase 2):
+    Scenario: email del cliente -> crea staff request automatica
+    Implementazione:
+      Trigger Gmail su label specifica
+      -> Parsing oggetto/corpo con pattern matching
+      -> Creazione entita' STAFF_REQUEST o EVENT DRAFT
+      -> Notifica admin per revisione
+
+  Livello 3 — Workflow completamente automatizzati (Fase 3):
+    AI parsing email, creazione automatica task, gestione back-and-forth
+
+
+MAKE.COM INTEGRATION
+--------------------------------------------------------------------------------
+Make (ex Integromat) puo' orchestrare flussi tra il sistema GAS e
+servizi esterni tramite webhook.
+
+Schema webhook in entrata (GAS riceve da Make):
+  Il sistema espone una action dedicata per webhook esterni:
+    {
+      "action": "webhook.inbound",
+      "source": "make",
+      "event":  "nome_evento_make",
+      "payload": { ...dati da Make... },
+      "secret":  "chiave_condivisa_sicura"
+    }
+  Validazione: il campo secret deve corrispondere a quello configurato.
+  Se non corrisponde: blocco + log CRITICAL.
+
+Schema webhook in uscita (GAS invia a Make):
+  Quando un evento di sistema si verifica, GAS puo' chiamare un URL Make:
+    UrlFetchApp.fetch(MAKE_WEBHOOK_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ event, data, timestamp })
+    })
+
+Casi d'uso consigliati con Make:
+  - Invio WhatsApp (tramite connector Twilio o 360dialog)
+  - Sincronizzazione con Google Calendar per eventi
+  - Notifiche Slack per admin
+  - Invio SMS reminder
+
+Gestione retry per webhook:
+  - UrlFetchApp non ha retry nativo
+  - Implementare retry manuale (3 tentativi) per webhook critici
+  - Loggare ogni invio e relativo esito
+
+
+MAPPING DATI PER INTEGRAZIONI ESTERNE
+--------------------------------------------------------------------------------
+Quando i dati escono dal sistema verso integrazioni esterne,
+applicare questi principi:
+
+  1. Pseudonimizzazione: non inviare dati personali completi
+     a sistemi terzi non necessari
+  2. Mapping esplicito: documentare quali campi vengono inviati
+  3. Versionamento: se il formato cambia, gestire la compatibilita'
+  4. Validazione: verificare che la risposta del servizio esterno
+     sia nel formato atteso prima di usarla
+
+Esempio mapping per invio a Make:
+  Interno: { talent_profile_id, shift_id, data_inizio, orario_inizio }
+  Verso Make: { talentId, shiftDate, shiftTime, meetingPoint }
+  (no dati personali non necessari al caso d'uso)
+
+
+================================================================================
+20. CONFIGURATION SYSTEM                                               [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Le configurazioni permettono di adattare il comportamento del sistema
+senza modificare il codice. Esistono a tre livelli: sistema, tenant, feature.
+
+
+STRUTTURA CONFIGURAZIONI
+--------------------------------------------------------------------------------
+Foglio: SystemConfig
+
+Campi:
+  config_id     UUID
+  scope         SYSTEM | TENANT | FEATURE
+  tenant_id     null se SYSTEM, altrimenti id specifico
+  key           stringa identificativa (es. "reminder.enabled")
+  value         stringa o JSON
+  type          string | boolean | number | json
+  description   descrizione leggibile
+  updated_at    timestamp
+  updated_by    userId
+
+
+CONFIGURAZIONI DI SISTEMA (scope: SYSTEM)
+--------------------------------------------------------------------------------
+  Chiave                          Default    Descrizione
+  -----------------------------   ---------  ---------------------------------
+  system.version                  "1.0.0"    Versione attuale sistema
+  auth.token_expiry_hours         8          Durata token in ore
+  auth.max_login_attempts         5          Tentativi login prima del blocco
+  rate_limit.requests_per_minute  60         Max richieste per utente/minuto
+  reminder.enabled                false      Attivazione sistema reminder
+  gdpr.retention_months_talent    36         Retention dati talent inattivi
+  gdpr.retention_months_events    60         Retention dati eventi
+  email.daily_limit_warning       80         % limite email per alert
+
+
+CONFIGURAZIONI PER TENANT (scope: TENANT)
+--------------------------------------------------------------------------------
+  Chiave                          Default    Descrizione
+  -----------------------------   ---------  ---------------------------------
+  tenant.name                     ""         Nome visualizzato
+  tenant.email_from               ""         Mittente email operazioni
+  tenant.timezone                 "Europe/Rome"  Fuso orario
+  tenant.overlap_check            "warn"     Gestione overlap: warn | block
+  tenant.shift_full_auto          true       Auto-chiudi shift quando pieno
+  talent.min_score_apply          0          Score minimo per candidarsi
+  talent.require_cv               true       CV obbligatorio per candidarsi
+  checkin.geolocation_required    false      Geolocalizzazione check-in
+  checkin.radius_meters           500        Raggio tollerato check-in
+  reminder.hours_before_event     24         Ore prima del reminder evento
+  reminder.hours_before_shift     2          Ore prima del reminder shift
+
+
+FEATURE FLAGS (scope: FEATURE)
+--------------------------------------------------------------------------------
+I feature flags permettono di attivare/disattivare funzionalita' in modo
+controllato, per tenant o globalmente.
+
+  Flag                            Default    Descrizione
+  ------------------------------  ---------  ---------------------------------
+  feature.geolocation             false      Geolocalizzazione check-in
+  feature.messaging               false      Sistema messaggistica interno
+  feature.client_portal           false      Accesso portale clienti
+  feature.ai_matching             false      Suggerimento talent automatico
+  feature.advanced_analytics      false      Dashboard analytics avanzate
+  feature.job_announcements       true       Annunci lavoro pubblici
+  feature.gdpr_export             false      Export dati per GDPR (Fase 2)
+
+
+OVERRIDE PER CLIENTE
+--------------------------------------------------------------------------------
+Un ADMIN puo' fare override di specifiche configurazioni per il proprio tenant.
+Un SUPER_ADMIN puo' fare override a livello di sistema.
+
+Logica di risoluzione (priority chain):
+  1. Configurazione specifica per tenant (se esiste)
+  2. Configurazione di sistema (default)
+
+Implementazione:
+  getConfig(key, tenantId):
+    1. Cerca in SystemConfig dove key=key AND tenant_id=tenantId
+    2. Se non trovata, cerca dove key=key AND scope=SYSTEM
+    3. Se non trovata, usa default hardcoded nel codice
+
+
+================================================================================
+21. TESTING STRATEGY                                                   [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+In assenza di un framework di test automatizzati per GAS, la strategia
+di testing e' basata su: test manuali strutturati, checklist di regressione,
+e test espliciti dei flussi core prima di ogni release.
+
+
+TEST MANUALI — FLUSSI CORE
+--------------------------------------------------------------------------------
+Questi test devono essere eseguiti prima di ogni deploy in produzione.
+
+TEST 1: Registrazione Talent (flusso completo)
+  Precondizioni: nessun utente con email test@test.com
+  Steps:
+    1. Esegui talent.registerStep1 con dati validi
+    2. Verifica LEAD_TALENT creato con status PARTIAL
+    3. Esegui talent.registerStep2 con dati validi
+    4. Esegui talent.registerStep3 con foto e cv_url
+    5. Verifica score calcolato e ranking assegnato
+    6. Verifica status COMPLETED_PENDING_APPROVAL
+    7. Esegui talent.approve come admin
+    8. Verifica USER creato con ruolo USER
+    9. Verifica TALENT_PROFILE creato e collegato
+    10. Esegui auth.login con le credenziali create
+  Risultato atteso: flow completo senza errori
+
+TEST 2: Creazione Evento e Shift
+  Precondizioni: CLIENT_COMPANY esistente
+  Steps:
+    1. Esegui event.create
+    2. Verifica EVENT creato con status DRAFT
+    3. Esegui shift.create collegato all'evento
+    4. Verifica SHIFT creato con status OPEN
+  Risultato atteso: evento e shift visibili in dashboard
+
+TEST 3: Candidatura e Assegnazione
+  Precondizioni: TALENT approvato, SHIFT OPEN
+  Steps:
+    1. Login come talent
+    2. Esegui application.submit
+    3. Verifica APPLICATION con status PENDING
+    4. Login come admin
+    5. Esegui application.approve
+    6. Verifica APPLICATION status APPROVED
+    7. Verifica ASSIGNMENT creato con status CONFIRMED
+  Risultato atteso: assignment creato automaticamente
+
+TEST 4: Check-in / Check-out
+  Precondizioni: ASSIGNMENT CONFIRMED
+  Steps:
+    1. Login come talent
+    2. Esegui assignment.checkin
+    3. Verifica status CHECKED_IN e timestamp salvato
+    4. Esegui assignment.checkout
+    5. Verifica status CHECKED_OUT
+    6. Verifica ore_lavorate calcolate correttamente
+    7. Verifica timesheet salvato
+  Risultato atteso: timesheet corretto e stato aggiornato
+
+TEST 5: Validazione e Chiusura
+  Precondizioni: ASSIGNMENT CHECKED_OUT
+  Steps:
+    1. Login come admin
+    2. Esegui assignment.validate
+    3. Verifica status VALIDATED
+  Risultato atteso: assignment validato
+
+
+TEST EDGE CASE — CHECKLIST
+--------------------------------------------------------------------------------
+  [ ] Login con credenziali errate -> errore AUTH_003
+  [ ] Token scaduto -> errore AUTH_002
+  [ ] Talent non approvato si candida -> errore BIZ_002
+  [ ] Candidatura su shift CLOSED -> errore WF_003
+  [ ] Doppia candidatura stesso talent/shift -> errore BIZ_001
+  [ ] Check-in su assignment non CONFIRMED -> errore WF_002
+  [ ] Check-out su assignment non CHECKED_IN -> errore WF_002
+  [ ] Accesso entita' altro tenant -> errore AUTH_006
+  [ ] Transizione di stato non valida -> errore WF_001
+  [ ] Campo obbligatorio mancante nel payload -> errore VAL_001
+  [ ] Admin approva candidatura su shift FULL -> comportamento atteso?
+  [ ] Admin crea evento senza client_id valido -> errore VAL_002
+
+
+TEST FLUSSI AUTOMAZIONI
+--------------------------------------------------------------------------------
+  [ ] Approvazione application -> verifica creazione automatica assignment
+  [ ] Approvazione lead -> verifica creazione USER + TALENT_PROFILE
+  [ ] Shift pieno -> verifica transizione automatica OPEN -> FULL
+  [ ] Check-in -> verifica log corretto in ActivityLog
+  [ ] Check-out -> verifica calcolo ore corretto per casi limite:
+        - turno notturno (es. 23:00 -> 02:00, giorno successivo)
+        - check-out prima del check-in (non permesso)
+        - turno di 0 minuti (check-in e check-out stesso timestamp)
+
+
+TEST PERFORMANCE (BASELINE)
+--------------------------------------------------------------------------------
+  [ ] entity.list con 100 entita': tempo risposta < 3 secondi
+  [ ] entity.list con 1.000 entita': tempo risposta < 8 secondi
+  [ ] Creazione entita': tempo risposta < 2 secondi
+  [ ] Login: tempo risposta < 1 secondo
+  [ ] Check-in: tempo risposta < 2 secondi
+
+Se i tempi superano le soglie: loggare e pianificare ottimizzazione.
+
+
+AMBIENTE DI TEST
+--------------------------------------------------------------------------------
+  Sviluppo:   script GAS separato, foglio Sheets separato (non produzione)
+              Nominazione: "[DEV] Entities", "[DEV] Users", etc.
+  Staging:    copia del sistema produzione con dati anonimizzati
+              Usato per test prima di deploy
+  Produzione: mai usare per test
+
+  Regola: non eseguire mai test distruttivi o di carico in produzione.
+
+
+================================================================================
+22. DEPLOYMENT & VERSIONING                                            [NUOVO]
+================================================================================
+
+PRINCIPIO BASE
+--------------------------------------------------------------------------------
+Il sistema GAS non ha un processo di deploy tradizionale (CI/CD).
+Il "deploy" consiste nel pubblicare una nuova versione dello script GAS.
+E' necessario definire un processo strutturato per gestire versioni,
+rollback e la differenza tra ambiente di test e produzione.
+
+
+VERSIONING SISTEMA
+--------------------------------------------------------------------------------
+Formato versione:  MAJOR.MINOR.PATCH
+  MAJOR:  cambiamenti architetturali o breaking changes
+  MINOR:  nuove funzionalita'
+  PATCH:  bugfix, piccole correzioni
+
+Dove vivono le versioni:
+  - Commento in testa a CODE.gs: // VERSION: 1.2.3
+  - Configurazione sistema: config key "system.version"
+  - Log di deploy: foglio DeployLog
+
+  DeployLog — struttura:
+    deploy_id, version, deploy_date, deployed_by,
+    description, rollback_version, status
+
+
+VERSIONI GAS — COME FUNZIONANO
+--------------------------------------------------------------------------------
+Google Apps Script permette di salvare versioni numerate dello script.
+
+Processo:
+  1. Prima di ogni modifica: crea una versione numerata (snapshot)
+     Editor GAS -> Progetto -> Gestisci versioni -> Salva nuova versione
+  2. Annota il numero di versione nel DeployLog
+  3. Esegui le modifiche
+  4. Testa in ambiente DEV
+  5. Se ok: pubblica come Web App con la nuova versione
+  6. Aggiorna "system.version" nella configurazione
+
+
+PROCESSO DI RELEASE
+--------------------------------------------------------------------------------
+  STEP 1: Sviluppo
+    - Lavora su script DEV separato
+    - Usa foglio Sheets DEV (non produzione)
+    - Testa con checklist sezione 21
+
+  STEP 2: Staging
+    - Copia lo script DEV in ambiente staging
+    - Esegui test completi con dati reali (anonimizzati)
+    - Verifica tutti i flussi core
+
+  STEP 3: Deploy produzione
+    1. Notifica admin: "Aggiornamento sistema in corso"
+    2. Crea versione GAS (snapshot) PRIMA di modificare
+    3. Applica le modifiche
+    4. Pubblica Web App con nuova versione
+    5. Aggiorna system.version nella config
+    6. Scrivi nel DeployLog
+    7. Esegui smoke test (test rapido dei flussi principali)
+    8. Notifica admin: "Aggiornamento completato"
+
+  STEP 4: Monitoraggio post-deploy
+    - Monitora ErrorLog nelle prime 2 ore
+    - Se errori anomali: rollback immediato
+
+
+ROLLBACK
+--------------------------------------------------------------------------------
+  Scenario: deploy causa problemi in produzione.
+
+  Procedura:
+    1. Identifica il numero di versione GAS precedente (dal DeployLog)
+    2. Editor GAS -> Pubblica -> Distribuisci come app Web
+       -> Seleziona versione precedente
+    3. Il sistema torna alla versione funzionante in 2-3 minuti
+    4. Aggiorna system.version nel config
+    5. Scrivi nel DeployLog: rollback a versione X, motivo
+
+  Nota: il rollback del codice NON fa rollback dei dati su Sheets.
+  Se il deploy ha modificato dati (es. migrazione schema):
+    -> Necessario rollback manuale dei dati prima del rollback codice
+    -> Questo e' il motivo per cui le migrazioni devono essere progettate
+       in modo backward-compatible quando possibile
+
+
+AMBIENTI
+--------------------------------------------------------------------------------
+  DEV:         Script ID separato, Sheets separato
+               URL: non pubblicato (accesso solo tramite editor)
+               Dati: fittizi
+
+  STAGING:     Script ID separato, Sheets separato (copia prod anonimizzata)
+               URL: condiviso solo con team tecnico
+               Dati: anonimizzati da produzione
+
+  PRODUZIONE:  Script ID principale, Sheets principale
+               URL: distribuito a tutti gli utenti
+               Dati: reali
+
+  Regola: non usare mai lo stesso Script ID o Sheets per ambienti diversi.
+
+
+GESTIONE DIPENDENZE E LIBRERIE
+--------------------------------------------------------------------------------
+  GAS non ha un package manager (no npm).
+  Le dipendenze sono:
+    - Fogli Google Sheets (per nome e ID)
+    - Servizi Google (Gmail, Drive, Calendar)
+    - Eventuali librerie GAS esterne (tramite Library ID)
+
+  Best practice:
+    - Documentare ogni dipendenza esterna in CONFIG o in testa al file
+    - Non usare librerie GAS esterne per logica critica
+      (rischio: la libreria non viene aggiornata, e' rimossa, cambia API)
+    - Preferire codice interno per tutto il core business
+
+
+================================================================================
+APPENDICE — TABELLA RIEPILOGATIVA STATI
+================================================================================
+
+LEAD_TALENT
+  PARTIAL -> COMPLETED_PENDING_APPROVAL -> APPROVED -> (diventa TALENT_PROFILE)
+                                        -> REJECTED
+
+TALENT_PROFILE
+  PENDING_REVIEW -> APPROVED -> ACTIVE
+                 -> REJECTED
+  ACTIVE -> INACTIVE -> ACTIVE (riattivabile)
+
+EVENT
+  DRAFT -> PLANNING -> LIVE -> COMPLETED
+        -> CANCELLED (da qualsiasi stato)
+
+SHIFT
+  OPEN -> FULL (automatico quando posti esauriti)
+       -> CLOSED (manuale)
+       -> CANCELLED
+
+APPLICATION
+  PENDING -> APPROVED -> (genera ASSIGNMENT)
+          -> REJECTED
+          -> WITHDRAWN (dal talent)
+
+ASSIGNMENT
+  CONFIRMED -> CHECKED_IN -> CHECKED_OUT -> VALIDATED -> PAID
+            -> NO_SHOW (da CONFIRMED se assenza rilevata)
+            -> CANCELLED (da CONFIRMED, manuale)
+
+================================================================================
+APPENDICE — GLOSSARIO TECNICO
+================================================================================
+
+  GAS           Google Apps Script
+  Tenant        Istanza logica del sistema (cliente/agenzia)
+  Entity        Unita' di dato nel sistema (modello unificato)
+  Workflow      Sequenza di stati e transizioni di un'entita'
+  Hook          Azione automatica attivata da un evento/transizione
+  Shift         Turno di lavoro da coprire
+  Assignment    Assegnazione ufficiale di un talent a uno shift
+  Timesheet     Registro ore lavorate calcolato da check-in/out
+  Score         Punteggio qualitativo del profilo talent
+  Ranking       Classificazione talent (A/B/C/D) basata su score
+  Lead          Candidato talent non ancora approvato
+  Soft delete   Eliminazione logica (record conservato, nascosto)
+  Hard delete   Eliminazione fisica (record rimosso)
+  Rate limit    Limite al numero di richieste per unita' di tempo
+  Idempotente   Operazione che produce lo stesso risultato se eseguita
+                piu' volte
+  Race condition Situazione in cui due operazioni concorrenti producono
+                 un risultato inatteso
+  Feature flag  Interruttore software per attivare/disattivare una feature
+
+================================================================================
+Fine documento — MADE EVENT Platform v2.0
+================================================================================
