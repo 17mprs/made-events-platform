@@ -25,6 +25,7 @@ function handleDashboardBootstrap(payload, auth) {
   var leads        = [];
   var events       = [];
   var applications = [];
+  var clients      = [];
   var pendingTalent = 0;
 
   var activeEventStatuses = [
@@ -66,6 +67,10 @@ function handleDashboardBootstrap(payload, auth) {
         applications.push(entityToPublic(e));
         break;
 
+      case 'CLIENT':
+        clients.push(entityToPublic(e));
+        break;
+
       case 'TALENT_PROFILE':
         if (e.status === ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW) {
           pendingTalent++;
@@ -88,6 +93,7 @@ function handleDashboardBootstrap(payload, auth) {
     leads:        leads,
     events:       events,
     applications: applications,
+    clients:      clients,
     stats: {
       totalLeads:   leads.length,
       pendingTalent: pendingTalent,

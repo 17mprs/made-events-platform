@@ -50,6 +50,7 @@ async function _fetch() {
       const leads        = _dedupeById(d.leads)
       const events       = _dedupeById(d.events)
       const applications = _dedupeById(d.applications)
+      const clients      = _dedupeById(d.clients || [])
       // Ricalcola pendingTalent dal raw array — il backend usa TALENT_PROFILE
       // ma i lead con COMPLETED_PENDING_APPROVAL sono la fonte corretta
       const pendingTalent = leads.filter(l => l.status === 'COMPLETED_PENDING_APPROVAL').length
@@ -57,6 +58,7 @@ async function _fetch() {
         leads,
         events,
         applications,
+        clients,
         stats: { ...(d.stats ?? {}), pendingTalent },
       }
       _lastUpdate = Date.now()

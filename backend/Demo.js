@@ -523,7 +523,44 @@ function setupDemoData() {
       ' — campi: ' + Object.keys(adata).length + ' — ' + aentity.entity_id);
   }
 
-  // 6. CLIENTI DEMO
+  // 6. ACCOUNT UTENTE per i profili APPROVED (Luca Marino, Valentina Conti)
+  Logger.log('\n--- Creazione account utente demo (USER) ---');
+  var demoUserCredentials = [
+    { email: 'luca.marino@demo.it',     password: 'Demo2024!', nome: 'Luca Marino' },
+    { email: 'valentina.conti@demo.it', password: 'Demo2024!', nome: 'Valentina Conti' }
+  ];
+  var existingUsers = getAllRows('Users');
+  for (var du = 0; du < demoUserCredentials.length; du++) {
+    var cred = demoUserCredentials[du];
+    // Evita duplicati: salta se esiste già un utente con questa email
+    var alreadyExists = false;
+    for (var eu = 0; eu < existingUsers.length; eu++) {
+      if (String(existingUsers[eu].email).toLowerCase().trim() === cred.email) {
+        alreadyExists = true;
+        break;
+      }
+    }
+    if (alreadyExists) {
+      Logger.log('[SKIP] Utente già esistente: ' + cred.email);
+      continue;
+    }
+    appendRow_('Users', {
+      user_id:       Utilities.getUuid(),
+      tenant_id:     tenantId,
+      email:         cred.email,
+      password_hash: hashPassword(cred.password),
+      role:          'USER',
+      status:        'active',
+      pwd_version:   0,
+      created_at:    now,
+      last_login:    '',
+      updated_at:    now,
+      deleted:       false, deleted_at: '', deleted_by: ''
+    });
+    Logger.log('[OK] Account USER: ' + cred.email + ' / ' + cred.password);
+  }
+
+  // 7. CLIENTI DEMO
   Logger.log('\n--- Creazione clienti demo ---');
   var clientEntities = [];
   for (var ci = 0; ci < DEMO_CLIENTI.length; ci++) {
@@ -740,6 +777,7 @@ function setupDemoData() {
   Logger.log('  Parziale:     1 (Alessandro Gatti, sezione 3/8)');
   Logger.log('  In attesa:    3 (Sofia 92, Marco 78, Giulia 65)');
   Logger.log('  Approvati:    2 (Luca 58, Valentina 45)');
+  Logger.log('  Account USER: luca.marino@demo.it / valentina.conti@demo.it (pw: Demo2024!)');
   Logger.log('  Clienti:      2 (Luxuria Events, Bella Italia Catering)');
   Logger.log('  Eventi:       5 (Fiera LIVE, Concerto/Gala/Congresso/Luxury PLANNING)');
   Logger.log('  Candidature:  2 PENDING (Luca→Fiera, Valentina→Gala)');

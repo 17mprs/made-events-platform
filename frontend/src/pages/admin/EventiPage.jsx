@@ -1,7 +1,7 @@
 // === EVENTI PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { clientApi, applicationApi, getErrorMessage } from '../../api/client'
+import { clientApi, eventApi, applicationApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { clientApi, getErrorMessage } from '../../api/client'
+import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
@@ -85,11 +86,11 @@ export default function ClientiPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = handleApiResponse(await clientApi.list())
+    const storeData = await adminStore.refresh()
     setLoading(false)
-    if (!res.success) { setError(getErrorMessage(res.error)); return }
-    setClients(res.data?.items ?? [])
-  }, [handleApiResponse])
+    if (!storeData) { setError('Errore nel caricamento dati.'); return }
+    setClients(storeData.clients ?? [])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
