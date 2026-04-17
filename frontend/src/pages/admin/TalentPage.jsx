@@ -1,7 +1,7 @@
 // === TALENT PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { talentApi, getErrorMessage } from '../../api/client'
+import { talentApi, emailApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
 import { COLORS } from '../../styles/theme'
@@ -10,6 +10,19 @@ import {
   TalentAvatar, LeadBadge, ScoreBar,
   FILTER_INPUT, PAGE_SIZE, Pagination,
 } from './shared'
+
+// ---------------------------------------------------------------------------
+// HELPERS
+// ---------------------------------------------------------------------------
+
+function isDriveUrl(url) {
+  return typeof url === 'string' && (url.includes('drive.google.com') || url.includes('docs.google.com'))
+}
+
+/** Cerca la foto profilo in più campi in ordine di priorità. */
+function getFotoUrl(data) {
+  return data?.foto_busto_url || data?.documenti?.foto?.url || data?.foto_url || null
+}
 
 // ---------------------------------------------------------------------------
 // PHOTO EXPIRY HELPER
@@ -48,6 +61,13 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
   const [emailBody,         setEmailBody]          = useState(
     `Ciao ${d.nome || ''},\n\nIl team MADE EVENTS ha esaminato il tuo profilo.\n\nPer ulteriori informazioni non esitare a contattarci.\n\nIl team MADE EVENTS`
   )
+  const [emailSending,      setEmailSending]       = useState(false)
+  const [emailResult,       setEmailResult]        = useState(null) // null | 'sent' | 'error'
+  const [socialText,        setSocialText]         = useState(
+    `Ciao ${d.nome || ''}, seguici su Instagram @madeevents e Facebook Made Events per restare aggiornata sulle opportunità di lavoro!`
+  )
+  const [socialSending,     setSocialSending]      = useState(false)
+  const [socialResult,      setSocialResult]       = useState(null)
   const [copied,            setCopied]             = useState(false)
   const [openSections,      setOpenSections]       = useState({ dati: true, fisico: false, disp: false, lingue: false, exp: false, dot: false })
 
@@ -58,8 +78,6 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
     { key: 'foto_intera', label: 'Figura intera',  url: d.foto_intera_url },
     { key: 'foto_extra',  label: 'Aggiuntiva',     url: d.foto_extra_url  },
   ].filter(p => p.url)
-
-  const socialText = `Ciao ${d.nome || ''}, seguici su Instagram @madeevents e Facebook Made Events per restare aggiornata sulle opportunità!`
 
   const accSection = (k, label, children) => (
     <div key={k} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
@@ -93,10 +111,36 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
     </div>
   )
 
+  const handleSendEmail = async () => {
+    setEmailSending(true)
+    setEmailResult(null)
+    const res = await emailApi.sendCustom(d.email, d.nome || '', emailBody, 'custom')
+    setEmailSending(false)
+    if (res.success) {
+      setEmailResult('sent')
+      setTimeout(() => { setEmailResult(null); setShowEmailModal(false) }, 2000)
+    } else {
+      setEmailResult('error')
+    }
+  }
+
+  const handleSendSocial = async () => {
+    setSocialSending(true)
+    setSocialResult(null)
+    const res = await emailApi.sendCustom(d.email, d.nome || '', socialText, 'social')
+    setSocialSending(false)
+    if (res.success) {
+      setSocialResult('sent')
+      setTimeout(() => { setSocialResult(null); setShowSocialModal(false) }, 2000)
+    } else {
+      setSocialResult('error')
+    }
+  }
+
   return (
     <>
-      {/* Lightbox */}
-      {lightboxUrl && (
+      {/* Lightbox — only for non-Drive URLs */}
+      {lightboxUrl && !isDriveUrl(lightboxUrl) && (
         <div
           onClick={() => setLightboxUrl(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -109,7 +153,7 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
       {/* Email Modal */}
       {showEmailModal && (
         <>
-          <div onClick={() => setShowEmailModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 650 }} />
+          <div onClick={() => { if (!emailSending) setShowEmailModal(false) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 650 }} />
           <div style={{
             position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
             background: '#fff', borderRadius: 8, padding: 28, width: 480, maxWidth: '90vw', zIndex: 651,
@@ -120,18 +164,36 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
             <textarea
               value={emailBody}
               onChange={e => setEmailBody(e.target.value)}
+              disabled={emailSending}
               rows={7}
-              style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '8px 12px', fontSize: 13, fontFamily: 'Montserrat, sans-serif', resize: 'vertical', boxSizing: 'border-box', color: COLORS.text }}
+              style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '8px 12px', fontSize: 13, fontFamily: 'Montserrat, sans-serif', resize: 'vertical', boxSizing: 'border-box', color: COLORS.text, opacity: emailSending ? 0.7 : 1 }}
             />
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowEmailModal(false)} style={{ padding: '8px 16px', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', color: COLORS.text }}>
+            {emailResult === 'sent' && (
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#E8F5E9', borderRadius: 6, fontSize: 12, color: '#2E7D32', fontWeight: 600 }}>
+                ✓ Email inviata con successo
+              </div>
+            )}
+            {emailResult === 'error' && (
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#FFEBEE', borderRadius: 6, fontSize: 12, color: '#C62828' }}>
+                Errore nell'invio. Usa il client email come alternativa.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => window.open(`mailto:${d.email}?subject=MADE EVENTS&body=${encodeURIComponent(emailBody)}`)}
+                style={{ padding: '7px 12px', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontFamily: 'Montserrat, sans-serif', color: COLORS.textSecondary }}
+              >
+                Apri client email
+              </button>
+              <button onClick={() => { if (!emailSending) setShowEmailModal(false) }} style={{ padding: '7px 14px', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', color: COLORS.text }}>
                 Annulla
               </button>
               <button
-                onClick={() => { window.open(`mailto:${d.email}?subject=MADE EVENTS&body=${encodeURIComponent(emailBody)}`); setShowEmailModal(false) }}
-                style={{ padding: '8px 16px', background: COLORS.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'Montserrat, sans-serif' }}
+                onClick={handleSendEmail}
+                disabled={emailSending || !emailBody.trim()}
+                style={{ padding: '8px 20px', background: emailSending ? '#ccc' : COLORS.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: emailSending ? 'wait' : 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'Montserrat, sans-serif' }}
               >
-                Apri client email →
+                {emailSending ? 'Invio…' : 'Invia →'}
               </button>
             </div>
           </div>
@@ -141,32 +203,54 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
       {/* Social Modal */}
       {showSocialModal && (
         <>
-          <div onClick={() => setShowSocialModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 650 }} />
+          <div onClick={() => { if (!socialSending) setShowSocialModal(false) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 650 }} />
           <div style={{
             position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-            background: '#fff', borderRadius: 8, padding: 28, width: 420, maxWidth: '90vw', zIndex: 651,
+            background: '#fff', borderRadius: 8, padding: 28, width: 440, maxWidth: '90vw', zIndex: 651,
             fontFamily: 'Montserrat, sans-serif', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
           }}>
             <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: COLORS.text }}>Invita sui social</h3>
-            <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '12px 16px', fontSize: 13, color: COLORS.text, lineHeight: 1.7, marginBottom: 16 }}>
-              {socialText}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: COLORS.textSecondary, marginBottom: 8 }}>A: <strong>{d.email}</strong></div>
+            <textarea
+              value={socialText}
+              onChange={e => setSocialText(e.target.value)}
+              disabled={socialSending}
+              rows={4}
+              style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '10px 12px', fontSize: 13, fontFamily: 'Montserrat, sans-serif', resize: 'vertical', boxSizing: 'border-box', color: COLORS.text, lineHeight: 1.6, marginBottom: 12 }}
+            />
+            {socialResult === 'sent' && (
+              <div style={{ marginBottom: 10, padding: '8px 12px', background: '#E8F5E9', borderRadius: 6, fontSize: 12, color: '#2E7D32', fontWeight: 600 }}>
+                ✓ Messaggio inviato via email
+              </div>
+            )}
+            {socialResult === 'error' && (
+              <div style={{ marginBottom: 10, padding: '8px 12px', background: '#FFEBEE', borderRadius: 6, fontSize: 12, color: '#C62828' }}>
+                Errore nell'invio email.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => { navigator.clipboard?.writeText(socialText); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
                 style={{ flex: 1, padding: '9px 0', background: copied ? '#10B981' : 'none', color: copied ? '#fff' : COLORS.text, border: `1px solid ${copied ? '#10B981' : COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', fontWeight: 600, transition: 'all 0.2s' }}
               >
-                {copied ? '✓ Copiato' : 'Copia testo'}
+                {copied ? '✓ Copiato' : 'Copia'}
               </button>
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(socialText)}`}
                 target="_blank" rel="noreferrer"
                 style={{ flex: 1, padding: '9px 0', background: '#25D366', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontFamily: 'Montserrat, sans-serif', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                Apri WhatsApp
+                WhatsApp
               </a>
+              <button
+                onClick={handleSendSocial}
+                disabled={socialSending}
+                style={{ flex: 1, padding: '9px 0', background: socialSending ? '#ccc' : COLORS.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: socialSending ? 'wait' : 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', fontWeight: 700 }}
+              >
+                {socialSending ? 'Invio…' : 'Invia email'}
+              </button>
             </div>
-            <button onClick={() => setShowSocialModal(false)} style={{ width: '100%', padding: '8px 0', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', color: COLORS.textSecondary }}>
+            <button onClick={() => { if (!socialSending) setShowSocialModal(false) }} style={{ width: '100%', marginTop: 10, padding: '8px 0', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', color: COLORS.textSecondary }}>
               Chiudi
             </button>
           </div>
@@ -208,15 +292,36 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {photos.map(p => (
                   <div key={p.key} style={{ textAlign: 'center' }}>
-                    <img
-                      src={p.url}
-                      alt={p.label}
-                      onClick={() => setLightboxUrl(p.url)}
-                      style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 6, border: `1px solid ${COLORS.border}`, cursor: 'zoom-in', display: 'block' }}
-                    />
+                    {isDriveUrl(p.url) ? (
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          width: 140, height: 180, display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', gap: 8,
+                          border: `1px solid ${COLORS.border}`, borderRadius: 6,
+                          background: COLORS.surface, textDecoration: 'none',
+                          color: COLORS.accent, fontSize: 12, fontFamily: 'Montserrat, sans-serif',
+                        }}
+                      >
+                        <span style={{ fontSize: 28, lineHeight: 1 }}>📷</span>
+                        <span style={{ fontWeight: 600 }}>Apri foto →</span>
+                      </a>
+                    ) : (
+                      <img
+                        src={p.url}
+                        alt={p.label}
+                        onClick={() => setLightboxUrl(p.url)}
+                        style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 6, border: `1px solid ${COLORS.border}`, cursor: 'zoom-in', display: 'block' }}
+                      />
+                    )}
                     <div style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 4 }}>{p.label}</div>
                   </div>
                 ))}
+                {photos.length === 0 && (
+                  <div style={{ fontSize: 12, color: COLORS.textSecondary, fontStyle: 'italic' }}>Foto non caricate</div>
+                )}
               </div>
             </div>
           )}
@@ -350,13 +455,13 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
               </button>
             )}
             <button
-              onClick={() => setShowEmailModal(true)}
+              onClick={() => { setEmailResult(null); setShowEmailModal(true) }}
               style={{ padding: '9px 12px', background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
             >
               Invia email
             </button>
             <button
-              onClick={() => setShowSocialModal(true)}
+              onClick={() => { setSocialResult(null); setShowSocialModal(true) }}
               style={{ padding: '9px 12px', background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
             >
               Invita social
@@ -407,9 +512,7 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
       }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <div>
-            <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:COLORS.text }}>
-              Modifiche in attesa
-            </h2>
+            <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:COLORS.text }}>Modifiche in attesa</h2>
             <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:3 }}>
               {d.nome} {d.cognome} · inviato {d.pending_submitted_at ? new Date(d.pending_submitted_at).toLocaleDateString('it-IT') : ''}
             </div>
@@ -454,11 +557,7 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
             onChange={e => setNota(e.target.value)}
             placeholder="Motivo del rifiuto..."
             rows={2}
-            style={{
-              width:'100%', border:`1px solid ${COLORS.border}`, borderRadius:6,
-              padding:'8px 10px', fontSize:12, fontFamily:'Montserrat,sans-serif',
-              resize:'vertical', boxSizing:'border-box', color:COLORS.text,
-            }}
+            style={{ width:'100%', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'8px 10px', fontSize:12, fontFamily:'Montserrat,sans-serif', resize:'vertical', boxSizing:'border-box', color:COLORS.text }}
           />
         </div>
 
@@ -466,22 +565,14 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
           <button
             onClick={() => onApprove(profile.entity_id)}
             disabled={!!actionLoading}
-            style={{
-              padding:'10px 16px', background:'#10B981', color:'#fff', border:'none',
-              borderRadius:6, fontSize:13, fontWeight:600, cursor:actionLoading ? 'wait' : 'pointer',
-              fontFamily:'Montserrat,sans-serif',
-            }}
+            style={{ padding:'10px 16px', background:'#10B981', color:'#fff', border:'none', borderRadius:6, fontSize:13, fontWeight:600, cursor:actionLoading ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}
           >
             {actionLoading === profile.entity_id + '_approve' ? 'Approvando…' : 'Approva modifiche'}
           </button>
           <button
             onClick={() => onReject(profile.entity_id, nota)}
             disabled={!!actionLoading}
-            style={{
-              padding:'10px 16px', background:'none', color:'#EF4444',
-              border:'1px solid #EF4444', borderRadius:6, fontSize:13, fontWeight:600,
-              cursor:actionLoading ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif',
-            }}
+            style={{ padding:'10px 16px', background:'none', color:'#EF4444', border:'1px solid #EF4444', borderRadius:6, fontSize:13, fontWeight:600, cursor:actionLoading ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}
           >
             {actionLoading === profile.entity_id + '_reject' ? 'Rifiutando…' : 'Rifiuta modifiche'}
           </button>
@@ -514,7 +605,7 @@ function TalentProfileDrawer({ talent, onClose }) {
         </div>
 
         <div style={{ display:'flex', gap:20, marginBottom:24, alignItems:'flex-start' }}>
-          <TalentAvatar nome={nome} fotoUrl={d.foto_busto_url} size={80} />
+          <TalentAvatar nome={nome} fotoUrl={getFotoUrl(d)} size={80} />
           <div style={{ flex:1 }}>
             <div style={{ fontSize:20, fontWeight:700, color:COLORS.text, marginBottom:4 }}>{nome}</div>
             <div style={{ fontSize:13, color:COLORS.textSecondary, marginBottom:2 }}>{d.email ?? '—'}</div>
@@ -540,11 +631,7 @@ function TalentProfileDrawer({ talent, onClose }) {
             {(photoExp.status === 'expired' || photoExp.status === 'expiring') && (
               <button
                 onClick={() => alert(`Richiesta aggiornamento foto inviata a ${d.email ?? 'il talent'}.`)}
-                style={{
-                  flexShrink:0, background:'none', border:`1px solid ${photoExp.color}`,
-                  color:photoExp.color, borderRadius:6, padding:'5px 10px', fontSize:11,
-                  cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap',
-                }}
+                style={{ flexShrink:0, background:'none', border:`1px solid ${photoExp.color}`, color:photoExp.color, borderRadius:6, padding:'5px 10px', fontSize:11, cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap' }}
               >
                 Richiedi aggiornamento
               </button>
@@ -596,17 +683,26 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         )}
 
-        {(d.foto_busto_url || d.foto_intera_url || d.foto_profilo_url) && (
+        {(getFotoUrl(d) || d.foto_intera_url || d.foto_profilo_url) && (
           <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:10 }}>Foto</div>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {[['Busto', d.foto_busto_url], ['Intera', d.foto_intera_url], ['Profilo', d.foto_profilo_url]]
+              {[['Busto', getFotoUrl(d)], ['Intera', d.foto_intera_url], ['Profilo', d.foto_profilo_url]]
                 .filter(([, u]) => u)
                 .map(([label, url]) => (
                   <div key={label} style={{ textAlign:'center' }}>
-                    <a href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt={label} style={{ width:100, height:120, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, display:'block' }} />
-                    </a>
+                    {isDriveUrl(url) ? (
+                      <a href={url} target="_blank" rel="noreferrer"
+                        style={{ width:100, height:120, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, border:`1px solid ${COLORS.border}`, borderRadius:6, background:COLORS.surface, textDecoration:'none', color:COLORS.accent, fontSize:11 }}
+                      >
+                        <span style={{ fontSize:20 }}>📷</span>
+                        <span>Apri →</span>
+                      </a>
+                    ) : (
+                      <a href={url} target="_blank" rel="noreferrer">
+                        <img src={url} alt={label} style={{ width:100, height:120, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, display:'block' }} />
+                      </a>
+                    )}
                     <div style={{ fontSize:10, color:COLORS.textSecondary, marginTop:4 }}>{label}</div>
                   </div>
                 ))}
@@ -617,9 +713,7 @@ function TalentProfileDrawer({ talent, onClose }) {
         {d.cv_url && (
           <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Curriculum</div>
-            <a href={d.cv_url} target="_blank" rel="noreferrer" style={{ color:COLORS.accent, fontSize:13, textDecoration:'underline' }}>
-              Apri CV →
-            </a>
+            <a href={d.cv_url} target="_blank" rel="noreferrer" style={{ color:COLORS.accent, fontSize:13, textDecoration:'underline' }}>Apri CV →</a>
           </div>
         )}
 
@@ -668,9 +762,9 @@ export function TalentsSection({ handleApiResponse }) {
   const [filterStatus,   setFilterStatus]   = useState('ALL')
   const [sortScore,      setSortScore]      = useState('DESC')
   const [page,           setPage]           = useState(1)
-  const [selectedReview, setSelectedReview] = useState(null)   // ReviewDrawer
-  const [selectedScheda, setSelectedScheda] = useState(null)   // TalentProfileDrawer
-  const [selectedChanges,setSelectedChanges]= useState(null)   // TalentChangesDrawer
+  const [selectedReview, setSelectedReview] = useState(null)
+  const [selectedScheda, setSelectedScheda] = useState(null)
+  const [selectedChanges,setSelectedChanges]= useState(null)
   const [actionLoading,  setActionLoading]  = useState(null)
 
   const load = useCallback(async () => {
@@ -779,15 +873,12 @@ export function TalentsSection({ handleApiResponse }) {
     const hasPending    = linkedProfile?.status === 'PENDING_REVIEW'
     return (
       <tr key={l.entity_id}>
-        <td><TalentAvatar nome={l.data?.nome} fotoUrl={l.data?.foto_busto_url} size={36} /></td>
+        <td><TalentAvatar nome={l.data?.nome} fotoUrl={getFotoUrl(l.data)} size={36} /></td>
         <td>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
             {l.data?.nome} {l.data?.cognome}
             {hasPending && (
-              <span style={{
-                fontSize:9, fontWeight:700, background:'#FFF3E0', color:'#E65100',
-                border:'1px solid #F9A825', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap',
-              }}>
+              <span style={{ fontSize:9, fontWeight:700, background:'#FFF3E0', color:'#E65100', border:'1px solid #F9A825', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
                 MODIFICHE IN ATTESA
               </span>
             )}
@@ -798,41 +889,26 @@ export function TalentsSection({ handleApiResponse }) {
         <td><ScoreBar score={l.data?.score} /></td>
         <td>
           {photoExp.status === 'expired' && (
-            <span style={{ fontSize:10, fontWeight:700, color:'#EF4444', background:'#FFEBEE', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
-              Foto scadute
-            </span>
+            <span style={{ fontSize:10, fontWeight:700, color:'#EF4444', background:'#FFEBEE', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>Foto scadute</span>
           )}
           {photoExp.status === 'expiring' && (
-            <span style={{ fontSize:10, fontWeight:700, color:'#F97316', background:'#FFF3E0', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
-              In scadenza
-            </span>
+            <span style={{ fontSize:10, fontWeight:700, color:'#F97316', background:'#FFF3E0', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>In scadenza</span>
           )}
         </td>
         <td>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
             {linkedProfile && (
-              <button
-                onClick={() => setSelectedScheda(linkedProfile)}
-                onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)}
-                style={BTN}
-              >
+              <button onClick={() => setSelectedScheda(linkedProfile)} onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)} style={BTN}>
                 Scheda
               </button>
             )}
             {hasPending && (
-              <button
-                onClick={() => setSelectedChanges(linkedProfile)}
-                style={{ ...BTN, border:'1px solid #E65100', color:'#E65100' }}
-              >
+              <button onClick={() => setSelectedChanges(linkedProfile)} style={{ ...BTN, border:'1px solid #E65100', color:'#E65100' }}>
                 Modifiche →
               </button>
             )}
             {l.status === 'COMPLETED_PENDING_APPROVAL' && (
-              <button
-                onClick={() => setSelectedReview(l)}
-                onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)}
-                style={BTN}
-              >
+              <button onClick={() => setSelectedReview(l)} onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)} style={BTN}>
                 Revisiona →
               </button>
             )}
@@ -860,10 +936,7 @@ export function TalentsSection({ handleApiResponse }) {
     <div>
       {/* Banner modifiche in attesa dai profili TALENT_PROFILE */}
       {pendingProfiles.length > 0 && (
-        <div style={{
-          background:'#FFF8E1', border:'1px solid #F9A825', borderRadius:8,
-          padding:'12px 16px', marginBottom:16, display:'flex', flexWrap:'wrap', gap:8, alignItems:'center',
-        }}>
+        <div style={{ background:'#FFF8E1', border:'1px solid #F9A825', borderRadius:8, padding:'12px 16px', marginBottom:16, display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
           <span style={{ fontSize:12, fontWeight:700, color:'#E65100' }}>
             {pendingProfiles.length} profilo{pendingProfiles.length !== 1 ? 'i' : ''} con modifiche in attesa:
           </span>
@@ -871,11 +944,7 @@ export function TalentsSection({ handleApiResponse }) {
             <button
               key={p.entity_id}
               onClick={() => setSelectedChanges(p)}
-              style={{
-                background:'#E65100', color:'#fff', border:'none', borderRadius:6,
-                padding:'4px 12px', fontSize:11, fontWeight:600, cursor:'pointer',
-                fontFamily:'Montserrat,sans-serif',
-              }}
+              style={{ background:'#E65100', color:'#fff', border:'none', borderRadius:6, padding:'4px 12px', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}
             >
               {p.data?.nome} {p.data?.cognome}
             </button>
@@ -885,12 +954,7 @@ export function TalentsSection({ handleApiResponse }) {
 
       {/* Filters */}
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16, alignItems:'center' }}>
-        <input
-          placeholder="Cerca nome o email…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ ...FILTER_INPUT, minWidth:180 }}
-        />
+        <input placeholder="Cerca nome o email…" value={search} onChange={e => setSearch(e.target.value)} style={{ ...FILTER_INPUT, minWidth:180 }} />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={FILTER_INPUT}>
           <option value="ALL">Tutti</option>
           <option value="COMPLETED_PENDING_APPROVAL">In Attesa</option>
@@ -900,16 +964,13 @@ export function TalentsSection({ handleApiResponse }) {
           <option value="DESC">Score ↓</option>
           <option value="ASC">Score ↑</option>
         </select>
-        <span style={{ fontSize:12, color:'#8888A0', marginLeft:'auto', whiteSpace:'nowrap' }}>
-          {filtered.length} profili
-        </span>
+        <span style={{ fontSize:12, color:'#8888A0', marginLeft:'auto', whiteSpace:'nowrap' }}>{filtered.length} profili</span>
       </div>
 
       {filtered.length === 0 ? (
         <div className="empty-state">Nessun profilo talent.</div>
       ) : (
         <>
-          {/* GROUP: IN ATTESA */}
           {(filterStatus === 'ALL' || filterStatus === 'COMPLETED_PENDING_APPROVAL') && (
             <>
               <GroupHeader label="In attesa di approvazione" count={pendingList.length} badgeColor="#E65100" />
@@ -917,16 +978,12 @@ export function TalentsSection({ handleApiResponse }) {
                 <div style={{ fontSize:12, color:COLORS.textSecondary, padding:'12px 0 4px' }}>Nessun profilo in attesa.</div>
               ) : (
                 <div style={{ overflowX:'auto' }}>
-                  <table className="data-table">
-                    {tableHead}
-                    <tbody>{pendingList.map(renderRow)}</tbody>
-                  </table>
+                  <table className="data-table">{tableHead}<tbody>{pendingList.map(renderRow)}</tbody></table>
                 </div>
               )}
             </>
           )}
 
-          {/* GROUP: APPROVATI */}
           {(filterStatus === 'ALL' || filterStatus === 'APPROVED') && (
             <>
               <GroupHeader label="Profili approvati — Database Talent" count={approvedList.length} badgeColor="#2E7D32" />
@@ -934,10 +991,7 @@ export function TalentsSection({ handleApiResponse }) {
                 <div style={{ fontSize:12, color:COLORS.textSecondary, padding:'12px 0 4px' }}>Nessun profilo approvato.</div>
               ) : (
                 <div style={{ overflowX:'auto' }}>
-                  <table className="data-table">
-                    {tableHead}
-                    <tbody>{approvedList.map(renderRow)}</tbody>
-                  </table>
+                  <table className="data-table">{tableHead}<tbody>{approvedList.map(renderRow)}</tbody></table>
                 </div>
               )}
             </>
@@ -948,30 +1002,13 @@ export function TalentsSection({ handleApiResponse }) {
       )}
 
       {selectedReview && (
-        <ReviewDrawer
-          lead={selectedReview}
-          onClose={() => setSelectedReview(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          actionLoading={actionLoading}
-        />
+        <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} actionLoading={actionLoading} />
       )}
-
       {selectedScheda && (
-        <TalentProfileDrawer
-          talent={selectedScheda}
-          onClose={() => setSelectedScheda(null)}
-        />
+        <TalentProfileDrawer talent={selectedScheda} onClose={() => setSelectedScheda(null)} />
       )}
-
       {selectedChanges && (
-        <TalentChangesDrawer
-          profile={selectedChanges}
-          onClose={() => setSelectedChanges(null)}
-          onApprove={handleApproveChanges}
-          onReject={handleRejectChanges}
-          actionLoading={actionLoading}
-        />
+        <TalentChangesDrawer profile={selectedChanges} onClose={() => setSelectedChanges(null)} onApprove={handleApproveChanges} onReject={handleRejectChanges} actionLoading={actionLoading} />
       )}
     </div>
   )
@@ -1021,7 +1058,6 @@ export function PendingApprovalSection({ handleApiResponse }) {
   }
 
   if (loading) return <div className="spinner" />
-
   if (items.length === 0) return (
     <div className="empty-state" style={{ padding: '20px 0' }}>Nessun profilo in attesa di approvazione.</div>
   )
@@ -1044,24 +1080,18 @@ export function PendingApprovalSection({ handleApiResponse }) {
           <tbody>
             {items.map(l => (
               <tr key={l.entity_id}>
-                <td><TalentAvatar nome={l.data?.nome} fotoUrl={l.data?.foto_busto_url} size={36} /></td>
+                <td><TalentAvatar nome={l.data?.nome} fotoUrl={getFotoUrl(l.data)} size={36} /></td>
                 <td style={{ fontWeight: 600 }}>{l.data?.nome} {l.data?.cognome}</td>
                 <td style={{ color: '#8888A0', fontSize: 12 }}>{l.data?.email}</td>
                 <td>{l.data?.citta ?? l.data?.residenza_citta ?? '—'}</td>
                 <td><ScoreBar score={l.data?.score} /></td>
                 <td style={{ fontSize: 12, color: COLORS.textSecondary }}>
-                  {l.data?.registration_completed_at
-                    ? new Date(l.data.registration_completed_at).toLocaleDateString('it-IT')
-                    : '—'}
+                  {l.data?.registration_completed_at ? new Date(l.data.registration_completed_at).toLocaleDateString('it-IT') : '—'}
                 </td>
                 <td>
                   <button
                     onClick={() => setSelectedReview(l)}
-                    style={{
-                      background: 'none', border: '1px solid #7A1E2C', color: '#7A1E2C',
-                      borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer',
-                      fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap',
-                    }}
+                    style={{ background: 'none', border: '1px solid #7A1E2C', color: '#7A1E2C', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
                   >
                     Revisiona →
                   </button>
@@ -1073,13 +1103,7 @@ export function PendingApprovalSection({ handleApiResponse }) {
       </div>
 
       {selectedReview && (
-        <ReviewDrawer
-          lead={selectedReview}
-          onClose={() => setSelectedReview(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          actionLoading={actionLoading}
-        />
+        <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} actionLoading={actionLoading} />
       )}
     </div>
   )

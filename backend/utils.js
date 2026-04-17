@@ -91,6 +91,9 @@ var PERMISSION_MATRIX = {
   'application.invite':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'application.updateStatus':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
+  // EMAIL
+  'email.sendCustom': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
   // SYSTEM
   'config.get':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'config.update': { SUPER_ADMIN:'Y', ADMIN:'N', USER:'N', CLIENTE:'N' },

@@ -623,3 +623,34 @@ function handleLeadGetByEmail(payload) {
     step_completed: parseInt(lead.data.step_completed) || 1,
   });
 }
+
+// ---------------------------------------------------------------------------
+// EMAIL SEND CUSTOM — admin invia email personalizzata a un talent
+// ---------------------------------------------------------------------------
+
+function handleEmailSendCustom(payload, auth) {
+  var valid = requireFields(payload, ['to', 'body']);
+  if (valid) return valid;
+
+  if (!isValidEmail(payload.to)) {
+    return errorResponse('VAL_002', 'Indirizzo email non valido: ' + payload.to);
+  }
+
+  var nome      = payload.nome  || '';
+  var tipo      = payload.tipo  || 'custom'; // 'custom' | 'social'
+  var adminEmail = auth.email   || '';
+  var sent;
+
+  if (tipo === 'social') {
+    sent = sendSocialInviteEmail(payload.to, nome, payload.body);
+  } else {
+    sent = sendCustomAdminEmail(payload.to, nome, payload.body, adminEmail);
+  }
+
+  if (!sent) {
+    return errorResponse('SYS_001', 'Invio email fallito. Controlla i log GAS per dettagli.');
+  }
+
+  Logger.log('[EMAIL] sendCustom tipo=' + tipo + ' to=' + payload.to + ' by=' + adminEmail);
+  return successResponse({ sent: true, to: payload.to, tipo: tipo });
+}

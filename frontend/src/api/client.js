@@ -226,3 +226,8 @@ export const documentApi = {
   get:    (talent_profile_id, tipo_documento) =>
     gasPost('document.get', { talent_profile_id, tipo_documento }, t()),
 }
+
+export const emailApi = {
+  sendCustom: (to, nome, body, tipo = 'custom') =>
+    gasPost('email.sendCustom', { to, nome, body, tipo }, t()),
+}

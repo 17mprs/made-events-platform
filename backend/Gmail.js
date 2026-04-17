@@ -540,6 +540,84 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE 12 — Email personalizzata admin → talent
+// ---------------------------------------------------------------------------
+
+function sendCustomAdminEmail(to, nome, contenutoTesto, emailAdmin) {
+  var ACCENT = '#7A1E2C';
+
+  var html = [
+    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
+    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
+    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
+    '<tr><td align="center">',
+    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
+    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
+    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
+    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Comunicazione dal team</h1>',
+    '</td></tr>',
+    '<tr><td style="padding:48px;">',
+    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
+    '<div style="height:2px;background:' + ACCENT + ';margin:16px 0 28px;width:48px;"></div>',
+    '<div style="font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
+    escapeHtml_(contenutoTesto),
+    '</div>',
+    '<div style="margin-top:40px;padding-top:24px;border-top:1px solid #EAEAEA;">',
+    '<p style="margin:0;font-size:12px;color:#AAAAAA;">',
+    'Il team MADE EVENTS',
+    emailAdmin ? ' &middot; ' + escapeHtml_(emailAdmin) : '',
+    '</p>',
+    '</div>',
+    '</td></tr>',
+    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
+    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
+    '</td></tr>',
+    '</table></td></tr></table></body></html>'
+  ].join('\n');
+
+  var text = 'Ciao ' + nome + ',\n\n' + contenutoTesto + '\n\n— Il team MADE EVENTS';
+  return sendEmail_(to, 'Comunicazione dal team MADE EVENTS', html, text);
+}
+
+// ---------------------------------------------------------------------------
+// TEMPLATE 13 — Invito social (admin → talent)
+// ---------------------------------------------------------------------------
+
+function sendSocialInviteEmail(to, nome, contenutoTesto) {
+  var ACCENT = '#7A1E2C';
+
+  var html = [
+    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
+    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
+    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
+    '<tr><td align="center">',
+    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
+    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
+    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
+    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Seguici sui social 📱</h1>',
+    '</td></tr>',
+    '<tr><td style="padding:48px;">',
+    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
+    '<div style="height:2px;background:' + ACCENT + ';margin:16px 0 28px;width:48px;"></div>',
+    '<div style="font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
+    escapeHtml_(contenutoTesto),
+    '</div>',
+    '<div style="margin-top:36px;display:flex;gap:12px;">',
+    '<a href="https://www.instagram.com/madeevents" style="display:inline-block;background:' + ACCENT + ';color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;margin-right:8px;">Instagram</a>',
+    '<a href="https://www.facebook.com/Made-Events" style="display:inline-block;background:#1877F2;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;">Facebook</a>',
+    '</div>',
+    '</td></tr>',
+    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
+    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
+    '</td></tr>',
+    '</table></td></tr></table></body></html>'
+  ].join('\n');
+
+  var text = contenutoTesto + '\n\nInstagram: @madeevents\nFacebook: Made Events\n\n— Il team MADE EVENTS';
+  return sendEmail_(to, 'Seguici sui social — MADE EVENTS', html, text);
+}
+
+// ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
 
