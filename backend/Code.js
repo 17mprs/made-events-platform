@@ -177,7 +177,8 @@ function handleRequest(action, payload, token) {
     case 'contract.generate': return handleContractGenerate(payload, auth);
 
     // EMAIL
-    case 'email.sendCustom': return handleEmailSendCustom(payload, auth);
+    case 'email.sendCustom':       return handleEmailSendCustom(payload, auth);
+    case 'email.sendConvocazione': return handleEmailSendConvocazione(payload, auth);
 
     // LOGGING
     case 'log.view': return handleLogView(payload, auth);

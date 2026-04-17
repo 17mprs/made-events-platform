@@ -1,7 +1,7 @@
 // === TALENT PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { talentApi, emailApi, getErrorMessage } from '../../api/client'
+import { talentApi, applicationApi, contractApi, emailApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
 import { COLORS } from '../../styles/theme'
@@ -583,146 +583,589 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
 }
 
 // ---------------------------------------------------------------------------
-// TALENT PROFILE DRAWER — scheda completa con timer foto
+// TALENT PROFILE DRAWER — scheda completa talent approvato
 // ---------------------------------------------------------------------------
 
-function TalentProfileDrawer({ talent, onClose }) {
+function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }) {
   const d = talent.data ?? {}
   const nome = `${d.nome ?? ''} ${d.cognome ?? ''}`.trim() || '—'
   const photoExp = photoExpiryStatus(talent)
 
+  const [openSections,  setOpenSections]  = useState({ dati:true, fisico:false, disp:false, lingue:false, exp:false, dot:false, documenti:true, eventi:true, storico:false })
+  const toggleSection = k => setOpenSections(p => ({ ...p, [k]: !p[k] }))
+
+  const [showIban,    setShowIban]    = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState(null)
+
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailBody,      setEmailBody]      = useState(`Ciao ${d.nome || ''},\n\nIl team MADE EVENTS ha esaminato il tuo profilo.\n\nPer ulteriori informazioni non esitare a contattarci.\n\nIl team MADE EVENTS`)
+  const [emailSending,   setEmailSending]   = useState(false)
+  const [emailResult,    setEmailResult]    = useState(null)
+
+  const [showSocialModal, setShowSocialModal] = useState(false)
+  const [socialText,      setSocialText]      = useState(`Ciao ${d.nome || ''}, seguici su Instagram @madeevents e Facebook Made Events per restare aggiornata sulle opportunità di lavoro!`)
+  const [socialSending,   setSocialSending]   = useState(false)
+  const [socialResult,    setSocialResult]    = useState(null)
+  const [copied,          setCopied]          = useState(false)
+
+  const [fotoEmailSending, setFotoEmailSending] = useState(false)
+  const [fotoEmailResult,  setFotoEmailResult]  = useState(null)
+
+  const [docEmailSending, setDocEmailSending] = useState(false)
+  const [docEmailResult,  setDocEmailResult]  = useState(null)
+
+  const [convocaEvent,   setConvocaEvent]   = useState(null)
+  const [convocaBody,    setConvocaBody]    = useState('')
+  const [convocaSending, setConvocaSending] = useState(false)
+  const [convocaResult,  setConvocaResult]  = useState(null)
+
+  const [showSospendiModal, setShowSospendiModal] = useState(false)
+  const [sospendiNota,      setSospendiNota]      = useState('')
+  const [sospendiLoading,   setSospendiLoading]   = useState(false)
+
+  const [showContractModal, setShowContractModal] = useState(false)
+  const [contractEventId,   setContractEventId]   = useState('')
+  const [contractLoading,   setContractLoading]   = useState(false)
+  const [contractResult,    setContractResult]    = useState(null)
+
+  const [history,        setHistory]        = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  const activeEvents = useMemo(() =>
+    (adminStore.getData()?.events ?? []).filter(e => e.status === 'LIVE' || e.status === 'PLANNING'),
+  [])
+  const eventMap = useMemo(() => {
+    const m = {}
+    ;(adminStore.getData()?.events ?? []).forEach(e => { m[e.entity_id] = e })
+    return m
+  }, [])
+
+  const loadStorico = useCallback(async () => {
+    if (history !== null || historyLoading) return
+    setHistoryLoading(true)
+    const res = await applicationApi.list({ talent_profile_id: talent.entity_id })
+    setHistoryLoading(false)
+    setHistory(res.success ? (res.data?.items ?? []) : [])
+  }, [history, historyLoading, talent.entity_id])
+
+  useEffect(() => {
+    if (openSections.storico) loadStorico()
+  }, [openSections.storico])
+
+  const accSection = (k, label, children) => (
+    <div key={k} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
+      <button onClick={() => toggleSection(k)} style={{ width:'100%', background:'none', border:'none', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', fontFamily:'Montserrat,sans-serif' }}>
+        <span style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary }}>{label}</span>
+        <span style={{ fontSize:11, color:COLORS.textSecondary }}>{openSections[k] ? '▲' : '▼'}</span>
+      </button>
+      {openSections[k] && <div style={{ paddingBottom:16 }}>{children}</div>}
+    </div>
+  )
+
+  const fld = (label, value) => value ? (
+    <div key={label} style={{ marginBottom:8 }}>
+      <div style={{ fontSize:10, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:2 }}>{label}</div>
+      <div style={{ fontSize:13, color:COLORS.text }}>{value}</div>
+    </div>
+  ) : null
+
+  const grid2 = items => <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px 16px' }}>{items}</div>
+
+  const photos = [
+    { key:'busto',  label:'Mezzo busto',  url: d.foto_busto_url  },
+    { key:'intera', label:'Figura intera', url: d.foto_intera_url },
+    { key:'extra',  label:'Aggiuntiva',    url: d.foto_extra_url  },
+  ].filter(p => p.url)
+
+  const renderPhoto = p => isDriveUrl(p.url) ? (
+    <a href={p.url} target="_blank" rel="noreferrer"
+      style={{ width:120, height:150, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6, border:`1px solid ${COLORS.border}`, borderRadius:6, background:COLORS.surface, textDecoration:'none', color:COLORS.accent, fontSize:11, fontFamily:'Montserrat,sans-serif' }}>
+      <span style={{ fontSize:24 }}>📷</span>
+      <span style={{ fontWeight:600 }}>Apri foto →</span>
+    </a>
+  ) : (
+    <img src={p.url} alt={p.label} onClick={() => setLightboxUrl(p.url)}
+      style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, cursor:'zoom-in', display:'block' }} />
+  )
+
+  const maskedIban = useMemo(() => {
+    if (!d.iban) return null
+    const s = d.iban.replace(/\s/g, '')
+    return s.length < 8 ? s : s.slice(0, 4) + '****' + s.slice(-4)
+  }, [d.iban])
+
+  const statusBadge = s => {
+    const MAP = { PENDING:{bg:'#FFF3E0',color:'#E65100',label:'In attesa'}, APPROVED:{bg:'#E8F5E9',color:'#2E7D32',label:'Approvata'}, REJECTED:{bg:'#FFEBEE',color:'#C62828',label:'Rifiutata'}, CONFIRMED:{bg:'#E3F2FD',color:'#1565C0',label:'Confermata'}, WITHDRAWN:{bg:'#F5F5F5',color:'#757575',label:'Ritirata'}, INVITED:{bg:'#F3E5F5',color:'#7B1FA2',label:'Invitata'} }
+    const c = MAP[s] || { bg:'#F5F5F5', color:'#757575', label: s }
+    return <span style={{ fontSize:10, fontWeight:700, background:c.bg, color:c.color, padding:'2px 8px', borderRadius:10 }}>{c.label}</span>
+  }
+
+  const handleSendEmail = async () => {
+    setEmailSending(true); setEmailResult(null)
+    const res = await emailApi.sendCustom(d.email, d.nome || '', emailBody, 'custom')
+    setEmailSending(false)
+    if (res.success) { setEmailResult('sent'); setTimeout(() => { setEmailResult(null); setShowEmailModal(false) }, 2000) }
+    else setEmailResult('error')
+  }
+
+  const handleSendSocial = async () => {
+    setSocialSending(true); setSocialResult(null)
+    const res = await emailApi.sendCustom(d.email, d.nome || '', socialText, 'social')
+    setSocialSending(false)
+    if (res.success) { setSocialResult('sent'); setTimeout(() => { setSocialResult(null); setShowSocialModal(false) }, 2000) }
+    else setSocialResult('error')
+  }
+
+  const handleRichiestaFoto = async () => {
+    setFotoEmailSending(true); setFotoEmailResult(null)
+    const msg = `Ciao ${d.nome || ''},\n\nLe tue foto nel nostro archivio stanno per scadere (o sono già scadute). Per continuare a ricevere proposte di lavoro, carica nuove foto di mezzo busto e figura intera accedendo alla piattaforma.\n\nGrazie per la collaborazione.\nIl team MADE EVENTS`
+    const res = await emailApi.sendCustom(d.email, d.nome || '', msg, 'custom')
+    setFotoEmailSending(false)
+    if (res.success) { setFotoEmailResult('sent'); setTimeout(() => setFotoEmailResult(null), 3000) }
+    else setFotoEmailResult('error')
+  }
+
+  const handleRichiestaDoc = async () => {
+    setDocEmailSending(true); setDocEmailResult(null)
+    const msg = `Ciao ${d.nome || ''},\n\nPer completare il tuo profilo, ti chiediamo di caricare i seguenti documenti mancanti:\n• Documento d'identità (fronte/retro)\n• Curriculum vitae aggiornato\n\nAccedi alla piattaforma e carica i documenti nella tua area personale.\n\nGrazie.\nIl team MADE EVENTS`
+    const res = await emailApi.sendCustom(d.email, d.nome || '', msg, 'custom')
+    setDocEmailSending(false)
+    if (res.success) { setDocEmailResult('sent'); setTimeout(() => setDocEmailResult(null), 3000) }
+    else setDocEmailResult('error')
+  }
+
+  const openConvoca = evt => {
+    const ed = evt.data ?? {}
+    const dataStr = ed.data_evento ? new Date(ed.data_evento).toLocaleDateString('it-IT') : '—'
+    const luogo = ed.citta ?? ed.location ?? '—'
+    setConvocaEvent(evt)
+    setConvocaBody(`Ciao ${d.nome || ''},\n\nSiamo lieti di invitarti come hostess/steward per il nostro prossimo evento:\n\n📅 ${ed.titolo ?? ''}\n📆 Data: ${dataStr}\n📍 Luogo: ${luogo}\n\nSe sei disponibile, ti chiediamo di confermare la tua partecipazione accedendo alla piattaforma al più presto.\n\nIl team MADE EVENTS`)
+    setConvocaResult(null)
+  }
+
+  const handleSendConvoca = async () => {
+    if (!convocaEvent) return
+    const ed = convocaEvent.data ?? {}
+    const dataStr = ed.data_evento ? new Date(ed.data_evento).toLocaleDateString('it-IT') : ''
+    setConvocaSending(true)
+    const res = await emailApi.sendConvocazione(d.email, d.nome || '', ed.titolo ?? '', dataStr, ed.citta ?? ed.location ?? '', convocaBody)
+    setConvocaSending(false)
+    if (res.success) { setConvocaResult('sent'); setTimeout(() => { setConvocaResult(null); setConvocaEvent(null) }, 2000) }
+    else setConvocaResult('error')
+  }
+
+  const handleSospendi = async () => {
+    if (!sospendiNota.trim()) return
+    setSospendiLoading(true)
+    const res = handleApiResponse
+      ? handleApiResponse(await talentApi.reject(talent.entity_id, sospendiNota))
+      : await talentApi.reject(talent.entity_id, sospendiNota)
+    setSospendiLoading(false)
+    if (res.success) { await adminStore.refresh(); onSuspended?.(); onClose() }
+    else alert(getErrorMessage(res.error))
+  }
+
+  const handleGeneraContratto = async () => {
+    if (!contractEventId) return
+    setContractLoading(true)
+    const res = await contractApi.generate(talent.entity_id, contractEventId)
+    setContractLoading(false)
+    if (res.success) setContractResult('ok')
+    else setContractResult('error')
+  }
+
+  const BTN_OUTLINE = { background:'none', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'7px 14px', cursor:'pointer', fontSize:12, fontFamily:'Montserrat,sans-serif', color:COLORS.text }
+
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:400 }} />
-      <div style={{
-        position:'fixed', right:0, top:0, bottom:0, width:560, maxWidth:'96vw',
-        background:'#fff', borderLeft:`1px solid ${COLORS.border}`,
-        zIndex:401, overflowY:'auto', padding:32, fontFamily:'Montserrat,sans-serif',
-      }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
-          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:COLORS.text }}>Scheda Talent</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#666', padding:'4px 8px', lineHeight:1 }}>✕</button>
+      {/* Lightbox */}
+      {lightboxUrl && !isDriveUrl(lightboxUrl) && (
+        <div onClick={() => setLightboxUrl(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.88)', zIndex:700, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <img src={lightboxUrl} alt="foto" style={{ maxWidth:'90vw', maxHeight:'90vh', objectFit:'contain', borderRadius:8 }} onClick={e => e.stopPropagation()} />
+          <button onClick={() => setLightboxUrl(null)} style={{ position:'absolute', top:20, right:20, background:'rgba(0,0,0,0.5)', border:'none', color:'#fff', fontSize:24, cursor:'pointer', width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
         </div>
+      )}
 
-        <div style={{ display:'flex', gap:20, marginBottom:24, alignItems:'flex-start' }}>
-          <TalentAvatar nome={nome} fotoUrl={getFotoUrl(d)} size={80} />
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:20, fontWeight:700, color:COLORS.text, marginBottom:4 }}>{nome}</div>
-            <div style={{ fontSize:13, color:COLORS.textSecondary, marginBottom:2 }}>{d.email ?? '—'}</div>
-            <div style={{ fontSize:13, color:COLORS.textSecondary, marginBottom:8 }}>{d.citta ?? '—'}</div>
-            <LeadBadge status={talent.status} />
-          </div>
-        </div>
-
-        {photoExp.label && (
-          <div style={{
-            padding:'12px 14px', borderRadius:8, marginBottom:20,
-            background: photoExp.status === 'expired' ? '#FFF0F0' : photoExp.status === 'expiring' ? '#FFF8F0' : '#F0FAF4',
-            border: `1px solid ${photoExp.color}44`,
-            display:'flex', justifyContent:'space-between', alignItems:'center', gap:12,
-          }}>
-            <div>
-              <div style={{ fontSize:12, fontWeight:700, color:photoExp.color }}>
-                {photoExp.status === 'expired'  ? '⛔ Foto scadute — profilo bloccato' :
-                 photoExp.status === 'expiring' ? '⚠️ Foto in scadenza' : '✓ Foto valide'}
-              </div>
-              <div style={{ fontSize:11, color:COLORS.textSecondary, marginTop:2 }}>{photoExp.label}</div>
-            </div>
-            {(photoExp.status === 'expired' || photoExp.status === 'expiring') && (
-              <button
-                onClick={() => alert(`Richiesta aggiornamento foto inviata a ${d.email ?? 'il talent'}.`)}
-                style={{ flexShrink:0, background:'none', border:`1px solid ${photoExp.color}`, color:photoExp.color, borderRadius:6, padding:'5px 10px', fontSize:11, cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap' }}
-              >
-                Richiedi aggiornamento
+      {/* Email Modal */}
+      {showEmailModal && (
+        <>
+          <div onClick={() => { if (!emailSending) setShowEmailModal(false) }} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />
+          <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'#fff', borderRadius:8, padding:28, width:480, maxWidth:'90vw', zIndex:651, fontFamily:'Montserrat,sans-serif', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin:'0 0 12px', fontSize:15, fontWeight:700, color:COLORS.text }}>Invia email a {d.nome}</h3>
+            <div style={{ fontSize:11, color:COLORS.textSecondary, marginBottom:10 }}>A: <strong>{d.email}</strong></div>
+            <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} disabled={emailSending} rows={7}
+              style={{ width:'100%', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'8px 12px', fontSize:13, fontFamily:'Montserrat,sans-serif', resize:'vertical', boxSizing:'border-box', color:COLORS.text }} />
+            {emailResult === 'sent'  && <div style={{ marginTop:10, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Email inviata con successo</div>}
+            {emailResult === 'error' && <div style={{ marginTop:10, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>Errore nell'invio. Usa il client email come alternativa.</div>}
+            <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end' }}>
+              <button onClick={() => window.open(`mailto:${d.email}?subject=MADE EVENTS&body=${encodeURIComponent(emailBody)}`)} style={{ ...BTN_OUTLINE, fontSize:11, color:COLORS.textSecondary }}>Apri client email</button>
+              <button onClick={() => { if (!emailSending) setShowEmailModal(false) }} style={BTN_OUTLINE}>Annulla</button>
+              <button onClick={handleSendEmail} disabled={emailSending || !emailBody.trim()} style={{ padding:'8px 20px', background: emailSending ? '#ccc' : COLORS.accent, color:'#fff', border:'none', borderRadius:6, cursor: emailSending ? 'wait' : 'pointer', fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif' }}>
+                {emailSending ? 'Invio…' : 'Invia →'}
               </button>
-            )}
-          </div>
-        )}
-
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Score</div>
-          <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-            <div style={{ fontSize:32, fontWeight:300, color:COLORS.text }}>{d.score ?? '—'}</div>
-            <div style={{ flex:1 }}><ScoreBar score={d.score} /></div>
-          </div>
-        </div>
-
-        <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
-          <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:12 }}>Dati anagrafici</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            {[
-              ['Telefono',           d.telefono],
-              ['Data di nascita',    d.data_nascita],
-              ['Sesso',              d.sesso],
-              ['Altezza',            d.altezza ? `${d.altezza} cm` : null],
-              ['Taglia',             d.taglia],
-              ['Residenza',          d.citta],
-              ['Province lavoro',    (d.province_lavoro ?? []).join(', ') || null],
-              ['Lingue',             (d.lingue ?? []).join(', ') || null],
-              ['Automunita',         d.automunita],
-              ['Disp. trasferte',    d.disponibilita_trasferte],
-              ['Disp. weekend',      d.disponibilita_weekend],
-              ['Anni esperienza',    d.anni_esperienza_settore],
-            ].filter(([, v]) => v).map(([label, val]) => (
-              <div key={label}>
-                <div style={{ fontSize:10, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:2 }}>{label}</div>
-                <div style={{ fontSize:13, color:COLORS.text }}>{val}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {(d.skills ?? []).length > 0 && (
-          <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Skills</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {d.skills.map(s => (
-                <span key={s} style={{ fontSize:11, background:'#f5f5f5', color:COLORS.text, padding:'3px 10px', borderRadius:10 }}>{s}</span>
-              ))}
             </div>
           </div>
-        )}
+        </>
+      )}
 
-        {(getFotoUrl(d) || d.foto_intera_url || d.foto_profilo_url) && (
-          <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:10 }}>Foto</div>
+      {/* Social Modal */}
+      {showSocialModal && (
+        <>
+          <div onClick={() => { if (!socialSending) setShowSocialModal(false) }} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />
+          <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'#fff', borderRadius:8, padding:28, width:440, maxWidth:'90vw', zIndex:651, fontFamily:'Montserrat,sans-serif', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin:'0 0 12px', fontSize:15, fontWeight:700, color:COLORS.text }}>Invita sui social</h3>
+            <div style={{ fontSize:11, color:COLORS.textSecondary, marginBottom:8 }}>A: <strong>{d.email}</strong></div>
+            <textarea value={socialText} onChange={e => setSocialText(e.target.value)} disabled={socialSending} rows={4}
+              style={{ width:'100%', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'10px 12px', fontSize:13, fontFamily:'Montserrat,sans-serif', resize:'vertical', boxSizing:'border-box', color:COLORS.text, lineHeight:1.6, marginBottom:12 }} />
+            {socialResult === 'sent'  && <div style={{ marginBottom:10, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Messaggio inviato via email</div>}
+            {socialResult === 'error' && <div style={{ marginBottom:10, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>Errore nell'invio email.</div>}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {[['Busto', getFotoUrl(d)], ['Intera', d.foto_intera_url], ['Profilo', d.foto_profilo_url]]
-                .filter(([, u]) => u)
-                .map(([label, url]) => (
-                  <div key={label} style={{ textAlign:'center' }}>
-                    {isDriveUrl(url) ? (
-                      <a href={url} target="_blank" rel="noreferrer"
-                        style={{ width:100, height:120, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, border:`1px solid ${COLORS.border}`, borderRadius:6, background:COLORS.surface, textDecoration:'none', color:COLORS.accent, fontSize:11 }}
-                      >
-                        <span style={{ fontSize:20 }}>📷</span>
-                        <span>Apri →</span>
-                      </a>
-                    ) : (
-                      <a href={url} target="_blank" rel="noreferrer">
-                        <img src={url} alt={label} style={{ width:100, height:120, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, display:'block' }} />
-                      </a>
-                    )}
-                    <div style={{ fontSize:10, color:COLORS.textSecondary, marginTop:4 }}>{label}</div>
-                  </div>
-                ))}
+              <button onClick={() => { navigator.clipboard?.writeText(socialText); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                style={{ flex:1, padding:'9px 0', background: copied ? '#10B981' : 'none', color: copied ? '#fff' : COLORS.text, border:`1px solid ${copied ? '#10B981' : COLORS.border}`, borderRadius:6, cursor:'pointer', fontSize:12, fontFamily:'Montserrat,sans-serif', fontWeight:600, transition:'all 0.2s' }}>
+                {copied ? '✓ Copiato' : 'Copia'}
+              </button>
+              <a href={`https://wa.me/?text=${encodeURIComponent(socialText)}`} target="_blank" rel="noreferrer"
+                style={{ flex:1, padding:'9px 0', background:'#25D366', color:'#fff', border:'none', borderRadius:6, fontSize:12, fontFamily:'Montserrat,sans-serif', fontWeight:700, textDecoration:'none', display:'flex', alignItems:'center', justifyContent:'center' }}>WhatsApp</a>
+              <button onClick={handleSendSocial} disabled={socialSending}
+                style={{ flex:1, padding:'9px 0', background: socialSending ? '#ccc' : COLORS.accent, color:'#fff', border:'none', borderRadius:6, cursor: socialSending ? 'wait' : 'pointer', fontSize:12, fontFamily:'Montserrat,sans-serif', fontWeight:700 }}>
+                {socialSending ? 'Invio…' : 'Invia email'}
+              </button>
+            </div>
+            <button onClick={() => { if (!socialSending) setShowSocialModal(false) }} style={{ width:'100%', marginTop:10, padding:'8px 0', background:'none', border:`1px solid ${COLORS.border}`, borderRadius:6, cursor:'pointer', fontSize:12, fontFamily:'Montserrat,sans-serif', color:COLORS.textSecondary }}>Chiudi</button>
+          </div>
+        </>
+      )}
+
+      {/* Convoca Modal */}
+      {convocaEvent && (
+        <>
+          <div onClick={() => { if (!convocaSending) setConvocaEvent(null) }} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />
+          <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'#fff', borderRadius:8, padding:28, width:500, maxWidth:'90vw', zIndex:651, fontFamily:'Montserrat,sans-serif', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin:'0 0 4px', fontSize:15, fontWeight:700, color:COLORS.text }}>Convoca per evento</h3>
+            <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:12 }}><strong>{convocaEvent.data?.titolo}</strong> · A: {d.email}</div>
+            <textarea value={convocaBody} onChange={e => setConvocaBody(e.target.value)} disabled={convocaSending} rows={8}
+              style={{ width:'100%', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'8px 12px', fontSize:13, fontFamily:'Montserrat,sans-serif', resize:'vertical', boxSizing:'border-box', color:COLORS.text, lineHeight:1.6 }} />
+            {convocaResult === 'sent'  && <div style={{ marginTop:10, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Email di convocazione inviata</div>}
+            {convocaResult === 'error' && <div style={{ marginTop:10, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>Errore nell'invio.</div>}
+            <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end' }}>
+              <button onClick={() => { if (!convocaSending) setConvocaEvent(null) }} style={BTN_OUTLINE}>Annulla</button>
+              <button onClick={handleSendConvoca} disabled={convocaSending || !convocaBody.trim()}
+                style={{ padding:'8px 20px', background: convocaSending ? '#ccc' : COLORS.accent, color:'#fff', border:'none', borderRadius:6, cursor: convocaSending ? 'wait' : 'pointer', fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif' }}>
+                {convocaSending ? 'Invio…' : 'Invia convocazione →'}
+              </button>
             </div>
           </div>
-        )}
+        </>
+      )}
 
-        {d.cv_url && (
-          <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Curriculum</div>
-            <a href={d.cv_url} target="_blank" rel="noreferrer" style={{ color:COLORS.accent, fontSize:13, textDecoration:'underline' }}>Apri CV →</a>
+      {/* Sospendi Modal */}
+      {showSospendiModal && (
+        <>
+          <div onClick={() => { if (!sospendiLoading) setShowSospendiModal(false) }} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />
+          <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'#fff', borderRadius:8, padding:28, width:420, maxWidth:'90vw', zIndex:651, fontFamily:'Montserrat,sans-serif', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin:'0 0 8px', fontSize:15, fontWeight:700, color:'#C62828' }}>Sospendi profilo</h3>
+            <div style={{ fontSize:13, color:COLORS.textSecondary, marginBottom:16 }}>
+              Questa azione sospende il profilo di <strong>{nome}</strong>. Il talent non potrà più accedere alla piattaforma fino a nuova approvazione.
+            </div>
+            <label style={{ fontSize:11, color:COLORS.textSecondary, display:'block', marginBottom:4 }}>Motivo (obbligatorio)</label>
+            <textarea value={sospendiNota} onChange={e => setSospendiNota(e.target.value)} rows={3} placeholder="Motivo della sospensione..."
+              style={{ width:'100%', border:'1px solid #EF4444', borderRadius:6, padding:'8px 10px', fontSize:13, fontFamily:'Montserrat,sans-serif', resize:'vertical', boxSizing:'border-box', color:COLORS.text }} />
+            <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end' }}>
+              <button onClick={() => { if (!sospendiLoading) setShowSospendiModal(false) }} style={BTN_OUTLINE}>Annulla</button>
+              <button onClick={handleSospendi} disabled={!sospendiNota.trim() || sospendiLoading}
+                style={{ padding:'8px 20px', background: !sospendiNota.trim() ? '#f5f5f5' : '#EF4444', color: !sospendiNota.trim() ? '#999' : '#fff', border:'none', borderRadius:6, cursor: !sospendiNota.trim() ? 'not-allowed' : 'pointer', fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif' }}>
+                {sospendiLoading ? 'Sospensione…' : 'Conferma sospensione'}
+              </button>
+            </div>
           </div>
-        )}
+        </>
+      )}
 
-        {d.note && (
-          <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Note</div>
-            <div style={{ fontSize:13, color:COLORS.text, lineHeight:1.6 }}>{d.note}</div>
+      {/* Contract Modal */}
+      {showContractModal && (
+        <>
+          <div onClick={() => { if (!contractLoading) setShowContractModal(false) }} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />
+          <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'#fff', borderRadius:8, padding:28, width:440, maxWidth:'90vw', zIndex:651, fontFamily:'Montserrat,sans-serif', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin:'0 0 12px', fontSize:15, fontWeight:700, color:COLORS.text }}>Genera contratto</h3>
+            <div style={{ fontSize:13, color:COLORS.textSecondary, marginBottom:16 }}>Talent: <strong>{nome}</strong></div>
+            {activeEvents.length === 0 ? (
+              <div style={{ fontSize:13, color:COLORS.textSecondary, marginBottom:16 }}>Nessun evento LIVE o PLANNING disponibile.</div>
+            ) : (
+              <div style={{ marginBottom:16 }}>
+                <label style={{ fontSize:11, color:COLORS.textSecondary, display:'block', marginBottom:6 }}>Evento</label>
+                <select value={contractEventId} onChange={e => setContractEventId(e.target.value)}
+                  style={{ width:'100%', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'8px 10px', fontSize:13, fontFamily:'Montserrat,sans-serif', color:COLORS.text, background:'#fff' }}>
+                  <option value="">Seleziona evento…</option>
+                  {activeEvents.map(e => <option key={e.entity_id} value={e.entity_id}>{e.data?.titolo ?? e.entity_id}</option>)}
+                </select>
+              </div>
+            )}
+            {contractResult === 'ok'    && <div style={{ marginBottom:12, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Contratto generato con successo</div>}
+            {contractResult === 'error' && <div style={{ marginBottom:12, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>Errore nella generazione del contratto.</div>}
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <button onClick={() => { if (!contractLoading) { setShowContractModal(false); setContractResult(null); setContractEventId('') } }} style={BTN_OUTLINE}>Chiudi</button>
+              <button onClick={handleGeneraContratto} disabled={!contractEventId || contractLoading}
+                style={{ padding:'8px 20px', background: !contractEventId ? '#f5f5f5' : COLORS.accent, color: !contractEventId ? '#999' : '#fff', border:'none', borderRadius:6, cursor: !contractEventId ? 'not-allowed' : 'pointer', fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif' }}>
+                {contractLoading ? 'Generazione…' : 'Genera contratto'}
+              </button>
+            </div>
           </div>
-        )}
+        </>
+      )}
+
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:400 }} />
+
+      {/* Drawer */}
+      <div style={{ position:'fixed', right:0, top:0, bottom:0, width:680, maxWidth:'96vw', background:'#fff', borderLeft:`1px solid ${COLORS.border}`, zIndex:401, display:'flex', flexDirection:'column', fontFamily:'Montserrat,sans-serif' }}>
+
+        {/* Header */}
+        <div style={{ padding:'20px 28px', borderBottom:`1px solid ${COLORS.border}`, flexShrink:0 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+              <TalentAvatar nome={nome} fotoUrl={getFotoUrl(d)} size={56} />
+              <div>
+                <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:COLORS.text }}>{nome}</h2>
+                <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:2 }}>{d.email ?? '—'}</div>
+                <div style={{ fontSize:12, color:COLORS.textSecondary }}>{d.citta ?? d.residenza_citta ?? '—'}</div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#666', padding:'4px 8px', lineHeight:1 }}>✕</button>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:12 }}>
+            <LeadBadge status={talent.status} />
+            <div style={{ flex:1, maxWidth:200 }}><ScoreBar score={d.score} /></div>
+            {d.score != null && <span style={{ fontSize:13, fontWeight:700, color:COLORS.text }}>{d.score}<span style={{ fontSize:10, color:COLORS.textSecondary }}>/100</span></span>}
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{ flex:1, overflowY:'auto', padding:'20px 28px' }}>
+
+          {/* FOTO E SCADENZE */}
+          {(photos.length > 0 || photoExp.label) && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:12 }}>Foto e scadenze</div>
+              {photos.length > 0 && (
+                <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:12 }}>
+                  {photos.map(p => (
+                    <div key={p.key} style={{ textAlign:'center' }}>
+                      {renderPhoto(p)}
+                      <div style={{ fontSize:10, color:COLORS.textSecondary, marginTop:4 }}>{p.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {photoExp.label && (
+                <div style={{ padding:'12px 14px', borderRadius:8, background: photoExp.status === 'expired' ? '#FFF0F0' : photoExp.status === 'expiring' ? '#FFF8F0' : '#F0FAF4', border:`1px solid ${photoExp.color}44`, display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color:photoExp.color }}>
+                      {photoExp.status === 'expired' ? '⛔ Foto scadute' : photoExp.status === 'expiring' ? '⚠️ Foto in scadenza' : '✓ Foto valide'}
+                    </div>
+                    <div style={{ fontSize:11, color:COLORS.textSecondary, marginTop:2 }}>{photoExp.label}</div>
+                  </div>
+                  {(photoExp.status === 'expired' || photoExp.status === 'expiring') && (
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                      <button onClick={handleRichiestaFoto} disabled={fotoEmailSending}
+                        style={{ background:'none', border:`1px solid ${photoExp.color}`, color: fotoEmailSending ? '#ccc' : photoExp.color, borderRadius:6, padding:'5px 10px', fontSize:11, cursor: fotoEmailSending ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap' }}>
+                        {fotoEmailSending ? 'Invio…' : 'Richiedi aggiornamento foto'}
+                      </button>
+                      {fotoEmailResult === 'sent'  && <span style={{ fontSize:10, color:'#2E7D32' }}>✓ Email inviata</span>}
+                      {fotoEmailResult === 'error' && <span style={{ fontSize:10, color:'#C62828' }}>Errore invio</span>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DATI ANAGRAFICI accordion */}
+          <div style={{ marginBottom:20 }}>
+            {accSection('dati', 'Dati Personali', grid2([
+              fld('Genere', d.genere === 'F' ? 'Donna' : d.genere === 'M' ? 'Uomo' : d.genere),
+              fld('Data nascita', d.data_nascita),
+              fld('Città nascita', d.nascita_citta ? `${d.nascita_citta}${d.nascita_provincia ? ' ('+d.nascita_provincia+')' : ''}` : null),
+              fld('Nazionalità', d.nazionalita),
+              fld('Città residenza', d.residenza_citta ? `${d.residenza_citta}${d.residenza_provincia ? ' ('+d.residenza_provincia+')' : ''}` : d.citta),
+              fld('Telefono', d.telefono),
+              fld('Instagram', d.instagram),
+              fld('Facebook', d.facebook),
+            ]))}
+            {accSection('fisico', 'Profilo Fisico', grid2([
+              fld('Altezza', d.altezza ? `${d.altezza} cm` : null),
+              fld('Taglia t-shirt', d.taglia_tshirt ?? d.taglia),
+              fld('Taglia pantalone', d.taglia_pantalone),
+              fld('Taglia gonna', d.taglia_gonna),
+              fld('N° scarpe', d.numero_scarpe),
+              fld('Piercing visibili', d.piercing_visibili),
+              fld('Tatuaggi visibili', d.tatuaggi_visibili),
+              fld('Dove tatuaggi', d.tatuaggi_dove),
+            ]))}
+            {accSection('disp', 'Disponibilità', grid2([
+              fld('Province lavoro', (d.province_lavoro ?? []).join(', ') || null),
+              fld('Patente', (d.patente_tipologie ?? []).join(', ') || null),
+              fld('Automunita', d.automunita),
+              fld('Trasferte', d.disponibilita_trasferte),
+              fld('Weekend', d.disponibilita_weekend),
+              fld('Serate', d.disponibilita_serali),
+            ]))}
+            {accSection('lingue', 'Lingue', grid2([
+              fld('Inglese', d.lingua_inglese),
+              fld('Francese', d.lingua_francese && d.lingua_francese !== 'Non conosco' ? d.lingua_francese : null),
+              fld('Spagnolo', d.lingua_spagnolo && d.lingua_spagnolo !== 'Non conosco' ? d.lingua_spagnolo : null),
+              fld('Tedesco', d.lingua_tedesco && d.lingua_tedesco !== 'Non conosco' ? d.lingua_tedesco : null),
+              ...(d.altre_lingue ?? (d.lingue ?? []).map(l => ({ nome: l }))).map((l, i) =>
+                fld(`Altra ${i+1}`, typeof l === 'object' ? (l.nome && l.livello ? `${l.nome}: ${l.livello}` : l.nome) : l)
+              ),
+            ]))}
+            {accSection('exp', 'Esperienza Professionale', grid2([
+              fld('Titolo studio', d.titolo_studio),
+              fld('Indirizzo studio', d.titolo_studio_indirizzo),
+              fld('Professione attuale', (d.professione_attuale ?? []).join(', ') || null),
+              fld('Anni esperienza', d.anni_esperienza_settore),
+              fld('Tipologie', (d.tipologie_esperienza ?? d.skills ?? []).join(', ') || null),
+            ]))}
+            {accSection('dot', 'Dotazione', (d.dotazione_personale ?? d.attrezzatura ?? []).length > 0 ? (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {(d.dotazione_personale ?? d.attrezzatura ?? []).map(item => (
+                  <span key={item} style={{ fontSize:11, background:'#f5f5f5', color:COLORS.text, padding:'3px 10px', borderRadius:10 }}>{item}</span>
+                ))}
+              </div>
+            ) : <div style={{ fontSize:12, color:COLORS.textSecondary }}>Nessun capo indicato</div>)}
+          </div>
+
+          {/* CV E DOCUMENTI */}
+          {accSection('documenti', 'CV e Documenti', (
+            <div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:12 }}>
+                {d.cv_url && <a href={d.cv_url} target="_blank" rel="noreferrer" style={{ fontSize:13, color:COLORS.accent, textDecoration:'none', padding:'8px 14px', border:`1px solid ${COLORS.accent}`, borderRadius:6, fontWeight:600 }}>📄 Apri CV →</a>}
+                {d.doc_identita_url && <a href={d.doc_identita_url} target="_blank" rel="noreferrer" style={{ fontSize:13, color:COLORS.accent, textDecoration:'none', padding:'8px 14px', border:`1px solid ${COLORS.accent}`, borderRadius:6, fontWeight:600 }}>🪪 Documento identità →</a>}
+                {d.doc_cf_url && <a href={d.doc_cf_url} target="_blank" rel="noreferrer" style={{ fontSize:13, color:COLORS.accent, textDecoration:'none', padding:'8px 14px', border:`1px solid ${COLORS.accent}`, borderRadius:6, fontWeight:600 }}>📋 Cod. Fiscale doc. →</a>}
+                {!d.cv_url && !d.doc_identita_url && <span style={{ fontSize:12, color:COLORS.textSecondary }}>Nessun documento caricato.</span>}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:d.iban ? 12 : 0, flexWrap:'wrap' }}>
+                <button onClick={handleRichiestaDoc} disabled={docEmailSending}
+                  style={{ background:'none', border:`1px solid ${COLORS.border}`, color: docEmailSending ? '#ccc' : COLORS.text, borderRadius:6, padding:'6px 12px', fontSize:11, cursor: docEmailSending ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                  {docEmailSending ? 'Invio…' : 'Richiedi documenti via email'}
+                </button>
+                {docEmailResult === 'sent'  && <span style={{ fontSize:11, color:'#2E7D32' }}>✓ Email inviata</span>}
+                {docEmailResult === 'error' && <span style={{ fontSize:11, color:'#C62828' }}>Errore</span>}
+              </div>
+              {d.iban && (
+                <div style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'12px 14px', marginTop:12 }}>
+                  <div style={{ fontSize:10, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:4 }}>IBAN</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <span style={{ fontSize:14, fontFamily:'monospace', color:COLORS.text, letterSpacing:1 }}>{showIban ? d.iban : maskedIban}</span>
+                    <button onClick={() => setShowIban(v => !v)}
+                      style={{ background:'none', border:`1px solid ${COLORS.border}`, borderRadius:4, padding:'3px 8px', fontSize:10, cursor:'pointer', color:COLORS.textSecondary, fontFamily:'Montserrat,sans-serif' }}>
+                      {showIban ? 'Nascondi' : 'Mostra IBAN'}
+                    </button>
+                  </div>
+                  {d.intestatario_conto && <div style={{ fontSize:11, color:COLORS.textSecondary, marginTop:4 }}>Intestatario: {d.intestatario_conto}</div>}
+                  {d.codice_fiscale && <div style={{ fontSize:11, color:COLORS.textSecondary, marginTop:2 }}>CF: {d.codice_fiscale}</div>}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* EVENTI ATTIVI — CONVOCA */}
+          {accSection('eventi', 'Eventi Attivi — Convoca', (
+            <div>
+              {activeEvents.length === 0 ? (
+                <div style={{ fontSize:12, color:COLORS.textSecondary }}>Nessun evento LIVE o PLANNING al momento.</div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {activeEvents.map(evt => {
+                    const ed = evt.data ?? {}
+                    const req = Number(ed.hostess_richieste) || 0
+                    const conf = Number(ed.hostess_confermate ?? 0)
+                    const pct = req > 0 ? Math.round((conf / req) * 100) : 0
+                    const satColor = pct >= 100 ? '#EF4444' : pct >= 80 ? '#F97316' : '#10B981'
+                    const dataStr = ed.data_evento ? new Date(ed.data_evento).toLocaleDateString('it-IT') : '—'
+                    return (
+                      <div key={evt.entity_id} style={{ border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                        <div style={{ flex:1, minWidth:150 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:COLORS.text, marginBottom:2 }}>{ed.titolo ?? '—'}</div>
+                          <div style={{ fontSize:11, color:COLORS.textSecondary }}>{dataStr} · {ed.citta ?? ed.location ?? '—'}</div>
+                          {req > 0 && (
+                            <div style={{ fontSize:11, marginTop:4 }}>
+                              <span style={{ color:satColor, fontWeight:600 }}>{conf}/{req}</span>
+                              <span style={{ color:COLORS.textSecondary }}> ({pct}%) </span>
+                              <span style={{ fontSize:9, background:`${satColor}22`, color:satColor, padding:'1px 6px', borderRadius:8, fontWeight:700 }}>{evt.status}</span>
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={() => openConvoca(evt)}
+                          style={{ background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, padding:'7px 14px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap' }}>
+                          Convoca →
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* STORICO CANDIDATURE */}
+          {accSection('storico', 'Storico Candidature', (
+            <div>
+              {historyLoading && <div className="spinner" style={{ margin:'16px 0' }} />}
+              {!historyLoading && history !== null && history.length === 0 && (
+                <div style={{ fontSize:12, color:COLORS.textSecondary }}>Nessuna candidatura nel database.</div>
+              )}
+              {!historyLoading && (history ?? []).length > 0 && (
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ background:'#f5f5f5' }}>
+                      <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Evento</th>
+                      <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Data</th>
+                      <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Stato</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map(app => {
+                      const evt = eventMap[app.data?.event_id ?? app.data?.shift_id]
+                      const evtTitle = evt?.data?.titolo ?? app.data?.event_id ?? '—'
+                      const appDate = app.created_at ? new Date(app.created_at).toLocaleDateString('it-IT') : '—'
+                      return (
+                        <tr key={app.entity_id} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
+                          <td style={{ padding:'8px 10px', color:COLORS.text }}>{evtTitle}</td>
+                          <td style={{ padding:'8px 10px', color:COLORS.textSecondary }}>{appDate}</td>
+                          <td style={{ padding:'8px 10px' }}>{statusBadge(app.status)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ))}
+
+          <div style={{ height:16 }} />
+        </div>
+
+        {/* Sticky bottom actions */}
+        <div style={{ borderTop:`1px solid ${COLORS.border}`, padding:'12px 28px', flexShrink:0, background:'#fff' }}>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <button onClick={() => { setEmailResult(null); setShowEmailModal(true) }}
+              style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', border:`1px solid ${COLORS.border}`, color:COLORS.text, borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
+              Invia email
+            </button>
+            <button onClick={() => { setSocialResult(null); setShowSocialModal(true) }}
+              style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', border:`1px solid ${COLORS.border}`, color:COLORS.text, borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
+              Invita social
+            </button>
+            <button onClick={() => { setSospendiNota(''); setShowSospendiModal(true) }}
+              style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', color:'#EF4444', border:'1px solid #EF4444', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif', fontWeight:600 }}>
+              Sospendi
+            </button>
+            <button onClick={() => { setContractResult(null); setContractEventId(''); setShowContractModal(true) }}
+              style={{ flex:'1 1 90px', padding:'9px 12px', background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif', fontWeight:700 }}>
+              Genera contratto
+            </button>
+          </div>
+        </div>
       </div>
     </>
   )
@@ -1005,7 +1448,12 @@ export function TalentsSection({ handleApiResponse }) {
         <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} actionLoading={actionLoading} />
       )}
       {selectedScheda && (
-        <TalentProfileDrawer talent={selectedScheda} onClose={() => setSelectedScheda(null)} />
+        <TalentProfileDrawer
+          talent={selectedScheda}
+          onClose={() => setSelectedScheda(null)}
+          handleApiResponse={handleApiResponse}
+          onSuspended={() => { adminStore.refresh().then(load) }}
+        />
       )}
       {selectedChanges && (
         <TalentChangesDrawer profile={selectedChanges} onClose={() => setSelectedChanges(null)} onApprove={handleApproveChanges} onReject={handleRejectChanges} actionLoading={actionLoading} />

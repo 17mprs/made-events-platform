@@ -230,4 +230,6 @@ export const documentApi = {
 export const emailApi = {
   sendCustom: (to, nome, body, tipo = 'custom') =>
     gasPost('email.sendCustom', { to, nome, body, tipo }, t()),
+  sendConvocazione: (to, nome, titolo_evento, data_evento, luogo_evento, body) =>
+    gasPost('email.sendConvocazione', { to, nome, titolo_evento, data_evento, luogo_evento, body }, t()),
 }

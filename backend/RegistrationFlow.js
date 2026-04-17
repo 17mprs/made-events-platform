@@ -654,3 +654,29 @@ function handleEmailSendCustom(payload, auth) {
   Logger.log('[EMAIL] sendCustom tipo=' + tipo + ' to=' + payload.to + ' by=' + adminEmail);
   return successResponse({ sent: true, to: payload.to, tipo: tipo });
 }
+
+// ---------------------------------------------------------------------------
+// EMAIL SEND CONVOCAZIONE — admin convoca un talent per un evento specifico
+// ---------------------------------------------------------------------------
+
+function handleEmailSendConvocazione(payload, auth) {
+  var valid = requireFields(payload, ['to', 'body']);
+  if (valid) return valid;
+
+  if (!isValidEmail(payload.to)) {
+    return errorResponse('VAL_002', 'Indirizzo email non valido: ' + payload.to);
+  }
+
+  var nome         = payload.nome          || '';
+  var titoloEvento = payload.titolo_evento || '';
+  var dataEvento   = payload.data_evento   || '';
+  var luogoEvento  = payload.luogo_evento  || '';
+
+  var sent = sendConvocazioneEmail(payload.to, nome, titoloEvento, dataEvento, luogoEvento, payload.body);
+  if (!sent) {
+    return errorResponse('SYS_001', 'Invio email convocazione fallito.');
+  }
+
+  Logger.log('[EMAIL] sendConvocazione to=' + payload.to + ' evento=' + titoloEvento + ' by=' + (auth.email || ''));
+  return successResponse({ sent: true, to: payload.to, titolo_evento: titoloEvento });
+}

@@ -618,6 +618,55 @@ function sendSocialInviteEmail(to, nome, contenutoTesto) {
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE 14 — Convocazione evento (admin → talent)
+// ---------------------------------------------------------------------------
+
+function sendConvocazioneEmail(to, nome, titoloEvento, dataEvento, luogoEvento, contenutoTesto) {
+  var ACCENT = '#7A1E2C';
+
+  var eventoBlock = titoloEvento
+    ? '<div style="background:#FAFAFA;border-left:4px solid ' + ACCENT + ';padding:16px 20px;margin-bottom:28px;border-radius:0 4px 4px 0;">' +
+      '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#2E2E2E;">' + escapeHtml_(titoloEvento) + '</p>' +
+      (dataEvento   ? '<p style="margin:0 0 4px;font-size:13px;color:#6B6B6B;">&#128197; ' + escapeHtml_(dataEvento)   + '</p>' : '') +
+      (luogoEvento  ? '<p style="margin:0;font-size:13px;color:#6B6B6B;">&#128205; '       + escapeHtml_(luogoEvento)  + '</p>' : '') +
+      '</div>'
+    : '';
+
+  var html = [
+    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
+    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
+    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
+    '<tr><td align="center">',
+    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
+    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
+    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
+    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Sei stata selezionata ✨</h1>',
+    '</td></tr>',
+    '<tr><td style="padding:48px;">',
+    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
+    '<div style="height:2px;background:' + ACCENT + ';margin:16px 0 28px;width:48px;"></div>',
+    eventoBlock,
+    '<div style="font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
+    escapeHtml_(contenutoTesto),
+    '</div>',
+    '<div style="margin-top:40px;padding-top:24px;border-top:1px solid #EAEAEA;">',
+    '<p style="margin:0;font-size:12px;color:#AAAAAA;">Il team MADE EVENTS</p>',
+    '</div>',
+    '</td></tr>',
+    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
+    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
+    '</td></tr>',
+    '</table></td></tr></table></body></html>'
+  ].join('\n');
+
+  var textHeader = titoloEvento
+    ? titoloEvento + (dataEvento ? ' · ' + dataEvento : '') + (luogoEvento ? ' · ' + luogoEvento : '') + '\n\n'
+    : '';
+  var text = 'Ciao ' + nome + ',\n\n' + textHeader + contenutoTesto + '\n\n— Il team MADE EVENTS';
+  return sendEmail_(to, 'Sei stata selezionata — ' + (titoloEvento || 'MADE EVENTS'), html, text);
+}
+
+// ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
 
