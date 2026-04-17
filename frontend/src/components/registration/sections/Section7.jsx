@@ -1,144 +1,139 @@
-// === SEZIONE 7 — DATI FISCALI E BANCARI ===
+// === SEZIONE 7 — FOTO PROFILO ===
+// Upload foto profilo via base64 verso GAS.
+// Ogni foto viene caricata appena selezionata (prima del submit finale).
 import React, { useState } from 'react'
-import { COLORS, COMPONENT_STYLES } from '../../../styles/theme'
-import Input from '../../Input'
+import { COLORS } from '../../../styles/theme'
+import FileUpload from '../FileUpload'
 import SectionShell from '../SectionShell'
+import { talentApi, getErrorMessage } from '../../../api/client'
 
-function validateCF(cf) {
-  return /^[A-Z0-9]{16}$/i.test(cf.replace(/\s/g, ''))
+const CRITERI_NON_ACCETTAZIONE = [
+  'Con altre persone',
+  'Con filtri / ritocchi',
+  'Con loghi / scritte',
+  'Con occhiali da sole',
+  'Sfocate o scattate da lontano',
+  'Bassa risoluzione',
+  'Con cornici decorative',
+  'Formato stories / screenshot',
+]
+
+const FOTO_FIELDS = {
+  foto_busto:  { label: 'Foto mezzo busto / primo piano', accept: 'image/jpeg,image/png', maxMB: 5, required: true,  hint: 'Sfondo neutro, viso frontale, espressione naturale.' },
+  foto_intera: { label: 'Foto figura intera',             accept: 'image/jpeg,image/png', maxMB: 5, required: true,  hint: 'Sfondo neutro, outfit professionale.' },
+  foto_extra:  { label: 'Foto aggiuntiva',                accept: 'image/jpeg,image/png', maxMB: 5, required: false, hint: 'Opzionale.' },
 }
 
-function validatePIVA(piva) {
-  return /^\d{11}$/.test(piva.replace(/\s/g, ''))
-}
+export default function Section7({ data, onChange, leadId, email, onNext, onBack, loading: parentLoading }) {
+  const [uploadState, setUploadState]   = useState({})
+  const [uploadErrors, setUploadErrors] = useState({})
+  const [formErrors,   setFormErrors]   = useState({})
 
-function validateIBAN(iban) {
-  const clean = iban.replace(/\s/g, '').toUpperCase()
-  return /^IT\d{2}[A-Z0-9]{23}$/.test(clean) // IT + 2 check + 23 chars = 27 totale
-}
+  function setUpState(key, state) {
+    setUploadState(prev => ({ ...prev, [key]: state }))
+  }
 
-function RadioYesNo({ label, name, value, onChange, required, error }) {
-  return (
-    <div>
-      <label style={COMPONENT_STYLES.label}>{label}{required && ' *'}</label>
-      <div style={{ display: 'flex', gap: '20px', marginTop: '4px' }}>
-        {['Sì', 'No'].map(opt => (
-          <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: COLORS.text }}>
-            <input
-              type="radio"
-              name={name}
-              value={opt}
-              checked={value === opt}
-              onChange={() => onChange(opt)}
-              style={{ accentColor: COLORS.accent }}
-            />
-            {opt}
-          </label>
-        ))}
-      </div>
-      {error && <p style={{ fontSize: '12px', color: COLORS.error, marginTop: '4px' }}>{error}</p>}
-    </div>
-  )
-}
+  async function handleFile(fieldKey, { base64, filename, mimeType }) {
+    setUpState(fieldKey, 'uploading')
+    setUploadErrors(prev => ({ ...prev, [fieldKey]: null }))
+    try {
+      const res = await talentApi.uploadRegistrationDoc(leadId, email, fieldKey, base64, filename, mimeType)
+      if (!res.success) {
+        setUpState(fieldKey, 'error')
+        setUploadErrors(prev => ({ ...prev, [fieldKey]: getErrorMessage(res.error) }))
+        return
+      }
+      const url = res.data?.url
+      if (!url) {
+        console.error('[Section7] upload ok but no url in response', res)
+        setUpState(fieldKey, 'error')
+        setUploadErrors(prev => ({ ...prev, [fieldKey]: 'Caricamento completato ma URL non ricevuto.' }))
+        return
+      }
+      setUpState(fieldKey, 'done')
+      onChange(`${fieldKey}_url`, url)
+    } catch (err) {
+      console.error('[Section7] handleFile threw', fieldKey, err)
+      setUpState(fieldKey, 'error')
+      setUploadErrors(prev => ({ ...prev, [fieldKey]: 'Errore imprevisto durante il caricamento.' }))
+    }
+  }
 
-export default function Section7({ data, onChange, onNext, onBack, loading }) {
-  const [errors, setErrors] = useState({})
+  function handleClear(fieldKey) {
+    setUpState(fieldKey, undefined)
+    onChange(`${fieldKey}_url`, '')
+  }
 
   function validate() {
     const e = {}
-    const cf   = (data.codice_fiscale || '').trim()
-    const piva = (data.partita_iva || '').trim()
-    const iban = (data.iban || '').trim()
-
-    if (!cf)                    e.codice_fiscale = 'Il codice fiscale è obbligatorio'
-    else if (!validateCF(cf))   e.codice_fiscale = 'Formato non valido (16 caratteri alfanumerici)'
-
-    if (piva && !validatePIVA(piva)) e.partita_iva = 'Formato non valido (11 cifre)'
-
-    if (!iban)                   e.iban = 'L\'IBAN è obbligatorio'
-    else if (!validateIBAN(iban)) e.iban = 'Formato non valido — deve iniziare con IT e avere 27 caratteri'
-
-    if (!data.disponibile_chiamata)  e.disponibile_chiamata  = 'Seleziona un\'opzione'
-    if (!data.disponibile_ritenuta)  e.disponibile_ritenuta  = 'Seleziona un\'opzione'
-
-    setErrors(e)
+    Object.entries(FOTO_FIELDS).forEach(([key, cfg]) => {
+      if (cfg.required && !data[`${key}_url`]) {
+        e[key] = 'Foto obbligatoria'
+      }
+      if (uploadState[key] === 'uploading') {
+        e[key] = 'Attendi il completamento del caricamento'
+      }
+    })
+    setFormErrors(e)
     return Object.keys(e).length === 0
   }
+
+  const anyUploading = Object.values(uploadState).some(s => s === 'uploading')
 
   return (
     <SectionShell
       number={7}
-      title="Dati Fiscali e Bancari"
-      description="Necessari per la gestione dei pagamenti. Tutti i dati sono trattati in conformità al GDPR."
+      title="Foto Profilo"
+      description="Carica le tue foto profilo. Vengono salvate in modo sicuro su Google Drive."
       onBack={onBack}
       onNext={() => { if (validate()) onNext() }}
-      loading={loading}
+      loading={parentLoading || anyUploading}
+      nextLabel="Invia candidatura →"
     >
-      <div className="form-grid">
-        <Input
-          label="Codice Fiscale *"
-          value={data.codice_fiscale || ''}
-          onChange={e => onChange('codice_fiscale', e.target.value.toUpperCase())}
-          placeholder="RSSMRA80A01H501Z"
-          helper="16 caratteri alfanumerici"
-          error={errors.codice_fiscale}
-          maxLength={16}
-        />
-
-        <Input
-          label="Partita IVA"
-          value={data.partita_iva || ''}
-          onChange={e => onChange('partita_iva', e.target.value)}
-          placeholder="12345678901"
-          helper="11 cifre — opzionale"
-          error={errors.partita_iva}
-          maxLength={11}
-        />
-
-        <div className="form-field-full">
-          <Input
-            label="IBAN *"
-            value={data.iban || ''}
-            onChange={e => onChange('iban', e.target.value.toUpperCase())}
-            placeholder="IT60 X054 2811 1010 0000 0123 456"
-            helper="IT + 25 caratteri (27 totali) — puoi inserirlo con spazi"
-            error={errors.iban}
-          />
+      {/* Criteri di non accettazione */}
+      <div style={{
+        background: COLORS.surface,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: '4px',
+        padding: '16px 20px',
+        marginBottom: '32px',
+      }}>
+        <p style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: 500, color: COLORS.textSecondary, marginBottom: '12px' }}>
+          Criteri di non accettazione
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+          {CRITERI_NON_ACCETTAZIONE.map(c => (
+            <div key={c} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: COLORS.textSecondary }}>
+              <span style={{ color: COLORS.error, fontWeight: 600, flexShrink: 0 }}>✗</span> {c}
+            </div>
+          ))}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '28px' }}>
-        <RadioYesNo
-          label="Disponibile contratto a chiamata"
-          name="disp_chiamata"
-          value={data.disponibile_chiamata || ''}
-          onChange={v => onChange('disponibile_chiamata', v)}
-          required
-          error={errors.disponibile_chiamata}
-        />
-        <RadioYesNo
-          label="Disponibile ritenuta d'acconto"
-          name="disp_ritenuta"
-          value={data.disponibile_ritenuta || ''}
-          onChange={v => onChange('disponibile_ritenuta', v)}
-          required
-          error={errors.disponibile_ritenuta}
-        />
-      </div>
-
-      {/* Info box */}
-      <div style={{
-        marginTop: '24px',
-        background: '#FFF8E1',
-        border: `1px solid #FFE082`,
-        borderRadius: '4px',
-        padding: '12px 16px',
-        fontSize: '12px',
-        color: '#5D4037',
-        lineHeight: 1.6,
-      }}>
-        I tuoi dati fiscali e bancari sono utilizzati esclusivamente per l'emissione di pagamenti relativi
-        agli incarichi svolti. Non vengono condivisi con terze parti.
+      {/* Campi upload */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {Object.entries(FOTO_FIELDS).map(([fieldKey, cfg]) => (
+          <div key={fieldKey}>
+            <FileUpload
+              label={cfg.label}
+              accept={cfg.accept}
+              maxMB={cfg.maxMB}
+              required={cfg.required}
+              uploaded={uploadState[fieldKey] === 'done' || !!data[`${fieldKey}_url`]}
+              uploadedUrl={data[`${fieldKey}_url`]}
+              onFile={(fileData) => handleFile(fieldKey, fileData)}
+              onClear={() => handleClear(fieldKey)}
+              error={uploadErrors[fieldKey] || formErrors[fieldKey]}
+              hint={cfg.hint}
+            />
+            {uploadState[fieldKey] === 'uploading' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                <div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '1.5px' }} />
+                <span style={{ fontSize: '12px', color: COLORS.textSecondary }}>Caricamento in corso…</span>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </SectionShell>
   )

@@ -9,6 +9,7 @@ const SECTION_LABELS = [
   'Lingue',
   'Professionale',
   'Dotazione',
+  'Foto Profilo',
 ]
 
 export default function ProgressBar({ current }) {

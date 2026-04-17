@@ -427,9 +427,9 @@ const PROFILE_SECTIONS = [
     bool: ['disponibile_chiamata','disponibile_ritenuta'],
   },
   {
-    id: 'S8', title: 'Documenti e Foto',
-    fields: ['foto_busto_url','foto_intera_url','doc_identita_url','doc_cf_url','cv_url'],
-    labels: { foto_busto_url:'Foto mezzo busto (URL)', foto_intera_url:'Foto figura intera (URL)', doc_identita_url:'Documento identità (URL)', doc_cf_url:'Codice fiscale documento (URL)', cv_url:'CV (URL)' },
+    id: 'S8', title: 'Documenti',
+    fields: ['doc_identita_url','doc_cf_url','cv_url'],
+    labels: { doc_identita_url:'Documento identità (URL)', doc_cf_url:'Codice fiscale documento (URL)', cv_url:'CV (URL)' },
   },
 ]
 
@@ -792,7 +792,7 @@ function MyProfile({ handleApiResponse }) {
         </div>
       )}
 
-      {(!d.codice_fiscale || !d.foto_busto_url) && (
+      {!d.codice_fiscale && (
         <div style={{
           background: '#FFF8E1', border: '1px solid #FFD54F', borderRadius: 8,
           padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12,

@@ -15,6 +15,7 @@ import Section3 from '../components/registration/sections/Section3'
 import Section4 from '../components/registration/sections/Section4'
 import Section5 from '../components/registration/sections/Section5'
 import Section6 from '../components/registration/sections/Section6'
+import Section7 from '../components/registration/sections/Section7'
 
 // ---------------------------------------------------------------------------
 // STATO INIZIALE FORM
@@ -41,6 +42,8 @@ const FORM_INITIAL = {
   professione_attuale: [], tipologie_esperienza: [], anni_esperienza_settore: '',
   // Sezione 6
   dotazione_personale: [],
+  // Sezione 7 — URL restituiti dal backend dopo upload
+  foto_busto_url: '', foto_intera_url: '', foto_extra_url: '',
 }
 
 // Mappa i campi saved_data del backend sui campi del form
@@ -215,7 +218,7 @@ export default function RegisterComplete() {
       const { lead_id, nome, email, step_completed, saved_data } = res.data
       setLeadData({ lead_id, nome, email })
 
-      if (step_completed >= 6) {
+      if (step_completed >= 7) {
         setStatus('already_done')
         return
       }
@@ -226,7 +229,7 @@ export default function RegisterComplete() {
       }
 
       // Riprendi dalla sezione successiva a quella già completata
-      const resumeAt = Math.min(Math.max((step_completed || 0) + 1, 1), 6)
+      const resumeAt = Math.min(Math.max((step_completed || 0) + 1, 1), 7)
       setSection(resumeAt)
       setStatus('form')
     })
@@ -392,8 +395,16 @@ export default function RegisterComplete() {
         <Section6
           {...commonProps}
           onBack={() => handleBack(6)}
+          onNext={() => handleNext(6)}
+        />
+      )}
+      {section === 7 && (
+        <Section7
+          {...commonProps}
+          leadId={leadData?.lead_id}
+          email={leadData?.email}
+          onBack={() => handleBack(7)}
           onNext={handleFinalSubmit}
-          nextLabel="Invia candidatura →"
         />
       )}
     </PageShell>
