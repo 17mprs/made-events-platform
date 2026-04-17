@@ -239,7 +239,7 @@ function handleEventList(payload, auth) {
 
   if (payload.status) {
     filters = filters || {};
-    filters.status_filter = payload.status; // gestito sotto come filtro su entity.status
+    filters.status_filter = payload.status;
   }
 
   var result = listEntities('EVENT', tenantId, filters, payload.page, payload.limit);
@@ -247,6 +247,15 @@ function handleEventList(payload, auth) {
   // Filtro status sull'entità (non su data)
   if (payload.status) {
     result.items = result.items.filter(function(e) { return e.status === payload.status; });
+    result.total = result.items.length;
+  }
+
+  // USER vede solo eventi LIVE o PLANNING con selezioni aperte
+  if (auth.role === ROLES.USER) {
+    var openStatuses = [ENTITY_STATUS.EVENT.LIVE, ENTITY_STATUS.EVENT.PLANNING];
+    result.items = result.items.filter(function(e) {
+      return openStatuses.indexOf(e.status) !== -1 && !e.data.selezioni_chiuse;
+    });
     result.total = result.items.length;
   }
 
@@ -582,8 +591,15 @@ function handleAssignmentUpdatePayment(payload, auth) {
 
 function handleTalentList(payload, auth) {
   var tenantId = resolvedTenantId_(payload, auth);
-  var filters  = {};
 
+  // USER vede solo il proprio profilo talent
+  if (auth.role === ROLES.USER) {
+    var myProfile = findTalentProfileByUserId_(auth.user_id, tenantId);
+    if (!myProfile) return successResponse({ items: [], total: 0, page: 1, limit: 50, pages: 0 });
+    return successResponse({ items: [talentToPublic(myProfile, auth.role)], total: 1, page: 1, limit: 50, pages: 1 });
+  }
+
+  var filters  = {};
   if (payload.ranking)  filters.ranking = payload.ranking;
   if (payload.citta)    filters.citta   = payload.citta;
 
@@ -634,8 +650,24 @@ function handleTalentUpdateProfile(payload, auth) {
   }
 
   var allowedFields = [
-    'telefono', 'citta', 'province_operativita', 'lingue',
-    'altezza', 'taglia', 'skills', 'disponibilita', 'note'
+    // S1 — Dati Personali
+    'telefono', 'data_nascita', 'citta_nascita', 'nazionalita',
+    'indirizzo_residenza', 'numero_documento', 'stato_emissione_documento',
+    // S2 — Profilo Fisico
+    'altezza', 'taglia', 'capelli', 'occhi', 'corporatura',
+    // S3 — Logistica
+    'citta', 'province_operativita', 'automunita',
+    'disponibile_trasferte', 'disponibile_weekend',
+    // S4 — Lingue
+    'lingue',
+    // S5 — Esperienza
+    'esperienza_anni', 'skills', 'esperienze_precedenti',
+    // S6 — Attrezzatura
+    'attrezzatura',
+    // S7 — Fiscale
+    'codice_fiscale', 'iban', 'intestatario_conto', 'partita_iva',
+    // Altro
+    'disponibilita', 'note'
   ];
   var updates = {};
   for (var i = 0; i < allowedFields.length; i++) {
@@ -643,6 +675,20 @@ function handleTalentUpdateProfile(payload, auth) {
     if (payload[f] !== undefined) updates[f] = payload[f];
   }
 
+  // USER → salva come pending_data e passa a PENDING_REVIEW
+  if (auth.role === ROLES.USER) {
+    var pendingUpdates = {};
+    for (var k in updates) { pendingUpdates[k] = updates[k]; }
+    updates.pending_data = pendingUpdates;
+    updates.pending_submitted_at = new Date().toISOString();
+    updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
+    updateRow('Entities', payload.entity_id, { status: ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW });
+    entity.status = ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW;
+    entity.data = Object.assign({}, entity.data, updates);
+    return successResponse({ talent: talentToPublic(entity, auth.role), pending: true });
+  }
+
+  // ADMIN → aggiornamento diretto
   var updated = updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
   return successResponse({ talent: talentToPublic(updated, auth.role) });
 }

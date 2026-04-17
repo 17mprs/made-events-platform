@@ -47,15 +47,27 @@ export default function Section8({ data, onChange, leadId, email, onNext, onBack
   async function handleFile(fieldKey, { base64, filename, mimeType }) {
     setUpState(fieldKey, 'uploading')
     setUploadErrors(prev => ({ ...prev, [fieldKey]: null }))
-
-    const res = await talentApi.uploadRegistrationDoc(leadId, email, fieldKey, base64, filename, mimeType)
-    if (!res.success) {
+    try {
+      const res = await talentApi.uploadRegistrationDoc(leadId, email, fieldKey, base64, filename, mimeType)
+      if (!res.success) {
+        setUpState(fieldKey, 'error')
+        setUploadErrors(prev => ({ ...prev, [fieldKey]: getErrorMessage(res.error) }))
+        return
+      }
+      const url = res.data?.url
+      if (!url) {
+        console.error('[Section8] upload ok but no url in response', res)
+        setUpState(fieldKey, 'error')
+        setUploadErrors(prev => ({ ...prev, [fieldKey]: 'Caricamento completato ma URL non ricevuto.' }))
+        return
+      }
+      setUpState(fieldKey, 'done')
+      onChange(`${fieldKey}_url`, url)
+    } catch (err) {
+      console.error('[Section8] handleFile threw', fieldKey, err)
       setUpState(fieldKey, 'error')
-      setUploadErrors(prev => ({ ...prev, [fieldKey]: getErrorMessage(res.error) }))
-      return
+      setUploadErrors(prev => ({ ...prev, [fieldKey]: 'Errore imprevisto durante il caricamento.' }))
     }
-    setUpState(fieldKey, 'done')
-    onChange(`${fieldKey}_url`, res.data.url)
   }
 
   function handleClear(fieldKey) {

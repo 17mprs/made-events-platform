@@ -26,7 +26,7 @@ var PERMISSION_MATRIX = {
   'talent.registerStep3': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'Y', CLIENTE:'N' },
   'talent.approve':       { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'talent.reject':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
-  'talent.list':          { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'talent.list':          { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
   'talent.get':           { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
   'talent.updateProfile': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
 
@@ -38,8 +38,8 @@ var PERMISSION_MATRIX = {
 
   // EVENT
   'event.create':         { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
-  'event.list':           { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'O' },
-  'event.get':            { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'O' },
+  'event.list':           { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'Y', CLIENTE:'O' },
+  'event.get':            { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'Y', CLIENTE:'O' },
   'event.updateStatus':   { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'event.cancel':         { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
@@ -65,6 +65,11 @@ var PERMISSION_MATRIX = {
 
   // LEAD
   'lead.list':     { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'lead.update':   { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'lead.solicit':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // CONTRACT
+  'contract.generate': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // TENANT
   'tenant.list':   { SUPER_ADMIN:'Y', ADMIN:'N', USER:'N', CLIENTE:'N' },
@@ -82,8 +87,9 @@ var PERMISSION_MATRIX = {
   // EVENT (update)
   'event.update':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
-  // APPLICATION (invite)
-  'application.invite':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  // APPLICATION (invite + updateStatus)
+  'application.invite':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'application.updateStatus':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // SYSTEM
   'config.get':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },

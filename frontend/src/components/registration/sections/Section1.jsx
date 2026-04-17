@@ -99,6 +99,7 @@ export default function Section1({ data, onChange, onNext, loading }) {
 
   function validate() {
     const e = {}
+    if (!data.genere) e.genere = 'Seleziona un\'opzione'
     // Luogo di nascita
     if (!data.nascita_citta) e.nascita_citta = 'Campo obbligatorio'
     if (data.nascita_nazione === 'Italia' && !data.nascita_regione) e.nascita_regione = 'Seleziona la regione'
@@ -124,6 +125,29 @@ export default function Section1({ data, onChange, onNext, loading }) {
       onNext={handleNext}
       loading={loading}
     >
+      {/* Genere */}
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: COLORS.textSecondary, fontWeight: 500, marginBottom: '16px' }}>
+          Sei un uomo o una donna? *
+        </div>
+        <div style={{ display: 'flex', gap: '24px' }}>
+          {[{ label: 'Donna', value: 'F' }, { label: 'Uomo', value: 'M' }].map(opt => (
+            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: COLORS.text }}>
+              <input
+                type="radio"
+                name="genere"
+                value={opt.value}
+                checked={data.genere === opt.value}
+                onChange={() => onChange('genere', opt.value)}
+                style={{ accentColor: COLORS.accent }}
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+        {errors.genere && <p style={{ fontSize: '12px', color: COLORS.error, marginTop: '6px' }}>{errors.genere}</p>}
+      </div>
+
       {/* Luogo di nascita */}
       <LuogoSelect prefix="nascita" label="Luogo di nascita" data={data} onChange={onChange} required />
 

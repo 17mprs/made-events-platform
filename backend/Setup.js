@@ -3,6 +3,32 @@
 // Eseguire UNA SOLA VOLTA da Editor GAS → Esegui → setupDatabase().
 
 // ---------------------------------------------------------------------------
+// SCRIPT PROPERTIES — chiavi scalabili per ID e URL di configurazione
+// Eseguire una volta: Editor GAS → seleziona initScriptProperties → ▶ Esegui
+// ---------------------------------------------------------------------------
+
+function initScriptProperties() {
+  var props = PropertiesService.getScriptProperties();
+  var current = props.getProperties();
+
+  var defaults = {
+    SPREADSHEET_ID:       '12ITb5K_ZcskSFgLmpdWXvqqP2oh5cJ51KKhPq2PhlHQ',
+    CONTRACT_TEMPLATE_ID: '1WyVn17-7Iaq3H5uF0DZPDN_DVC-KQPmFnU4bWbFNYgM',
+    FRONTEND_URL:         'http://localhost:3000',
+  };
+
+  for (var key in defaults) {
+    if (!current[key]) {
+      props.setProperty(key, defaults[key]);
+      Logger.log('Impostata: ' + key + ' = ' + defaults[key]);
+    } else {
+      Logger.log('Già presente: ' + key + ' = ' + current[key]);
+    }
+  }
+  Logger.log('=== Script Properties inizializzate ===');
+}
+
+// ---------------------------------------------------------------------------
 // SCHEMA FOGLI
 // ---------------------------------------------------------------------------
 
@@ -228,6 +254,123 @@ function setupDeployLog_(ss) {
   deploySheet.appendRow(headers.map(function(h) {
     return row[h] !== undefined ? row[h] : '';
   }));
+}
+
+// ---------------------------------------------------------------------------
+// CLEAN USERS SHEET — rimuove righe corrotte e duplicati
+// ---------------------------------------------------------------------------
+
+/**
+ * Pulisce il foglio Users rimuovendo:
+ *   - righe con user_id === "UUID" (letterale, segnaposto non sostituito)
+ *   - righe con tenant_id vuoto o === "0"
+ *   - duplicati per email: mantiene solo il record con tenant_id corretto
+ *     e created_at più recente; se più record hanno lo stesso tenant_id
+ *     corretto, conserva il più recente.
+ *
+ * Eseguire: Editor GAS → seleziona "cleanUsersSheet" → ▶ Esegui → vedi log.
+ */
+function cleanUsersSheet() {
+  var CORRECT_TENANT_ID = 'c29a68d0-2f1d-418d-84f6-c01f389af78d';
+
+  var ss         = getSpreadsheet();
+  var sheet      = ss.getSheetByName(SHEET_NAMES.Users);
+  if (!sheet) { Logger.log('ERRORE: foglio Users non trovato'); return; }
+
+  // Legge TUTTI i dati incluse le righe fisicamente presenti (anche deleted=true)
+  var data    = sheet.getDataRange().getValues();
+  if (data.length < 2) { Logger.log('Foglio Users vuoto — niente da fare'); return; }
+
+  var headers     = data[0].map(function(h) { return String(h).trim(); });
+  var userIdIdx   = headers.indexOf('user_id');
+  var tenantIdx   = headers.indexOf('tenant_id');
+  var emailIdx    = headers.indexOf('email');
+  var createdIdx  = headers.indexOf('created_at');
+
+  if (userIdIdx === -1 || tenantIdx === -1 || emailIdx === -1) {
+    Logger.log('ERRORE: colonne obbligatorie mancanti (user_id / tenant_id / email)');
+    return;
+  }
+
+  Logger.log('=== CLEAN USERS SHEET ===');
+  Logger.log('Righe totali (header escluso): ' + (data.length - 1));
+
+  // --- PASS 1: individua righe corrotte (user_id="UUID" o tenant_id vuoto/"0") ---
+  var rowsToDelete = {};   // rowIndex (1-based, header=1) → motivo
+
+  for (var i = 1; i < data.length; i++) {
+    var uid    = String(data[i][userIdIdx]).trim();
+    var tid    = String(data[i][tenantIdx]).trim();
+    var email  = String(data[i][emailIdx]).trim().toLowerCase();
+
+    if (uid === 'UUID' || uid === 'uuid') {
+      rowsToDelete[i] = 'user_id letterale "UUID" — email: ' + email;
+      continue;
+    }
+    if (tid === '' || tid === '0') {
+      rowsToDelete[i] = 'tenant_id vuoto o "0" — email: ' + email;
+      continue;
+    }
+  }
+
+  // --- PASS 2: duplicati per email ---
+  // Raggruppa righe valide (non già marcate) per email
+  var emailMap = {};  // email → array di { rowIdx, tenantId, createdAt }
+
+  for (var j = 1; j < data.length; j++) {
+    if (rowsToDelete[j]) continue;
+    var em  = String(data[j][emailIdx]).trim().toLowerCase();
+    var tid2 = String(data[j][tenantIdx]).trim();
+    var ca  = createdIdx !== -1 ? data[j][createdIdx] : '';
+    if (!emailMap[em]) emailMap[em] = [];
+    emailMap[em].push({ rowIdx: j, tenantId: tid2, createdAt: ca });
+  }
+
+  for (var em in emailMap) {
+    var group = emailMap[em];
+    if (group.length <= 1) continue;
+
+    Logger.log('Email duplicata: ' + em + ' (' + group.length + ' record)');
+
+    // Ordina: prima i record con tenant_id corretto, poi per created_at DESC
+    group.sort(function(a, b) {
+      var aCorrect = (a.tenantId === CORRECT_TENANT_ID) ? 1 : 0;
+      var bCorrect = (b.tenantId === CORRECT_TENANT_ID) ? 1 : 0;
+      if (bCorrect !== aCorrect) return bCorrect - aCorrect;
+      // Stessa priorità: più recente prima
+      var aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      var bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (isNaN(aDate)) aDate = 0;
+      if (isNaN(bDate)) bDate = 0;
+      return bDate - aDate;
+    });
+
+    // Conserva il primo (miglior candidato), elimina gli altri
+    for (var k = 1; k < group.length; k++) {
+      rowsToDelete[group[k].rowIdx] =
+        'duplicato email ' + em + ' (tenant: ' + group[k].tenantId + ', conservato row ' + group[0].rowIdx + ')';
+    }
+  }
+
+  // --- PASS 3: elimina le righe marcate (dal basso verso l'alto per non sfasare indici) ---
+  var sortedRows = Object.keys(rowsToDelete).map(Number).sort(function(a, b) { return b - a; });
+
+  if (sortedRows.length === 0) {
+    Logger.log('Nessuna riga da eliminare — foglio già pulito.');
+    Logger.log('=== FINE CLEAN ===');
+    return;
+  }
+
+  Logger.log('Righe da eliminare: ' + sortedRows.length);
+  for (var r = 0; r < sortedRows.length; r++) {
+    var idx = sortedRows[r];
+    Logger.log('  ELIMINA riga ' + (idx + 1) + ': ' + rowsToDelete[idx]);
+    sheet.deleteRow(idx + 1);  // GAS è 1-based; idx è 0-based rispetto a data
+  }
+
+  Logger.log('Righe eliminate: ' + sortedRows.length);
+  Logger.log('Righe rimanenti (header escluso): ' + (data.length - 1 - sortedRows.length));
+  Logger.log('=== FINE CLEAN USERS SHEET ===');
 }
 
 // ---------------------------------------------------------------------------

@@ -22,11 +22,12 @@ function handleDashboardBootstrap(payload, auth) {
   // Singola lettura del foglio Entities — poi filtriamo in memoria
   var allRows = getAllRows('Entities');
 
-  var leads        = [];
-  var events       = [];
-  var applications = [];
-  var clients      = [];
-  var pendingTalent = 0;
+  var leads                 = [];
+  var events                = [];
+  var applications          = [];
+  var clients               = [];
+  var talent_profiles       = [];
+  var pendingTalent         = 0;
 
   var activeEventStatuses = [
     ENTITY_STATUS.EVENT.DRAFT,
@@ -72,6 +73,7 @@ function handleDashboardBootstrap(payload, auth) {
         break;
 
       case 'TALENT_PROFILE':
+        talent_profiles.push(entityToPublic(e));
         if (e.status === ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW) {
           pendingTalent++;
         }
@@ -90,12 +92,13 @@ function handleDashboardBootstrap(payload, auth) {
   }
 
   return successResponse({
-    leads:        leads,
-    events:       events,
-    applications: applications,
-    clients:      clients,
+    leads:           leads,
+    events:          events,
+    applications:    applications,
+    clients:         clients,
+    talent_profiles: talent_profiles,
     stats: {
-      totalLeads:   leads.length,
+      totalLeads:    leads.length,
       pendingTalent: pendingTalent,
       activeEvents:  activeEvents,
       pendingApps:   pendingApps

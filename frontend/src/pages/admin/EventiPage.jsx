@@ -1,7 +1,7 @@
 // === EVENTI PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { clientApi, eventApi, applicationApi, getErrorMessage } from '../../api/client'
+import { clientApi, eventApi, talentApi, applicationApi, contractApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
@@ -39,24 +39,27 @@ function parseEsperienza(val) {
 // SATURATION BAR
 // ---------------------------------------------------------------------------
 
-function SaturationBar({ confirmed, required }) {
+function SaturationBar({ confirmed, required, onCountClick }) {
   if (!required || required <= 0) return null
-  const pct     = (confirmed / required) * 100
-  const over    = confirmed > required
+  const pct      = (confirmed / required) * 100
+  const over     = confirmed > required
   const clampPct = Math.min(pct, 100)
-  const color   = over ? '#EF4444' : pct >= 80 ? '#F97316' : '#10B981'
+  const color    = over ? '#EF4444' : pct >= 80 ? '#F97316' : '#10B981'
 
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:11, marginBottom:4 }}>
         <span style={{ color:COLORS.textSecondary, letterSpacing:'0.3px' }}>Saturazione</span>
-        <span style={{
-          fontWeight:700, color,
-          ...(over ? {
-            border:`1.5px solid ${color}`, borderRadius:10,
-            padding:'1px 7px', fontSize:11,
-          } : {}),
-        }}>
+        <span
+          onClick={onCountClick}
+          title={onCountClick ? 'Vedi talent approvati' : undefined}
+          style={{
+            fontWeight:700, color,
+            cursor: onCountClick ? 'pointer' : 'default',
+            textDecoration: onCountClick ? 'underline' : 'none',
+            ...(over ? { border:`1.5px solid ${color}`, borderRadius:10, padding:'1px 7px', fontSize:11 } : {}),
+          }}
+        >
           {confirmed}/{required}
         </span>
       </div>
@@ -125,6 +128,14 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     anni_esperienza_minimi: prefill?.anni_esperienza_minimi ?? '',
     richiede_trasferte: prefill?.richiede_trasferte ?? false,
     richiede_weekend:   prefill?.richiede_weekend   ?? false,
+    // Requisiti Talent
+    sesso_richiesto:           prefill?.sesso_richiesto           ?? 'Indifferente',
+    altezza_minima:            prefill?.altezza_minima            ?? '',
+    taglia_richiesta:          prefill?.taglia_richiesta          ?? '',
+    lingue_richieste:          prefill?.lingue_richieste          ?? [],
+    ruoli_richiesti:           prefill?.ruoli_richiesti           ?? [],
+    automunita:                prefill?.automunita                ?? 'Indifferente',
+    priorita_lavorato_con_noi: prefill?.priorita_lavorato_con_noi ?? false,
   })
   const [saving, setSaving] = useState(false)
   const set = key => e => setForm(p => ({ ...p, [key]: e.target.value }))
@@ -132,6 +143,10 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
 
   const save = async (e) => {
     e.preventDefault()
+    if (!form.client_id) {
+      alert('Seleziona un cliente per questo evento')
+      return
+    }
     setSaving(true)
     if (isEdit) {
       const res = handleApiResponse(await eventApi.update({ entity_id: prefill.entity_id, ...form }))
@@ -175,11 +190,18 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
             <Input label="Titolo *" value={form.titolo} onChange={set('titolo')} required />
 
             <div>
-              <label style={LBL}>Cliente</label>
-              <select value={form.client_id} onChange={set('client_id')} style={{ ...COMPONENT_STYLES.input }}>
-                <option value="">— Seleziona —</option>
+              <label style={LBL}>Cliente *</label>
+              <select
+                value={form.client_id}
+                onChange={set('client_id')}
+                style={{ ...COMPONENT_STYLES.input, borderColor: !form.client_id ? '#F97316' : undefined }}
+              >
+                <option value="">— Seleziona cliente —</option>
                 {clients.map(c => <option key={c.entity_id} value={c.entity_id}>{c.data?.ragione_sociale}</option>)}
               </select>
+              {!form.client_id && (
+                <div style={{ fontSize:11, color:'#C2410C', marginTop:3 }}>Obbligatorio</div>
+              )}
             </div>
 
             <Input label="Luogo / Città" value={form.luogo} onChange={set('luogo')} />
@@ -211,6 +233,91 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               <label style={LBL}>Descrizione</label>
               <textarea value={form.descrizione} onChange={set('descrizione')} rows={3} style={{ ...COMPONENT_STYLES.input, resize:'vertical', minHeight:80 }} />
             </div>
+
+            {/* ── REQUISITI TALENT ── */}
+            <div style={{ paddingTop:12, borderTop:`1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:12 }}>
+                Requisiti Talent
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <label style={LBL}>Sesso richiesto</label>
+                  <select value={form.sesso_richiesto} onChange={set('sesso_richiesto')} style={{ ...COMPONENT_STYLES.input }}>
+                    <option value="Indifferente">Indifferente</option>
+                    <option value="F">Femminile</option>
+                    <option value="M">Maschile</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={LBL}>Automunita</label>
+                  <select value={form.automunita} onChange={set('automunita')} style={{ ...COMPONENT_STYLES.input }}>
+                    <option value="Indifferente">Indifferente</option>
+                    <option value="Sì">Richiesta</option>
+                    <option value="No">Non necessaria</option>
+                  </select>
+                </div>
+                <Input label="Altezza minima (cm)" type="number" min="140" max="220" value={form.altezza_minima} onChange={set('altezza_minima')} placeholder="es. 170" />
+                <div>
+                  <label style={LBL}>Taglia</label>
+                  <select value={form.taglia_richiesta} onChange={set('taglia_richiesta')} style={{ ...COMPONENT_STYLES.input }}>
+                    <option value="">Qualsiasi</option>
+                    <option value="XS">XS</option>
+                    <option value="S">S</option>
+                    <option value="M">M</option>
+                    <option value="L">L</option>
+                    <option value="XL">XL</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop:12 }}>
+                <label style={LBL}>Lingue richieste</label>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>
+                  {['Italiano','Inglese','Francese','Spagnolo','Tedesco'].map(lang => (
+                    <label key={lang} style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, cursor:'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={(form.lingue_richieste ?? []).includes(lang)}
+                        onChange={e => {
+                          const cur = form.lingue_richieste ?? []
+                          setForm(p => ({ ...p, lingue_richieste: e.target.checked ? [...cur, lang] : cur.filter(l => l !== lang) }))
+                        }}
+                      />
+                      {lang}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop:12 }}>
+                <label style={LBL}>Ruolo richiesto</label>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>
+                  {['Accoglienza','Accrediti','Guardaroba','Promoter','Modella','Coordinatrice'].map(ruolo => (
+                    <label key={ruolo} style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, cursor:'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={(form.ruoli_richiesti ?? []).includes(ruolo)}
+                        onChange={e => {
+                          const cur = form.ruoli_richiesti ?? []
+                          setForm(p => ({ ...p, ruoli_richiesti: e.target.checked ? [...cur, ruolo] : cur.filter(r => r !== ruolo) }))
+                        }}
+                      />
+                      {ruolo}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, cursor:'pointer', marginTop:12 }}>
+                <input
+                  type="checkbox"
+                  checked={form.priorita_lavorato_con_noi ?? false}
+                  onChange={e => setForm(p => ({ ...p, priorita_lavorato_con_noi: e.target.checked }))}
+                />
+                Priorità talent che hanno già lavorato con noi
+              </label>
+            </div>
           </div>
 
           <div style={{ marginTop:24, display:'flex', gap:10 }}>
@@ -226,116 +333,643 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
 }
 
 // ---------------------------------------------------------------------------
-// MATCH TALENT DRAWER (per-card)
+// CONTRACT PREVIEW MODAL
 // ---------------------------------------------------------------------------
 
-function MatchTalentDrawer({ event, allTalents, onClose, handleApiResponse }) {
+export function ContractPreviewModal({ talent, event, onClose }) {
+  const td = talent?.data ?? {}
+  const ed = event?.data ?? {}
+
+  useEffect(() => {
+    const el = document.createElement('style')
+    el.id = '__contract_print_css__'
+    el.textContent = `
+      @media print {
+        body * { visibility: hidden !important; }
+        #contract-printable, #contract-printable * { visibility: visible !important; }
+        #contract-printable {
+          position: fixed !important;
+          top: 0 !important; left: 0 !important; right: 0 !important;
+          padding: 15mm 20mm !important;
+          background: white !important;
+          overflow: visible !important;
+          max-width: none !important;
+        }
+        .contract-chrome { display: none !important; }
+      }
+    `
+    document.head.appendChild(el)
+    return () => { document.head.querySelector('#__contract_print_css__')?.remove() }
+  }, [])
+
+  const missing = (label) => (
+    <span style={{ color:'#C62828', fontWeight:600, background:'#FFF3F3', padding:'0 3px', borderRadius:2 }}>
+      [DATO MANCANTE – {label}]
+    </span>
+  )
+
+  const nomeCognome = [td.nome, td.cognome].filter(Boolean).join(' ') || null
+  const dataEvento  = ed.data_inizio
+    ? new Date(ed.data_inizio).toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' })
+    : null
+  const dataFirma = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' })
+
+  const S = {
+    page:     { fontFamily:'Montserrat,sans-serif', fontSize:'10pt', lineHeight:1.7, color:'#111', background:'#fff', padding:'40px 48px', maxWidth:794, width:'100%', boxSizing:'border-box' },
+    h1:       { fontSize:'14pt', fontWeight:700, color:'#7A1E2C', textAlign:'center', margin:'0 0 2px', letterSpacing:'0.5px' },
+    sub:      { fontSize:'8.5pt', color:'#888', textAlign:'center', margin:'0 0 20px' },
+    divider:  { borderTop:'1px solid #ddd', margin:'18px 0' },
+    artTitle: { fontSize:'10pt', fontWeight:700, color:'#7A1E2C', margin:'18px 0 5px' },
+    p:        { margin:'4px 0', fontSize:'10pt' },
+    dataRow:  { display:'flex', gap:16, marginBottom:3 },
+    dataLbl:  { fontSize:'9.5pt', color:'#555', minWidth:190, flexShrink:0 },
+    dataVal:  { fontSize:'9.5pt', fontWeight:500 },
+    sigRow:   { display:'flex', gap:60, marginTop:40 },
+    sigBox:   { flex:1 },
+    sigLine:  { borderTop:'1.5px solid #111', marginTop:44, marginBottom:5 },
+    sigName:  { fontSize:'9pt', color:'#555' },
+  }
+
+  const DR = ({ label, val, labelM }) => (
+    <div style={S.dataRow}>
+      <span style={S.dataLbl}>{label}</span>
+      <span style={S.dataVal}>{val ? val : missing(labelM || label)}</span>
+    </div>
+  )
+
+  const downloadDocx = async () => {
+    if (!window.docx) { alert('Libreria .docx non disponibile. Ricarica la pagina.'); return }
+    const { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, AlignmentType } = window.docx
+
+    const MAROON = '7A1E2C'; const GRAY = '888888'; const RED = 'C62828'
+    const PT11 = 22; const PT14 = 28; const PT9 = 18
+    const CM2_5 = 1418 // 2.5cm in twips (1cm = 567twips)
+
+    const v = (x) => (x && String(x).trim()) ? String(x).trim() : null
+
+    const AT = (text) => new Paragraph({
+      children: [new TextRun({ text, bold: true, color: MAROON, size: PT11 })],
+      spacing: { before: 280, after: 100 },
+    })
+    const BP = (text) => new Paragraph({
+      children: [new TextRun({ text, size: PT11 })],
+      spacing: { after: 80 },
+    })
+    const DL = (label, value) => new Paragraph({
+      children: [
+        new TextRun({ text: `${label}: `, bold: true, size: PT11 }),
+        v(value)
+          ? new TextRun({ text: v(value), size: PT11 })
+          : new TextRun({ text: '[DATO MANCANTE]', bold: true, color: RED, size: PT11 }),
+      ],
+      spacing: { after: 60 },
+    })
+    const LI = (text) => new Paragraph({
+      children: [new TextRun({ text: `\u2022 ${text}`, size: PT11 })],
+      indent: { left: 360 },
+      spacing: { after: 60 },
+    })
+
+    const nomeParts = (nomeCognome || 'Talent').replace(/\s+/g, '_')
+    const dataParts = ed.data_inizio
+      ? new Date(ed.data_inizio).toISOString().slice(0,10).replace(/-/g,'')
+      : 'ND'
+
+    const doc = new Document({
+      sections: [{
+        properties: { page: { margin: { top: CM2_5, right: CM2_5, bottom: CM2_5, left: CM2_5 } } },
+        headers: {
+          default: new Header({
+            children: [new Paragraph({
+              children: [new TextRun({ text: '[LOGO]', bold: true, color: MAROON, size: PT14 })],
+              alignment: AlignmentType.CENTER,
+            })],
+          }),
+        },
+        footers: {
+          default: new Footer({
+            children: [new Paragraph({
+              children: [
+                new TextRun({ text: 'Made Events S.r.l.s. \u2014 Via Montepulciano 60, Roma \u2014 C.F. 16645801008 \u2014 Pagina ', size: PT9, color: GRAY }),
+                new TextRun({ children: [PageNumber.CURRENT], size: PT9, color: GRAY }),
+              ],
+              alignment: AlignmentType.CENTER,
+            })],
+          }),
+        },
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: 'CONTRATTO DI COLLABORAZIONE OCCASIONALE', bold: true, color: MAROON, size: PT14 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 80 },
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: 'Made Events S.r.l.s. \u2014 Via Montepulciano 60, Roma \u2014 C.F. / P.IVA 16645801008', size: PT9, color: GRAY })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 280 },
+          }),
+          AT('PARTI CONTRAENTI'),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Committente: ', bold: true, size: PT11 }),
+              new TextRun({ text: 'Made Events S.r.l.s., con sede legale in Via Montepulciano 60, Roma, C.F. / P.IVA 16645801008', size: PT11 }),
+            ],
+            spacing: { after: 80 },
+          }),
+          BP('Prestatore:'),
+          DL('Nome e Cognome',   nomeCognome),
+          DL('Codice Fiscale',   td.codice_fiscale),
+          DL('Data di nascita',  td.data_nascita),
+          DL('Luogo di nascita', td.citta_nascita),
+          DL('Nazionalit\u00e0', td.nazionalita),
+          DL('Residenza',        td.indirizzo_residenza),
+          DL('N\u00b0 Documento',td.numero_documento),
+          DL('Emesso da',        td.stato_emissione_documento),
+          AT("Art. 1 \u2013 OGGETTO DELL'INCARICO"),
+          BP('Il Prestatore si impegna a svolgere attivit\u00e0 di Hostess/Steward/Promoter per conto del Committente.'),
+          DL('Tipologia evento',        ed.tipologia),
+          DL('Data',                    dataEvento),
+          DL('Luogo',                   ed.luogo),
+          DL('Orario',                  ed.orario),
+          DL('Abbigliamento richiesto', ed.abbigliamento_richiesto),
+          AT('Art. 2 \u2013 NATURA DEL RAPPORTO'),
+          BP("La prestazione oggetto del presente accordo \u00e8 da intendersi occasionale, senza alcun vincolo di subordinazione n\u00e9 oneri previdenziali a carico del Committente. La Risorsa dichiara di non aver percepito, nel corso dell'anno solare, compensi complessivi superiori a \u20ac 5.000,00 derivanti da prestazioni di lavoro occasionale. La prestazione avr\u00e0 carattere esclusivamente autonomo e professionale; pertanto, ogni responsabilit\u00e0, ivi compresa quella infortunistica, resta a carico del Prestatore."),
+          AT('Art. 3 \u2013 CORRISPETTIVO E PAGAMENTO'),
+          DL('Compenso', ed.compenso),
+          BP("Il pagamento avverr\u00e0 a 30 giorni fine mese tramite bonifico bancario. Il pagamento \u00e8 subordinato a: corretta esecuzione della prestazione, invio della documentazione richiesta (ritenuta d'acconto o fattura), effettivo incasso da parte del Committente. In assenza dei dati richiesti, il pagamento sar\u00e0 posticipato. Eventuali ore extra saranno riconosciute solo se autorizzate preventivamente."),
+          AT('Art. 4 \u2013 RECESSO E PENALI'),
+          BP('Il Prestatore potr\u00e0 recedere con preavviso minimo di 48 ore, motivando la propria decisione. In caso di mancato preavviso o assenza sar\u00e0 applicata una penale di \u20ac150,00, fatto salvo il risarcimento di eventuali danni ulteriori. La mancata presentazione o ritardi superiori a 15 minuti senza preavviso saranno considerati grave inadempienza.'),
+          AT('Art. 5 \u2013 ANNULLAMENTO O MODIFICHE'),
+          BP("Il Committente si riserva il diritto di annullare l'attivit\u00e0 o modificare orari, luogo o mansioni. Le variazioni saranno comunicate tempestivamente. La Risorsa potr\u00e0 accettare o rifiutare entro 24 ore. Il compenso sar\u00e0 proporzionato alle ore effettivamente svolte."),
+          AT('Art. 6 \u2013 SVOLGIMENTO DEL SERVIZIO'),
+          BP('La Risorsa si impegna a:'),
+          LI('rispettare gli orari di convocazione;'),
+          LI('attenersi alle indicazioni operative;'),
+          LI('mantenere un comportamento professionale.'),
+          BP('\u00c8 fatto divieto di utilizzare il telefono durante il servizio (salvo autorizzazione) e di allontanarsi dalla postazione senza consenso.'),
+          AT('Art. 7 \u2013 DRESS CODE'),
+          BP("La Risorsa \u00e8 tenuta a rispettare il dress code indicato. Il mancato rispetto potr\u00e0 comportare esclusione dall'attivit\u00e0 e mancato riconoscimento del compenso."),
+          AT('Art. 8 \u2013 INTERRUZIONE DEL SERVIZIO'),
+          BP('In caso di comportamento non conforme, il Committente si riserva il diritto di interrompere la prestazione. In tal caso non sar\u00e0 dovuto il compenso per le ore non svolte.'),
+          AT('Art. 9 \u2013 RISERVATEZZA'),
+          BP('Il Prestatore si impegna a non divulgare informazioni relative a cliente, evento e attivit\u00e0 svolta. La violazione comporta risoluzione del contratto ed eventuali azioni legali.'),
+          AT('Art. 10 \u2013 NON CONCORRENZA'),
+          BP("Il Prestatore si impegna a non contattare direttamente il cliente del Committente n\u00e9 ad accettare incarichi senza previa comunicazione e autorizzazione da parte dell'Agenzia. Eventuali contatti ricevuti dovranno essere comunicati entro 24 ore a Made Events S.r.l.s. Tale obbligo si estende anche per un periodo successivo alla conclusione della collaborazione. L'inadempienza potr\u00e0 comportare l'avvio di azioni a tutela del Committente."),
+          AT('Art. 11 \u2013 RESPONSABILIT\u00c0'),
+          BP('Il Prestatore \u00e8 responsabile per eventuali danni arrecati a persone, cose o immagine del cliente.'),
+          AT('Art. 12 \u2013 TRATTAMENTO DATI E IMMAGINE'),
+          BP("La Risorsa autorizza il trattamento dei propri dati personali ai sensi del D.Lgs. 196/2003 e del Regolamento UE 679/2016 (GDPR), esclusivamente per le finalit\u00e0 connesse al presente rapporto. Durante lo svolgimento dell'attivit\u00e0 potranno essere realizzati contenuti fotografici e video a fini di reportistica interna e promozione aziendale. La Risorsa autorizza l'utilizzo di tali materiali, purch\u00e9 non lesivi della propria immagine, dignit\u00e0 e professionalit\u00e0."),
+          AT('Art. 13 \u2013 FORO COMPETENTE'),
+          BP('Per ogni controversia \u00e8 competente in via esclusiva il Foro di Roma.'),
+          AT('Art. 14 \u2013 ACCETTAZIONE'),
+          BP('Il Prestatore dichiara di aver letto e accettato tutte le condizioni.'),
+          new Paragraph({ children: [new TextRun({ text: '\u2500'.repeat(60), color: GRAY, size: PT9 })], spacing: { before: 280, after: 280 } }),
+          BP(`Data: ${dataFirma} \u2014 Roma`),
+          new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 560 } }),
+          new Paragraph({
+            children: [new TextRun({ text: '_'.repeat(32) + '          ' + '_'.repeat(32), size: PT11 })],
+            spacing: { after: 80 },
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: 'Il Committente' + ' '.repeat(40) + 'Il Prestatore', size: PT11 })],
+            spacing: { after: 60 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'Made Events S.r.l.s.' + ' '.repeat(34) + (nomeCognome || '[DATO MANCANTE]'), bold: true, size: PT11 }),
+            ],
+          }),
+        ],
+      }],
+    })
+
+    const blob = await Packer.toBlob(doc)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Contratto_${nomeParts}_${dataParts}.docx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const btnPrimary   = { background:'#7A1E2C', color:'#fff', border:'none', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
+  const btnSecondary = { background:'none', border:'1px solid rgba(255,255,255,0.3)', color:'#ccc', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:600 }}>
+      <div onClick={onClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.65)' }} />
+
+      <div style={{ position:'relative', zIndex:1, height:'100%', overflowY:'auto', display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 16px 48px' }}>
+
+        {/* Chrome bar */}
+        <div className="contract-chrome" style={{
+          position:'sticky', top:0, zIndex:10,
+          display:'flex', alignItems:'center', gap:10,
+          background:'rgba(10,10,16,0.9)', backdropFilter:'blur(10px)',
+          padding:'10px 20px', borderRadius:8, marginBottom:16,
+          width:'100%', maxWidth:794, boxSizing:'border-box',
+        }}>
+          <span style={{ fontSize:13, fontWeight:600, color:'#fff', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            Contratto — {nomeCognome || 'Talent'}
+          </span>
+          <button onClick={() => window.print()} style={btnPrimary}>Stampa / PDF</button>
+          <button onClick={downloadDocx} style={{ ...btnPrimary, background:'#1D4ED8' }}>Scarica .docx</button>
+          <button onClick={() => alert('Funzione invio email in arrivo')} style={btnSecondary}>Invia per email</button>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#999', fontSize:18, cursor:'pointer', padding:'4px 8px', lineHeight:1 }}>✕</button>
+        </div>
+
+        {/* A4 Contract */}
+        <div id="contract-printable" style={S.page}>
+
+          <p style={S.h1}>CONTRATTO DI COLLABORAZIONE OCCASIONALE</p>
+          <p style={S.sub}>Made Events S.r.l.s. — Via Montepulciano 60, Roma — C.F. / P.IVA 16645801008</p>
+          <div style={S.divider} />
+
+          <p style={{ ...S.artTitle, marginTop:0 }}>PARTI CONTRAENTI</p>
+          <p style={S.p}><strong>Committente:</strong> Made Events S.r.l.s., con sede legale in Via Montepulciano 60, Roma, C.F. / P.IVA 16645801008</p>
+          <p style={{ ...S.p, marginTop:8 }}><strong>Prestatore:</strong></p>
+          <div style={{ marginTop:8, marginBottom:4 }}>
+            <DR label="Nome e Cognome"   val={nomeCognome}              labelM="Nome / Cognome" />
+            <DR label="Codice Fiscale"   val={td.codice_fiscale}        labelM="Codice Fiscale" />
+            <DR label="Data di nascita"  val={td.data_nascita}          labelM="Data di nascita" />
+            <DR label="Luogo di nascita" val={td.citta_nascita}         labelM="Città di nascita" />
+            <DR label="Nazionalità"      val={td.nazionalita}           labelM="Nazionalità" />
+            <DR label="Residenza"        val={td.indirizzo_residenza}   labelM="Indirizzo di residenza" />
+            <DR label="N° Documento"     val={td.numero_documento}      labelM="Numero documento" />
+            <DR label="Emesso da"        val={td.stato_emissione_documento} labelM="Stato emissione documento" />
+          </div>
+
+          <div style={S.divider} />
+
+          <p style={S.artTitle}>Art. 1 – OGGETTO DELL&apos;INCARICO</p>
+          <p style={S.p}>Il Prestatore si impegna a svolgere attività di Hostess/Steward/Promoter per conto del Committente.</p>
+          <div style={{ marginTop:8, marginBottom:4 }}>
+            <DR label="Tipologia evento"        val={ed.tipologia}               labelM="Tipologia evento" />
+            <DR label="Data"                    val={dataEvento}                 labelM="Data evento" />
+            <DR label="Luogo"                   val={ed.luogo}                   labelM="Luogo evento" />
+            <DR label="Orario"                  val={ed.orario}                  labelM="Orario" />
+            <DR label="Abbigliamento richiesto" val={ed.abbigliamento_richiesto} labelM="Abbigliamento richiesto" />
+          </div>
+
+          <p style={S.artTitle}>Art. 2 – NATURA DEL RAPPORTO</p>
+          <p style={S.p}>La prestazione oggetto del presente accordo è da intendersi occasionale, senza alcun vincolo di subordinazione né oneri previdenziali a carico del Committente. La Risorsa dichiara di non aver percepito, nel corso dell&apos;anno solare, compensi complessivi superiori a € 5.000,00 derivanti da prestazioni di lavoro occasionale. La prestazione avrà carattere esclusivamente autonomo e professionale; pertanto, ogni responsabilità, ivi compresa quella infortunistica, resta a carico del Prestatore.</p>
+
+          <p style={S.artTitle}>Art. 3 – CORRISPETTIVO E PAGAMENTO</p>
+          <p style={S.p}>Il compenso sarà quello indicato nei dettagli attività: <strong>{ed.compenso ? ed.compenso : missing('Compenso')}</strong>. Il pagamento avverrà a 30 giorni fine mese tramite bonifico bancario. Il pagamento è subordinato a: corretta esecuzione della prestazione, invio della documentazione richiesta (ritenuta d&apos;acconto o fattura), effettivo incasso da parte del Committente. In assenza dei dati richiesti, il pagamento sarà posticipato. Eventuali ore extra saranno riconosciute solo se autorizzate preventivamente.</p>
+
+          <p style={S.artTitle}>Art. 4 – RECESSO E PENALI</p>
+          <p style={S.p}>Il Prestatore potrà recedere con preavviso minimo di 48 ore, motivando la propria decisione. In caso di mancato preavviso o assenza sarà applicata una penale di €150,00, fatto salvo il risarcimento di eventuali danni ulteriori. La mancata presentazione o ritardi superiori a 15 minuti senza preavviso saranno considerati grave inadempienza.</p>
+
+          <p style={S.artTitle}>Art. 5 – ANNULLAMENTO O MODIFICHE</p>
+          <p style={S.p}>Il Committente si riserva il diritto di annullare l&apos;attività o modificare orari, luogo o mansioni. Le variazioni saranno comunicate tempestivamente. La Risorsa potrà accettare o rifiutare entro 24 ore. Il compenso sarà proporzionato alle ore effettivamente svolte.</p>
+
+          <p style={S.artTitle}>Art. 6 – SVOLGIMENTO DEL SERVIZIO</p>
+          <p style={S.p}>La Risorsa si impegna a:</p>
+          <ul style={{ margin:'5px 0 5px 22px', padding:0 }}>
+            <li style={S.p}>rispettare gli orari di convocazione;</li>
+            <li style={S.p}>attenersi alle indicazioni operative;</li>
+            <li style={S.p}>mantenere un comportamento professionale.</li>
+          </ul>
+          <p style={S.p}>È fatto divieto di utilizzare il telefono durante il servizio (salvo autorizzazione) e di allontanarsi dalla postazione senza consenso.</p>
+
+          <p style={S.artTitle}>Art. 7 – DRESS CODE</p>
+          <p style={S.p}>La Risorsa è tenuta a rispettare il dress code indicato. Il mancato rispetto potrà comportare esclusione dall&apos;attività e mancato riconoscimento del compenso.</p>
+
+          <p style={S.artTitle}>Art. 8 – INTERRUZIONE DEL SERVIZIO</p>
+          <p style={S.p}>In caso di comportamento non conforme, il Committente si riserva il diritto di interrompere la prestazione. In tal caso non sarà dovuto il compenso per le ore non svolte.</p>
+
+          <p style={S.artTitle}>Art. 9 – RISERVATEZZA</p>
+          <p style={S.p}>Il Prestatore si impegna a non divulgare informazioni relative a cliente, evento e attività svolta. La violazione comporta risoluzione del contratto ed eventuali azioni legali.</p>
+
+          <p style={S.artTitle}>Art. 10 – NON CONCORRENZA</p>
+          <p style={S.p}>Il Prestatore si impegna a non contattare direttamente il cliente del Committente né ad accettare incarichi senza previa comunicazione e autorizzazione da parte dell&apos;Agenzia. Eventuali contatti ricevuti dovranno essere comunicati entro 24 ore a Made Events S.r.l.s. Tale obbligo si estende anche per un periodo successivo alla conclusione della collaborazione. L&apos;inadempienza potrà comportare l&apos;avvio di azioni a tutela del Committente.</p>
+
+          <p style={S.artTitle}>Art. 11 – RESPONSABILITÀ</p>
+          <p style={S.p}>Il Prestatore è responsabile per eventuali danni arrecati a persone, cose o immagine del cliente.</p>
+
+          <p style={S.artTitle}>Art. 12 – TRATTAMENTO DATI E IMMAGINE</p>
+          <p style={S.p}>La Risorsa autorizza il trattamento dei propri dati personali ai sensi del D.Lgs. 196/2003 e del Regolamento UE 679/2016 (GDPR), esclusivamente per le finalità connesse al presente rapporto. Durante lo svolgimento dell&apos;attività potranno essere realizzati contenuti fotografici e video a fini di reportistica interna e promozione aziendale. La Risorsa autorizza l&apos;utilizzo di tali materiali, purché non lesivi della propria immagine, dignità e professionalità.</p>
+
+          <p style={S.artTitle}>Art. 13 – FORO COMPETENTE</p>
+          <p style={S.p}>Per ogni controversia è competente in via esclusiva il Foro di Roma.</p>
+
+          <p style={S.artTitle}>Art. 14 – ACCETTAZIONE</p>
+          <p style={S.p}>Il Prestatore dichiara di aver letto e accettato tutte le condizioni.</p>
+
+          <div style={{ ...S.divider, marginTop:28 }} />
+
+          <p style={{ ...S.p, marginBottom:6 }}>Le parti dichiarano di aver letto, compreso e accettato integralmente il presente contratto.</p>
+          <p style={S.p}><strong>Data:</strong> {dataFirma} — Roma</p>
+
+          <div style={S.sigRow}>
+            <div style={S.sigBox}>
+              <div style={S.sigLine} />
+              <div style={S.sigName}>Il Committente</div>
+              <div style={{ ...S.sigName, fontWeight:600 }}>Made Events S.r.l.s.</div>
+            </div>
+            <div style={S.sigBox}>
+              <div style={S.sigLine} />
+              <div style={S.sigName}>Il Prestatore</div>
+              <div style={{ ...S.sigName, fontWeight:600 }}>{nomeCognome || missing('Nome Cognome')}</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// TALENT EVENT DRAWER — 3 tab: Potenziali / In Attesa / Approvati
+// ---------------------------------------------------------------------------
+
+function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, initialTab = 'potenziali' }) {
   const d = event.data ?? {}
-  const [inviteLoading, setInviteLoading] = useState(null) // entity_id being invited
-  const [invited,       setInvited]       = useState(new Set())
+  const [tab,           setTab]           = useState(initialTab)
+  const [applications,  setApplications]  = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [actionLoading, setActionLoading] = useState(null)
+  const [contractData,  setContractData]  = useState(null)
+
+  const loadApps = useCallback(async () => {
+    setLoading(true)
+    const res = handleApiResponse(await applicationApi.list({ event_id: event.entity_id }))
+    setLoading(false)
+    if (res.success) setApplications(res.data?.items ?? [])
+  }, [event.entity_id, handleApiResponse])
+
+  useEffect(() => { loadApps() }, [loadApps])
+
+  // Sync tab when initialTab prop changes (e.g. click on saturation count)
+  useEffect(() => { setTab(initialTab) }, [initialTab])
+
+  // Talent lookup: entity_id → talent
+  const talentMap = useMemo(() => {
+    const m = {}
+    allTalents.forEach(t => { m[t.entity_id] = t })
+    return m
+  }, [allTalents])
+
+  // Split applications by status + collect applied IDs
+  const { pendingApps, approvedApps, appliedIds } = useMemo(() => {
+    const pendingApps  = []
+    const approvedApps = []
+    const appliedIds   = new Set()
+    applications.forEach(a => {
+      if (a.data?.talent_profile_id) appliedIds.add(a.data.talent_profile_id)
+      const s = a.status
+      if (s === 'PENDING' || s === 'INVITED') pendingApps.push(a)
+      else if (s === 'APPROVED')              approvedApps.push(a)
+    })
+    return { pendingApps, approvedApps, appliedIds }
+  }, [applications])
+
+  // TAB A — talent APPROVED non ancora candidati, filtrati per requisiti evento
+  const potenziali = useMemo(() => {
+    const luogo = (d.luogo ?? '').toUpperCase()
+    return allTalents.filter(t => {
+      if (appliedIds.has(t.entity_id)) return false
+      const td = t.data ?? {}
+
+      // Geo: province_lavoro o città vs luogo evento, o disponibilità trasferte
+      const provinces = td.province_lavoro ?? []
+      const cityMatch = provinces.some(p => luogo.includes(p.toUpperCase())) ||
+        (td.citta && luogo.includes(td.citta.toUpperCase()))
+      if (!cityMatch && td.disponibilita_trasferte !== 'Sì') return false
+
+      if (d.richiede_weekend  && td.disponibilita_weekend  !== 'Sì') return false
+      if (d.richiede_trasferte && td.disponibilita_trasferte !== 'Sì') return false
+
+      const minEsp = Number(d.anni_esperienza_minimi) || 0
+      if (minEsp > 0 && parseEsperienza(td.anni_esperienza_settore) < minEsp) return false
+
+      // Nuovi requisiti evento
+      if (d.sesso_richiesto && d.sesso_richiesto !== 'Indifferente') {
+        if (td.sesso && td.sesso !== d.sesso_richiesto) return false
+      }
+      if (d.altezza_minima && Number(td.altezza) < Number(d.altezza_minima)) return false
+      if (d.automunita && d.automunita !== 'Indifferente') {
+        if (d.automunita === 'Sì' && td.automunita !== 'Sì') return false
+      }
+      if ((d.lingue_richieste ?? []).length > 0) {
+        const talentLingue = (td.lingue ?? []).map(l => l.toLowerCase())
+        if (!d.lingue_richieste.every(l => talentLingue.includes(l.toLowerCase()))) return false
+      }
+
+      return true
+    }).sort((a, b) => (Number(b.data?.score) || 0) - (Number(a.data?.score) || 0))
+  }, [allTalents, appliedIds, d])
 
   const handleInvite = async (talentId) => {
-    setInviteLoading(talentId)
+    setActionLoading(talentId)
     const res = handleApiResponse(await applicationApi.invite(talentId, event.entity_id))
-    setInviteLoading(null)
-    if (res.success) {
-      setInvited(prev => new Set(prev).add(talentId))
+    setActionLoading(null)
+    if (res.success) await loadApps()
+    else alert(getErrorMessage(res.error))
+  }
+
+  const handleApprove = async (appId) => {
+    setActionLoading(appId + '_ap')
+    const res = handleApiResponse(await applicationApi.approve(appId))
+    setActionLoading(null)
+    if (res.success) loadApps()
+    else alert(getErrorMessage(res.error))
+  }
+
+  const handleReject = async (appId) => {
+    setActionLoading(appId + '_rj')
+    const res = handleApiResponse(await applicationApi.reject(appId))
+    setActionLoading(null)
+    if (res.success) loadApps()
+    else alert(getErrorMessage(res.error))
+  }
+
+  const handleContractGenerate = async (talentProfileId, appId) => {
+    setActionLoading(appId + '_ct')
+    const res = handleApiResponse(await contractApi.generate(talentProfileId, event.entity_id))
+    setActionLoading(null)
+    if (res.success && res.data?.url) {
+      window.open(res.data.url, '_blank')
     } else {
       alert(getErrorMessage(res.error))
     }
   }
 
-  // Extract province codes from luogo (e.g. "(MI)", "Milano" → "MI")
-  const luogo = (d.luogo ?? '').toUpperCase()
+  const TABS = [
+    { key:'potenziali', label:`Potenziali (${potenziali.length})` },
+    { key:'attesa',     label:`In Attesa (${pendingApps.length})` },
+    { key:'approvati',  label:`Approvati (${approvedApps.length})` },
+  ]
+  const BG = '#0E0E16'; const BD = '#2A2A3A'; const TEXT = '#E8E8F0'; const MUTED = '#8888A0'
 
-  const compatible = useMemo(() => {
-    return allTalents.filter(t => {
-      const td = t.data ?? {}
-      // Province match: any talent province appears in luogo string
-      const provinces = td.province_lavoro ?? []
-      const cityMatch = provinces.some(p => luogo.includes(p.toUpperCase())) ||
-        (td.citta && luogo.includes(td.citta.toUpperCase()))
+  // Mini talent row component (defined inline to use closure vars)
+  const TRow = ({ t, app, children }) => {
+    const td   = t?.data ?? app?.data ?? {}
+    const nome = td.nome ? `${td.nome} ${td.cognome ?? ''}`.trim() : (app?.data?.talent_name ?? '—')
+    return (
+      <div style={{ background:'#1A1A24', borderRadius:8, padding:'12px 14px', display:'flex', gap:12, alignItems:'center' }}>
+        <TalentAvatar nome={nome} fotoUrl={td.foto_busto_url} size={40} />
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:TEXT }}>{nome}</div>
+          <div style={{ fontSize:11, color:MUTED, marginTop:2 }}>
+            {td.citta ?? '—'}{td.score != null ? ` · score ${td.score}` : ''}
+          </div>
+          {td.score != null && <div style={{ marginTop:4 }}><ScoreBar score={td.score} /></div>}
+        </div>
+        <div style={{ display:'flex', gap:6, flexShrink:0 }}>{children}</div>
+      </div>
+    )
+  }
 
-      if (!cityMatch && !td.disponibilita_trasferte === 'Sì') {
-        // If no city match and no trasferte, skip
-        if (td.disponibilita_trasferte !== 'Sì') return false
-      }
-
-      // Weekend check
-      if (d.richiede_weekend && td.disponibilita_weekend !== 'Sì') return false
-
-      // Trasferte check
-      if (d.richiede_trasferte && td.disponibilita_trasferte !== 'Sì') return false
-
-      // Anni esperienza check
-      const minEsp = Number(d.anni_esperienza_minimi) || 0
-      if (minEsp > 0 && parseEsperienza(td.anni_esperienza_settore) < minEsp) return false
-
-      return true
-    }).sort((a, b) => (Number(b.data?.score) || 0) - (Number(a.data?.score) || 0))
-  }, [allTalents, d, luogo])
+  const BTN = (color) => ({
+    background:'none', border:`1px solid ${color}`, color,
+    borderRadius:6, padding:'5px 10px', fontSize:11,
+    cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap',
+  })
 
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:300 }} />
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:300 }} />
       <div style={{
-        position:'fixed', right:0, top:0, bottom:0, width:520, maxWidth:'96vw',
-        background:'#0E0E16', borderLeft:'1px solid #2A2A3A',
-        zIndex:301, overflowY:'auto', padding:32,
+        position:'fixed', right:0, top:0, bottom:0, width:540, maxWidth:'96vw',
+        background:BG, borderLeft:`1px solid ${BD}`,
+        zIndex:301, display:'flex', flexDirection:'column',
         fontFamily:'Montserrat, sans-serif',
       }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
-          <div>
-            <h2 style={{ fontSize:17, fontWeight:700, margin:0, color:'#E8E8F0' }}>Talent compatibili</h2>
-            <div style={{ fontSize:12, color:'#8888A0', marginTop:4 }}>{d.titolo}</div>
+        {/* Header */}
+        <div style={{ padding:'24px 28px 0', flexShrink:0 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+            <div>
+              <h2 style={{ fontSize:17, fontWeight:700, margin:0, color:TEXT }}>Talent per evento</h2>
+              <div style={{ fontSize:12, color:MUTED, marginTop:3 }}>{d.titolo}</div>
+            </div>
+            <button onClick={onClose} style={{ background:'none', border:'none', color:MUTED, fontSize:18, cursor:'pointer', padding:'4px 8px', lineHeight:1 }}>✕</button>
           </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#8888A0', fontSize:18, cursor:'pointer', padding:'4px 8px', lineHeight:1 }}>✕</button>
+
+          {/* Requisiti pillole */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+            {d.luogo            && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>📍 {d.luogo}</span>}
+            {d.richiede_trasferte && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>Trasferte</span>}
+            {d.richiede_weekend   && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>Weekend</span>}
+            {Number(d.anni_esperienza_minimi) > 0 && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>Esp. ≥ {d.anni_esperienza_minimi}y</span>}
+            {d.sesso_richiesto && d.sesso_richiesto !== 'Indifferente' && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>Sesso: {d.sesso_richiesto}</span>}
+            {d.altezza_minima  && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>Altezza ≥ {d.altezza_minima}cm</span>}
+            {(d.lingue_richieste ?? []).map(l => <span key={l} style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>{l}</span>)}
+          </div>
+
+          {/* Tab switcher */}
+          <div style={{ display:'flex', borderBottom:`1px solid ${BD}` }}>
+            {TABS.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)} style={{
+                padding:'10px 14px', fontSize:12, fontWeight:600,
+                background:'none', border:'none', cursor:'pointer',
+                borderBottom: tab === t.key ? '2px solid #7A1E2C' : '2px solid transparent',
+                color: tab === t.key ? '#E8B4BC' : MUTED,
+                fontFamily:'Montserrat,sans-serif', marginBottom:-1,
+              }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {d.luogo && (
-          <div style={{ fontSize:12, color:'#8888A0', marginBottom:6 }}>📍 {d.luogo}</div>
-        )}
-
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20 }}>
-          {d.richiede_trasferte && <span style={{ fontSize:11, background:'#1A1A24', color:'#8888A0', padding:'3px 8px', borderRadius:10 }}>Trasferte</span>}
-          {d.richiede_weekend   && <span style={{ fontSize:11, background:'#1A1A24', color:'#8888A0', padding:'3px 8px', borderRadius:10 }}>Weekend</span>}
-          {d.anni_esperienza_minimi > 0 && <span style={{ fontSize:11, background:'#1A1A24', color:'#8888A0', padding:'3px 8px', borderRadius:10 }}>Esp. ≥ {d.anni_esperienza_minimi} anni</span>}
+        {/* Scrollable body */}
+        <div style={{ flex:1, overflowY:'auto', padding:'16px 28px 24px' }}>
+          {loading ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:40 }}><div className="spinner" /></div>
+          ) : tab === 'potenziali' ? (
+            potenziali.length === 0 ? (
+              <div style={{ color:MUTED, fontSize:13, textAlign:'center', marginTop:40 }}>
+                Nessun talent compatibile con i requisiti di questo evento.
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {potenziali.map(t => (
+                  <TRow key={t.entity_id} t={t}>
+                    <button
+                      onClick={() => actionLoading !== t.entity_id && handleInvite(t.entity_id)}
+                      disabled={actionLoading === t.entity_id}
+                      style={{ ...BTN('#7A1E2C'), color:'#E8B4BC', opacity: actionLoading === t.entity_id ? 0.5 : 1 }}
+                    >
+                      {actionLoading === t.entity_id ? '…' : 'Invita'}
+                    </button>
+                  </TRow>
+                ))}
+              </div>
+            )
+          ) : tab === 'attesa' ? (
+            pendingApps.length === 0 ? (
+              <div style={{ color:MUTED, fontSize:13, textAlign:'center', marginTop:40 }}>
+                Nessuna candidatura in attesa.
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {pendingApps.map(a => (
+                  <TRow key={a.entity_id} t={talentMap[a.data?.talent_profile_id]} app={a}>
+                    <button
+                      onClick={() => handleApprove(a.entity_id)}
+                      disabled={!!(actionLoading)}
+                      style={{ ...BTN('#10B981'), opacity: actionLoading === a.entity_id + '_ap' ? 0.5 : 1 }}
+                    >
+                      {actionLoading === a.entity_id + '_ap' ? '…' : 'Accetta'}
+                    </button>
+                    <button
+                      onClick={() => handleReject(a.entity_id)}
+                      disabled={!!(actionLoading)}
+                      style={{ ...BTN('#EF4444'), opacity: actionLoading === a.entity_id + '_rj' ? 0.5 : 1 }}
+                    >
+                      {actionLoading === a.entity_id + '_rj' ? '…' : 'Rifiuta'}
+                    </button>
+                  </TRow>
+                ))}
+              </div>
+            )
+          ) : ( /* tab === 'approvati' */
+            approvedApps.length === 0 ? (
+              <div style={{ color:MUTED, fontSize:13, textAlign:'center', marginTop:40 }}>
+                Nessun talent approvato per questo evento.
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {approvedApps.map(a => {
+                  const t = talentMap[a.data?.talent_profile_id]
+                  const ctBusy = actionLoading === a.entity_id + '_ct'
+                  return (
+                    <TRow key={a.entity_id} t={t} app={a}>
+                      <button
+                        disabled={ctBusy}
+                        onClick={() => handleContractGenerate(a.data?.talent_profile_id, a.entity_id)}
+                        style={{ ...BTN('#C8A96E'), color:'#C8A96E', opacity: ctBusy ? 0.5 : 1, minWidth: 80 }}
+                        title="Genera contratto Google Doc"
+                      >
+                        {ctBusy ? '…' : 'Contratto'}
+                      </button>
+                      <button
+                        onClick={() => setContractData({ talent: t ?? null })}
+                        style={{ ...BTN('#6b7280'), color:'#8888A0' }}
+                        title="Anteprima e download .docx offline"
+                      >
+                        .docx
+                      </button>
+                    </TRow>
+                  )
+                })}
+              </div>
+            )
+          )}
         </div>
-
-        {compatible.length === 0 ? (
-          <div style={{ color:'#8888A0', fontSize:13 }}>Nessun talent compatibile trovato con i filtri dell'evento.</div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {compatible.map(t => {
-              const td = t.data ?? {}
-              return (
-                <div key={t.entity_id} style={{ background:'#1A1A24', borderRadius:8, padding:'14px 16px', display:'flex', gap:14, alignItems:'center' }}>
-                  <TalentAvatar nome={td.nome} fotoUrl={td.foto_busto_url} size={44} />
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:600, color:'#E8E8F0' }}>{td.nome} {td.cognome}</div>
-                    <div style={{ fontSize:11, color:'#8888A0', marginTop:2 }}>{td.citta ?? '—'} · {td.disponibilita_trasferte === 'Sì' ? 'Trasferte ✓' : 'No trasferte'}</div>
-                    <div style={{ marginTop:6 }}><ScoreBar score={td.score} /></div>
-                  </div>
-                  <button
-                    onClick={() => !invited.has(t.entity_id) && handleInvite(t.entity_id)}
-                    disabled={inviteLoading === t.entity_id || invited.has(t.entity_id)}
-                    style={{
-                      background: invited.has(t.entity_id) ? '#2A2A3A' : 'none',
-                      border:'1px solid #7A1E2C', color: invited.has(t.entity_id) ? '#8888A0' : '#7A1E2C',
-                      borderRadius:6, padding:'5px 12px', fontSize:11,
-                      cursor: invited.has(t.entity_id) ? 'default' : 'pointer',
-                      fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap', flexShrink:0,
-                      opacity: inviteLoading === t.entity_id ? 0.5 : 1,
-                    }}
-                  >
-                    {inviteLoading === t.entity_id ? '…' : invited.has(t.entity_id) ? 'Invitato ✓' : 'Invita'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
+
+      {contractData && (
+        <ContractPreviewModal
+          talent={contractData.talent}
+          event={event}
+          onClose={() => setContractData(null)}
+        />
+      )}
     </>
   )
 }
@@ -344,7 +978,7 @@ function MatchTalentDrawer({ event, allTalents, onClose, handleApiResponse }) {
 // EVENT CARD
 // ---------------------------------------------------------------------------
 
-function EventCard({ event, clients, onToggle, onDuplica, onModifica, onMatchTalent, toggling, closedSet, onToggleClosed, richieste, onSetRichieste }) {
+function EventCard({ event, clients, onToggle, onDuplica, onModifica, onMatchTalent, toggling, closedSet, onToggleClosed, richieste, onSetRichieste, onSaveRichieste }) {
   const d          = event.data ?? {}
   const sm         = statusMeta(event.status)
   const client     = clients.find(c => c.entity_id === d.client_id)
@@ -415,12 +1049,19 @@ function EventCard({ event, clients, onToggle, onDuplica, onModifica, onMatchTal
             value={richieste[event.entity_id] ?? (d.hostess_richieste || '')}
             placeholder="—"
             onChange={e => onSetRichieste(event.entity_id, e.target.value === '' ? 0 : Number(e.target.value))}
+            onBlur={e => onSaveRichieste(event.entity_id, e.target.value === '' ? 0 : Number(e.target.value))}
             style={{ width:52, border:'1px solid #e0e0e0', borderRadius:4, padding:'3px 6px', fontSize:12, fontFamily:'Montserrat,sans-serif', outline:'none' }}
           />
         </div>
 
-        {/* Saturation bar */}
-        {required > 0 && <SaturationBar confirmed={confirmed} required={required} />}
+        {/* Saturation bar — count click apre TAB Approvati */}
+        {required > 0 && (
+          <SaturationBar
+            confirmed={confirmed}
+            required={required}
+            onCountClick={() => onMatchTalent(event, 'approvati')}
+          />
+        )}
       </div>
 
       {/* Actions row */}
@@ -462,8 +1103,8 @@ function EventCard({ event, clients, onToggle, onDuplica, onModifica, onMatchTal
         {/* Right-side buttons */}
         <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
           <button
-            onClick={() => onMatchTalent(event)}
-            title="Talent compatibili"
+            onClick={() => onMatchTalent(event, 'potenziali')}
+            title="Talent per questo evento"
             style={{ background:'none', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'4px 10px', fontSize:10, cursor:'pointer', color:COLORS.textSecondary, fontFamily:'Montserrat,sans-serif' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor=COLORS.accent; e.currentTarget.style.color=COLORS.accent }}
             onMouseLeave={e => { e.currentTarget.style.borderColor=COLORS.border; e.currentTarget.style.color=COLORS.textSecondary }}
@@ -516,6 +1157,7 @@ export default function EventiPage() {
   const [formPrefill,  setFormPrefill]  = useState(null)
   const [isEdit,       setIsEdit]       = useState(false)
   const [matchEvent,   setMatchEvent]   = useState(null)
+  const [matchTab,     setMatchTab]     = useState('potenziali')
 
   // Per-card local state (needs backend to persist)
   const [closedSet,    setClosedSet]    = useState(new Set())   // entity_ids with closed selection
@@ -523,22 +1165,20 @@ export default function EventiPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [storeData, clRes] = await Promise.all([
+    const [storeData, clRes, talRes] = await Promise.all([
       adminStore.refresh(),
-      handleApiResponse(await clientApi.list()),
+      clientApi.list().then(r => handleApiResponse(r)),
+      talentApi.list({ status: 'APPROVED' }).then(r => handleApiResponse(r)),
     ])
     setLoading(false)
     if (!storeData) { setError('Errore nel caricamento dati.'); return }
-    setEvents(storeData.events ?? [])
+    const events = storeData.events ?? []
+    setEvents(events)
+    // Inizializza closedSet dai dati backend (selezioni_chiuse persistite)
+    setClosedSet(new Set(events.filter(e => e.data?.selezioni_chiuse).map(e => e.entity_id)))
     if (clRes.success) setClients(clRes.data?.items ?? [])
-    const seen = new Set()
-    const approved = (storeData.leads ?? []).filter(l => {
-      const key = (l.data?.email ?? l.entity_id).toLowerCase()
-      if (seen.has(key)) return false
-      seen.add(key)
-      return l.status === 'APPROVED'
-    })
-    setAllTalents(approved)
+    // BUG-2 fix: usa TALENT_PROFILE entities (entity_id corretto per application.invite)
+    if (talRes.success) setAllTalents(talRes.data?.items ?? [])
   }, [handleApiResponse])
 
   useEffect(() => { load() }, [load])
@@ -602,16 +1242,34 @@ export default function EventiPage() {
   const handleFormClose = () => { setShowForm(false); setFormPrefill(null); setIsEdit(false) }
   const handleFormSaved = () => { handleFormClose(); load() }
 
-  const handleToggleClosed = (entity_id) => {
+  const handleToggleClosed = async (entity_id) => {
+    const wasClosed = closedSet.has(entity_id)
+    const newClosed = !wasClosed
+    // Aggiornamento ottimistico
     setClosedSet(prev => {
       const next = new Set(prev)
-      next.has(entity_id) ? next.delete(entity_id) : next.add(entity_id)
+      newClosed ? next.add(entity_id) : next.delete(entity_id)
       return next
     })
+    const res = handleApiResponse(await eventApi.update({ entity_id, selezioni_chiuse: newClosed }))
+    if (!res.success) {
+      // Revert su errore
+      setClosedSet(prev => {
+        const next = new Set(prev)
+        wasClosed ? next.add(entity_id) : next.delete(entity_id)
+        return next
+      })
+      alert(getErrorMessage(res.error))
+    }
   }
 
   const handleSetRichieste = (entity_id, val) => {
     setRichieste(prev => ({ ...prev, [entity_id]: val }))
+  }
+
+  const handleSaveRichieste = async (entity_id, val) => {
+    const res = handleApiResponse(await eventApi.update({ entity_id, hostess_richieste: Number(val) || 0 }))
+    if (!res.success) alert(getErrorMessage(res.error))
   }
 
   const TAB = (active) => ({
@@ -670,12 +1328,13 @@ export default function EventiPage() {
               onToggle={handleToggle}
               onDuplica={handleDuplica}
               onModifica={handleModifica}
-              onMatchTalent={setMatchEvent}
+              onMatchTalent={(ev, tab = 'potenziali') => { setMatchEvent(ev); setMatchTab(tab) }}
               toggling={toggling}
               closedSet={closedSet}
               onToggleClosed={handleToggleClosed}
               richieste={richieste}
               onSetRichieste={handleSetRichieste}
+              onSaveRichieste={handleSaveRichieste}
             />
           ))}
         </div>
@@ -702,11 +1361,12 @@ export default function EventiPage() {
       )}
 
       {matchEvent && (
-        <MatchTalentDrawer
+        <TalentEventDrawer
           event={matchEvent}
           allTalents={allTalents}
           onClose={() => setMatchEvent(null)}
           handleApiResponse={handleApiResponse}
+          initialTab={matchTab}
         />
       )}
     </Layout>

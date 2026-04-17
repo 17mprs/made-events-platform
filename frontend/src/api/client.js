@@ -15,14 +15,15 @@ export const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxx22bM7g-Q
  * Invia una request al backend GAS.
  * Usa Content-Type: text/plain per evitare CORS preflight con GAS.
  */
-const GAS_TIMEOUT_MS = 45_000 // 45s — copre cold start GAS (~15-30s)
+const GAS_TIMEOUT_MS        = 45_000  // 45s — copre cold start GAS (~15-30s)
+const GAS_UPLOAD_TIMEOUT_MS = 120_000 // 120s — per upload file base64 (cold start + Drive write)
 
-async function gasPost(action, payload = {}, token = null) {
+async function gasPost(action, payload = {}, token = null, timeoutMs = GAS_TIMEOUT_MS) {
   const body = { action, payload }
   if (token) body.token = token
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), GAS_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const res = await fetch(GAS_ENDPOINT, {
@@ -144,7 +145,7 @@ export const talentApi = {
   registerStep3:  (payload)   => gasPost('talent.registerStep3', payload),
   getLead:        (lead_token) => gasPost('talent.getLead', { lead_token }),
   uploadRegistrationDoc: (lead_id, email, tipo_doc, file_base64, filename, mime_type) =>
-    gasPost('talent.uploadRegistrationDoc', { lead_id, email, tipo_doc, file_base64, filename, mime_type }),
+    gasPost('talent.uploadRegistrationDoc', { lead_id, email, tipo_doc, file_base64, filename, mime_type }, null, GAS_UPLOAD_TIMEOUT_MS),
   list:           (payload = {}) => gasPost('talent.list',        payload, t()),
   get:            (entity_id) => gasPost('talent.get',            { entity_id }, t()),
   approve:        (entity_id, nota) => gasPost('talent.approve',  { entity_id, nota }, t()),
@@ -154,7 +155,10 @@ export const talentApi = {
 }
 
 export const leadApi = {
-  list: (payload = {}) => gasPost('lead.list', payload, t()),
+  list:       (payload = {})    => gasPost('lead.list',       payload,               t()),
+  solicit:    (entity_id)       => gasPost('lead.solicit',    { entity_id },          t()),
+  update:     (entity_id, data) => gasPost('lead.update',     { entity_id, ...data }, t()),
+  getByEmail: (email)           => gasPost('lead.getByEmail', { email }),
 }
 
 export const clientApi = {
@@ -183,15 +187,18 @@ export const shiftApi = {
 }
 
 export const applicationApi = {
-  submit:   (shift_id, messaggio = '') =>
-                                  gasPost('application.submit',  { shift_id, messaggio }, t()),
-  invite:   (talent_profile_id, event_id, messaggio = '') =>
-                                  gasPost('application.invite',  { talent_profile_id, event_id, messaggio }, t()),
-  approve:  (entity_id)        => gasPost('application.approve', { entity_id }, t()),
-  reject:   (entity_id, nota_rifiuto = '') =>
-                                  gasPost('application.reject',  { entity_id, nota_rifiuto }, t()),
-  withdraw: (entity_id)        => gasPost('application.withdraw',{ entity_id }, t()),
-  list:     (payload = {})     => gasPost('application.list',    payload, t()),
+  submit:         (shift_id, messaggio = '') =>
+                    gasPost('application.submit',       { shift_id, messaggio }, t()),
+  submitForEvent: (event_id, messaggio = '') =>
+                    gasPost('application.submit',       { event_id, messaggio }, t()),
+  invite:         (talent_profile_id, event_id, messaggio = '') =>
+                    gasPost('application.invite',       { talent_profile_id, event_id, messaggio }, t()),
+  approve:        (entity_id)              => gasPost('application.approve',      { entity_id }, t()),
+  reject:         (entity_id, nota_rifiuto = '') =>
+                    gasPost('application.reject',       { entity_id, nota_rifiuto }, t()),
+  withdraw:       (entity_id)              => gasPost('application.withdraw',     { entity_id }, t()),
+  list:           (payload = {})           => gasPost('application.list',         payload, t()),
+  updateStatus:   (entity_id, new_status)  => gasPost('application.updateStatus', { entity_id, new_status }, t()),
 }
 
 export const assignmentApi = {
@@ -206,6 +213,11 @@ export const assignmentApi = {
 
 export const dashboardApi = {
   bootstrap: () => gasPost('dashboard.bootstrap', {}, t()),
+}
+
+export const contractApi = {
+  generate: (talent_profile_id, event_id) =>
+    gasPost('contract.generate', { talent_profile_id, event_id }, t()),
 }
 
 export const documentApi = {

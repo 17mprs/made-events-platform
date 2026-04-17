@@ -9,15 +9,17 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Un talent (USER) si candida a uno shift.
+ * Un talent (USER) si candida a uno shift o a un evento direttamente.
  * Regole (PRD RB-01, RB-03, BIZ_001/002/003, WF_003/004):
- *   - Shift deve essere OPEN
+ *   - shift_id: Shift deve essere OPEN
+ *   - event_id: Evento deve essere LIVE o PLANNING e selezioni non chiuse
  *   - Talent deve avere TALENT_PROFILE in stato APPROVED o ACTIVE
- *   - Non deve esserci già una APPLICATION attiva (PENDING/APPROVED) per questo shift+talent
+ *   - Non deve esserci già una APPLICATION attiva per questo shift/evento+talent
  */
 function handleApplicationSubmit(payload, auth) {
-  var valid = requireFields(payload, ['shift_id']);
-  if (valid) return valid;
+  if (!payload.shift_id && !payload.event_id) {
+    return errorResponse('VAL_001', 'Campo obbligatorio mancante: shift_id o event_id');
+  }
 
   // Recupera TALENT_PROFILE dell'utente corrente
   var profile = findTalentProfileByUserId_(auth.user_id, auth.tenant_id);
@@ -31,47 +33,90 @@ function handleApplicationSubmit(payload, auth) {
     return errorResponse('BIZ_002', 'Il tuo profilo talent non è ancora approvato. Stato attuale: ' + profile.status);
   }
 
-  // Recupera shift
-  var shift = getEntityById(payload.shift_id, auth.tenant_id);
-  if (!shift || shift.type !== 'SHIFT') {
-    return errorResponse('SYS_002', 'Shift non trovato');
-  }
-
-  // Shift deve essere OPEN (WF_003)
-  if (shift.status !== ENTITY_STATUS.SHIFT.OPEN) {
-    if (shift.status === ENTITY_STATUS.SHIFT.FULL) {
-      return errorResponse('WF_004', 'Lo shift è al completo');
+  // --- Candidatura a SHIFT ---
+  if (payload.shift_id) {
+    var shift = getEntityById(payload.shift_id, auth.tenant_id);
+    if (!shift || shift.type !== 'SHIFT') {
+      return errorResponse('SYS_002', 'Shift non trovato');
     }
-    return errorResponse('WF_003', 'Lo shift non è aperto alle candidature. Stato: ' + shift.status);
+
+    if (shift.status !== ENTITY_STATUS.SHIFT.OPEN) {
+      if (shift.status === ENTITY_STATUS.SHIFT.FULL) {
+        return errorResponse('WF_004', 'Lo shift è al completo');
+      }
+      return errorResponse('WF_003', 'Lo shift non è aperto alle candidature. Stato: ' + shift.status);
+    }
+
+    var existingApp = findActiveApplication_(payload.shift_id, profile.entity_id, auth.tenant_id);
+    if (existingApp) {
+      return errorResponse('BIZ_001', 'Hai già una candidatura attiva per questo shift', 'shift_id');
+    }
+
+    var overlapCheck = getConfig('tenant.overlap_check', auth.tenant_id);
+    if (overlapCheck === 'block') {
+      if (checkTimeOverlap_(profile.entity_id, shift, auth.tenant_id)) {
+        return errorResponse('BIZ_004', 'Hai già un assignment confermato in un orario sovrapposto');
+      }
+    }
+
+    var shiftApp = createEntity('APPLICATION', ENTITY_STATUS.APPLICATION.PENDING, {
+      shift_id:                payload.shift_id,
+      event_id:                shift.data.event_id || '',
+      talent_profile_id:       profile.entity_id,
+      messaggio:               payload.messaggio              || '',
+      disponibilita_confermata: payload.disponibilita_confermata || false
+    }, auth.tenant_id, auth.user_id);
+
+    return successResponse({
+      application_id: shiftApp.entity_id,
+      status:         ENTITY_STATUS.APPLICATION.PENDING,
+      shift_id:       payload.shift_id,
+      message:        'Candidatura inviata. In attesa di approvazione.'
+    });
   }
 
-  // Controlla candidatura duplicata (RB-01, BIZ_001)
-  var existingApp = findActiveApplication_(payload.shift_id, profile.entity_id, auth.tenant_id);
-  if (existingApp) {
-    return errorResponse('BIZ_001', 'Hai già una candidatura attiva per questo shift', 'shift_id');
+  // --- Candidatura diretta a EVENTO ---
+  var event = getEntityById(payload.event_id, auth.tenant_id);
+  if (!event || event.type !== 'EVENT') {
+    return errorResponse('SYS_002', 'Evento non trovato');
   }
 
-  // Controlla overlap orario (PRD: warn in MVP, block in Fase 2)
-  var overlapCheck = getConfig('tenant.overlap_check', auth.tenant_id);
-  if (overlapCheck === 'block') {
-    var overlapResult = checkTimeOverlap_(profile.entity_id, shift, auth.tenant_id);
-    if (overlapResult) {
-      return errorResponse('BIZ_004', 'Hai già un assignment confermato in un orario sovrapposto');
+  var openEventStatuses = [ENTITY_STATUS.EVENT.LIVE, ENTITY_STATUS.EVENT.PLANNING];
+  if (openEventStatuses.indexOf(event.status) === -1) {
+    return errorResponse('WF_003', 'L\'evento non è aperto alle candidature. Stato: ' + event.status);
+  }
+  if (event.data.selezioni_chiuse) {
+    return errorResponse('WF_003', 'Le selezioni per questo evento sono chiuse');
+  }
+
+  // Controlla duplicato per evento+talent
+  var allApps = getAllRows('Entities');
+  for (var k = 0; k < allApps.length; k++) {
+    var a = allApps[k];
+    if (a.type !== 'APPLICATION') continue;
+    if (String(a.deleted) === 'true') continue;
+    if (String(a.tenant_id) !== String(auth.tenant_id)) continue;
+    var ad = parseJSON(a.data);
+    if (String(ad.event_id) === String(payload.event_id) &&
+        String(ad.talent_profile_id) === String(profile.entity_id) &&
+        (a.status === 'PENDING' || a.status === 'APPROVED' || a.status === 'INVITED')) {
+      return errorResponse('BIZ_001', 'Hai già una candidatura attiva per questo evento', 'event_id');
     }
   }
 
-  // Crea APPLICATION(PENDING)
-  var application = createEntity('APPLICATION', ENTITY_STATUS.APPLICATION.PENDING, {
-    shift_id:                payload.shift_id,
+  var eventApp = createEntity('APPLICATION', ENTITY_STATUS.APPLICATION.PENDING, {
+    event_id:                payload.event_id,
+    shift_id:                '',
+    event_titolo:            event.data.titolo || event.data.nome_evento || '',
     talent_profile_id:       profile.entity_id,
-    messaggio:               payload.messaggio              || '',
+    messaggio:               payload.messaggio || '',
     disponibilita_confermata: payload.disponibilita_confermata || false
   }, auth.tenant_id, auth.user_id);
 
   return successResponse({
-    application_id: application.entity_id,
+    application_id: eventApp.entity_id,
     status:         ENTITY_STATUS.APPLICATION.PENDING,
-    shift_id:       payload.shift_id,
+    event_id:       payload.event_id,
     message:        'Candidatura inviata. In attesa di approvazione.'
   });
 }

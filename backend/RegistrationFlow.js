@@ -194,7 +194,12 @@ function handleUploadRegistrationDoc(payload) {
 
   // Validazione dimensione (max 10MB)
   var maxBytes = (payload.tipo_doc === 'cv' || payload.tipo_doc.indexOf('attestato') !== -1) ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
-  var decoded  = Utilities.base64Decode(payload.file_base64);
+  var decoded;
+  try {
+    decoded = Utilities.base64Decode(payload.file_base64);
+  } catch (decErr) {
+    return errorResponse('VAL_002', 'File base64 non valido: ' + decErr.message);
+  }
   if (decoded.length > maxBytes) {
     return errorResponse('VAL_002', 'File troppo grande (max ' + (maxBytes / 1024 / 1024) + 'MB)');
   }
@@ -226,7 +231,7 @@ function handleUploadRegistrationDoc(payload) {
     return successResponse({ url: fileUrl, tipo_doc: payload.tipo_doc, file_id: fileId });
 
   } catch (e) {
-    Logger.log('[UPLOAD_REG_DOC] Errore: ' + e.message);
+    logError_('REGISTRATION_FLOW', 'talent.uploadRegistrationDoc', e.message, e.stack || '', null, entity.tenant_id);
     return errorResponse('SYS_001', 'Errore durante l\'upload: ' + e.message);
   }
 }
@@ -470,6 +475,59 @@ function handleLeadList(payload, auth) {
 }
 
 // ---------------------------------------------------------------------------
+// LEAD UPDATE — aggiorna campi data di un LEAD_TALENT (admin only)
+// ---------------------------------------------------------------------------
+
+function handleLeadUpdate(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity || entity.type !== 'LEAD_TALENT') return errorResponse('SYS_002', 'Lead non trovato');
+
+  var allowedFields = ['sollecito_1_inviato', 'sollecito_2_inviato', 'sollecito_finale_inviato', 'ultimo_sollecito'];
+  var updates = {};
+  for (var i = 0; i < allowedFields.length; i++) {
+    var f = allowedFields[i];
+    if (payload[f] !== undefined) updates[f] = payload[f];
+  }
+
+  var updated = updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
+  return successResponse({ lead: entityToPublic(updated) });
+}
+
+// ---------------------------------------------------------------------------
+// LEAD SOLICIT — invia manualmente sollecito e aggiorna contatore
+// ---------------------------------------------------------------------------
+
+function handleLeadSolicit(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity || entity.type !== 'LEAD_TALENT') return errorResponse('SYS_002', 'Lead non trovato');
+
+  var d = entity.data;
+  var now = new Date().toISOString();
+  var levelUpdates = { ultimo_sollecito: now };
+
+  if (!d.sollecito_1_inviato) {
+    levelUpdates.sollecito_1_inviato = now;
+  } else if (!d.sollecito_2_inviato) {
+    levelUpdates.sollecito_2_inviato = now;
+  } else if (!d.sollecito_finale_inviato) {
+    levelUpdates.sollecito_finale_inviato = now;
+  }
+
+  // Invia email (aggiorna anche ultimo_sollecito internamente)
+  var emailSent = inviaEmailSollecito(payload.entity_id);
+
+  // Aggiorna i campi livello (merge — non sovrascrive altri campi)
+  var updated = updateEntityData(payload.entity_id, levelUpdates, auth.tenant_id, auth.user_id);
+  return successResponse({ lead: entityToPublic(updated), sollecito_inviato: emailSent });
+}
+
+// ---------------------------------------------------------------------------
 // INVIO EMAIL SOLLECITO — chiamato da Jobs.js
 // ---------------------------------------------------------------------------
 
@@ -545,4 +603,21 @@ function getDefaultTenantId_() {
     if (tenants[i].status === 'active') return tenants[i].tenant_id;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// LEAD GET BY EMAIL — endpoint pubblico (no token)
+// Restituisce solo { entity_id, nome, step_completed } — nessun dato sensibile
+// ---------------------------------------------------------------------------
+
+function handleLeadGetByEmail(payload) {
+  if (!payload.email) return errorResponse('VAL_001', 'email obbligatoria');
+  var email = String(payload.email).toLowerCase().trim();
+  var lead = findLeadByEmail_(email);
+  if (!lead) return errorResponse('SYS_002', 'Lead non trovato per questa email');
+  return successResponse({
+    entity_id:      lead.entity_id,
+    nome:           lead.data.nome || '',
+    step_completed: parseInt(lead.data.step_completed) || 1,
+  });
 }

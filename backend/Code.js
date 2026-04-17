@@ -65,6 +65,7 @@ var PUBLIC_ACTIONS = {
   'talent.registerStep3':          true,
   'talent.getLead':                true,
   'talent.uploadRegistrationDoc':  true,
+  'lead.getByEmail':               true,
 };
 
 function handleRequest(action, payload, token) {
@@ -77,6 +78,7 @@ function handleRequest(action, payload, token) {
       case 'talent.registerStep3': return handleRegisterStep3(payload);
       case 'talent.getLead':               return handleGetLead(payload);
       case 'talent.uploadRegistrationDoc': return handleUploadRegistrationDoc(payload);
+      case 'lead.getByEmail':              return handleLeadGetByEmail(payload);
     }
   }
 
@@ -141,12 +143,13 @@ function handleRequest(action, payload, token) {
     case 'shift.updateStatus': return handleShiftUpdateStatus(payload, auth);
 
     // APPLICATION
-    case 'application.submit':   return handleApplicationSubmit(payload, auth);
-    case 'application.invite':   return handleApplicationInvite(payload, auth);
-    case 'application.approve':  return handleApplicationApprove(payload, auth);
-    case 'application.reject':   return handleApplicationReject(payload, auth);
-    case 'application.withdraw': return handleApplicationWithdraw(payload, auth);
-    case 'application.list':     return handleApplicationList(payload, auth);
+    case 'application.submit':       return handleApplicationSubmit(payload, auth);
+    case 'application.invite':       return handleApplicationInvite(payload, auth);
+    case 'application.approve':      return handleApplicationApprove(payload, auth);
+    case 'application.reject':       return handleApplicationReject(payload, auth);
+    case 'application.withdraw':     return handleApplicationWithdraw(payload, auth);
+    case 'application.list':         return handleApplicationList(payload, auth);
+    case 'application.updateStatus': return handleApplicationUpdateStatus(payload, auth);
 
     // ASSIGNMENT
     case 'assignment.list':          return handleAssignmentList(payload, auth);
@@ -165,8 +168,13 @@ function handleRequest(action, payload, token) {
     case 'document.delete': return handleDocumentDelete(payload, auth);
     case 'drive.setup':     return handleDriveSetup(payload, auth);
 
-    // LEAD (lista per admin)
-    case 'lead.list': return handleLeadList(payload, auth);
+    // LEAD
+    case 'lead.list':    return handleLeadList(payload, auth);
+    case 'lead.update':  return handleLeadUpdate(payload, auth);
+    case 'lead.solicit': return handleLeadSolicit(payload, auth);
+
+    // CONTRACT
+    case 'contract.generate': return handleContractGenerate(payload, auth);
 
     // LOGGING
     case 'log.view': return handleLogView(payload, auth);

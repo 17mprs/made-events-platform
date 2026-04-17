@@ -55,6 +55,11 @@ export default function FileUpload({
       const base64 = ev.target.result.split(',')[1]
       onFile({ file, base64, filename: file.name, mimeType: file.type })
     }
+    reader.onerror = () => {
+      setLocalErr('Impossibile leggere il file. Riprova.')
+      setFileName(null)
+      if (inputRef.current) inputRef.current.value = ''
+    }
     reader.readAsDataURL(file)
   }
 

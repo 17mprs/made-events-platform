@@ -14,7 +14,7 @@ const DOTAZIONE_OPTIONS = [
   'Sneaker bianche',
 ]
 
-export default function Section6({ data, onChange, onNext, onBack, loading }) {
+export default function Section6({ data, onChange, onNext, onBack, loading, nextLabel }) {
   return (
     <SectionShell
       number={6}
@@ -23,6 +23,7 @@ export default function Section6({ data, onChange, onNext, onBack, loading }) {
       onBack={onBack}
       onNext={onNext}
       loading={loading}
+      nextLabel={nextLabel}
     >
       <div>
         <label style={COMPONENT_STYLES.label}>Abbigliamento disponibile (opzionale)</label>

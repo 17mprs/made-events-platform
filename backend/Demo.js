@@ -786,6 +786,225 @@ function setupDemoData() {
 }
 
 // ---------------------------------------------------------------------------
+// SETUP PRODUZIONE DEMO — eseguire dal GAS Editor per demo completa
+// ---------------------------------------------------------------------------
+
+/**
+ * Ricrea tutti i dati demo puliti e aggiunge TALENT_PROFILE reali
+ * collegati agli account USER per luca.marino e valentina.conti.
+ * Eseguire dal GAS Editor prima di una demo del portale talent.
+ */
+function setupProductionDemoData() {
+  Logger.log('=== SETUP PRODUCTION DEMO DATA — START ===');
+
+  // 1. Wipe + ricrea dati base (lead, eventi, turni, candidature, assignment, utenti)
+  nukeAllDemoData();
+
+  var tenantId = _getAdminTenantId_();
+  if (!tenantId) {
+    Logger.log('[ERRORE] Nessun tenant admin trovato dopo nukeAllDemoData.');
+    return;
+  }
+
+  var now = new Date();
+
+  // 2. Trova user_id per i due account demo
+  var users = getAllRows('Users');
+  var lucaUserId = null;
+  var valUserId  = null;
+  for (var i = 0; i < users.length; i++) {
+    var email = String(users[i].email).toLowerCase().trim();
+    if (email === 'luca.marino@demo.it')     lucaUserId = users[i].user_id;
+    if (email === 'valentina.conti@demo.it') valUserId  = users[i].user_id;
+  }
+  if (!lucaUserId) { Logger.log('[ERRORE] User luca.marino@demo.it non trovato'); return; }
+  if (!valUserId)  { Logger.log('[ERRORE] User valentina.conti@demo.it non trovato'); return; }
+  Logger.log('[OK] lucaUserId=' + lucaUserId + '  valUserId=' + valUserId);
+
+  // 3. Recupera entità eventi creati da nukeAllDemoData (per linkare le candidature)
+  var allEntities = getAllRows('Entities');
+  var evFieraId = null, evConcId = null;
+  for (var j = 0; j < allEntities.length; j++) {
+    var e = allEntities[j];
+    if (e.type !== 'EVENT') continue;
+    if (String(e.deleted) === 'true') continue;
+    var d = parseJSON(e.data);
+    if (d._demo !== true) continue;
+    if (!evFieraId && (d.titolo || '').indexOf('Fiera') !== -1) evFieraId = e.entity_id;
+    if (!evConcId  && (d.titolo || '').indexOf('Gala')  !== -1) evConcId  = e.entity_id;
+  }
+  Logger.log('[OK] evFieraId=' + evFieraId + '  evConcId=' + evConcId);
+
+  // 4. Crea TALENT_PROFILE per Luca Marino
+  var lucaProfile = createEntity('TALENT_PROFILE', 'APPROVED', {
+    _demo:              true,
+    user_id:            lucaUserId,
+    lead_id:            '',
+    nome:               'Luca',
+    cognome:            'Marino',
+    email_contatto:     'luca.marino@demo.it',
+    telefono:           '3471234004',
+    // S1 anagrafica
+    data_nascita:               '15/03/1995',
+    citta_nascita:              'Napoli',
+    nazionalita:                'Italiana',
+    indirizzo_residenza:        'Via Roma 45, Napoli',
+    numero_documento:           'AX4521890',
+    stato_emissione_documento:  'Italia',
+    // S2 fisico
+    altezza:            '178',
+    taglia:             'L',
+    capelli:            'Castani',
+    occhi:              'Marroni',
+    corporatura:        'Media',
+    // S3 logistica
+    citta:              'Napoli',
+    province_operativita: ['NA', 'SA', 'CE'],
+    automunita:         false,
+    disponibile_trasferte: false,
+    disponibile_weekend: true,
+    // S4 lingue
+    lingue:             ['Italiano', 'Inglese B1'],
+    // S5 esperienza
+    esperienza_anni:    1,
+    skills:             ['Catering', 'Accrediti', 'Sport Events'],
+    esperienze_precedenti: 'Promoter eventi sportivi, staff accrediti fiera 2023',
+    // S7 fiscale
+    codice_fiscale:     'MRNLCU95C15F839Z',
+    iban:               'IT60X0542811101000000123456',
+    intestatario_conto: 'Luca Marino',
+    partita_iva:        '',
+    // Foto
+    foto_busto_url:     'https://randomuser.me/api/portraits/men/55.jpg',
+    foto_intera_url:    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+    foto_caricata_il:   new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    // Meta
+    score:              58,
+    ranking:            'C',
+    rating:             0,
+    stato_verifica:     'verified',
+    disponibilita:      'Week-end',
+    documenti: {
+      cv:   {},
+      foto: { url: 'https://randomuser.me/api/portraits/men/55.jpg', status: 'valid' },
+      carta_identita: {}
+    }
+  }, tenantId, null);
+  Logger.log('[OK] TALENT_PROFILE Luca: ' + lucaProfile.entity_id);
+
+  // 5. Crea TALENT_PROFILE per Valentina Conti
+  var valProfile = createEntity('TALENT_PROFILE', 'APPROVED', {
+    _demo:              true,
+    user_id:            valUserId,
+    lead_id:            '',
+    nome:               'Valentina',
+    cognome:            'Conti',
+    email_contatto:     'valentina.conti@demo.it',
+    telefono:           '3471234005',
+    // S1 anagrafica
+    data_nascita:               '22/07/1998',
+    citta_nascita:              'Roma',
+    nazionalita:                'Italiana',
+    indirizzo_residenza:        'Via Nazionale 12, Roma',
+    numero_documento:           'BK7834521',
+    stato_emissione_documento:  'Italia',
+    // S2 fisico
+    altezza:            '170',
+    taglia:             'S',
+    capelli:            'Castani chiari',
+    occhi:              'Verdi',
+    corporatura:        'Esile',
+    // S3 logistica
+    citta:              'Roma',
+    province_operativita: ['RM', 'MI'],
+    automunita:         true,
+    disponibile_trasferte: true,
+    disponibile_weekend: true,
+    // S4 lingue
+    lingue:             ['Italiano', 'Inglese C1', 'Francese B1'],
+    // S5 esperienza
+    esperienza_anni:    3,
+    skills:             ['Catering', 'Accrediti', 'Fashion Week', 'Hostess fiera'],
+    esperienze_precedenti: 'Hostess Pitti Uomo 2022, Fashion Week Milano 2023, Congresso medico Roma 2023',
+    // S7 fiscale
+    codice_fiscale:     'CNTVNT98L62H501K',
+    iban:               'IT60X0542811101000000654321',
+    intestatario_conto: 'Valentina Conti',
+    partita_iva:        '',
+    // Foto
+    foto_busto_url:     'https://randomuser.me/api/portraits/women/21.jpg',
+    foto_intera_url:    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
+    foto_caricata_il:   new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    // Meta
+    score:              72,
+    ranking:            'B',
+    rating:             0,
+    stato_verifica:     'verified',
+    disponibilita:      'Week-end, Full-time',
+    documenti: {
+      cv:   {},
+      foto: { url: 'https://randomuser.me/api/portraits/women/21.jpg', status: 'valid' },
+      carta_identita: {}
+    }
+  }, tenantId, null);
+  Logger.log('[OK] TALENT_PROFILE Valentina: ' + valProfile.entity_id);
+
+  // 6. Candidatura APPROVED di Luca all'evento Fiera (o primo evento disponibile)
+  var targetEventLuca = evFieraId || evConcId;
+  if (targetEventLuca) {
+    var allEvs = getAllRows('Entities');
+    var evLucaData = {};
+    for (var x = 0; x < allEvs.length; x++) {
+      if (allEvs[x].entity_id === targetEventLuca) {
+        evLucaData = parseJSON(allEvs[x].data);
+        break;
+      }
+    }
+    createEntity('APPLICATION', 'APPROVED', {
+      _demo:            true,
+      event_id:         targetEventLuca,
+      shift_id:         '',
+      event_titolo:     evLucaData.titolo || 'Evento demo',
+      talent_profile_id: lucaProfile.entity_id,
+      talent_name:      'Luca Marino',
+      messaggio:        'Disponibile e motivato. Esperienza in accrediti e catering.',
+      disponibilita_confermata: true
+    }, tenantId, null);
+    Logger.log('[OK] APPLICATION APPROVED Luca → ' + (evLucaData.titolo || targetEventLuca));
+  }
+
+  // 7. Candidatura APPROVED di Valentina all'evento Gala (o primo diverso da Fiera)
+  var targetEventVal = evConcId || evFieraId;
+  if (targetEventVal) {
+    var allEvs2 = getAllRows('Entities');
+    var evValData = {};
+    for (var y = 0; y < allEvs2.length; y++) {
+      if (allEvs2[y].entity_id === targetEventVal) {
+        evValData = parseJSON(allEvs2[y].data);
+        break;
+      }
+    }
+    createEntity('APPLICATION', 'APPROVED', {
+      _demo:            true,
+      event_id:         targetEventVal,
+      shift_id:         '',
+      event_titolo:     evValData.titolo || 'Evento demo',
+      talent_profile_id: valProfile.entity_id,
+      talent_name:      'Valentina Conti',
+      messaggio:        'Esperienza in fashion e accoglienza VIP. Disponibile da subito.',
+      disponibilita_confermata: true
+    }, tenantId, null);
+    Logger.log('[OK] APPLICATION APPROVED Valentina → ' + (evValData.titolo || targetEventVal));
+  }
+
+  Logger.log('\n=== SETUP PRODUCTION DEMO DATA — COMPLETATO ===');
+  Logger.log('TALENT PROFILES creati:');
+  Logger.log('  Luca Marino    — luca.marino@demo.it / Demo2024! — TALENT_PROFILE: ' + lucaProfile.entity_id);
+  Logger.log('  Valentina Conti — valentina.conti@demo.it / Demo2024! — TALENT_PROFILE: ' + valProfile.entity_id);
+  Logger.log('Accedi al portale talent su /portale per testare la vista eventi e il profilo.');
+}
+
+// ---------------------------------------------------------------------------
 // FIX PASSWORD ADMIN — eseguire dal GAS Editor
 // ---------------------------------------------------------------------------
 

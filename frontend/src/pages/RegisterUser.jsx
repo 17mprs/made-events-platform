@@ -1,7 +1,7 @@
 // === REGISTER USER (Talent) — MADE EVENT Platform ===
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { talentApi, getErrorMessage } from '../api/client'
+import { talentApi, leadApi, getErrorMessage } from '../api/client'
 import { COLORS, LETTER_SPACING } from '../styles/theme'
 import Button from '../components/Button'
 import Input  from '../components/Input'
@@ -12,11 +12,14 @@ import Input  from '../components/Input'
 // ---------------------------------------------------------------------------
 
 export default function RegisterUser() {
-  const [form,    setForm]    = useState({ nome: '', cognome: '', email: '', telefono: '', gdpr_consent: false })
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
-  const [done,    setDone]    = useState(false)
-  const [sentTo,  setSentTo]  = useState('')
+  const [form,            setForm]            = useState({ nome: '', cognome: '', email: '', telefono: '', gdpr_consent: false })
+  const [loading,         setLoading]         = useState(false)
+  const [error,           setError]           = useState(null)
+  const [done,            setDone]            = useState(false)
+  const [sentTo,          setSentTo]          = useState('')
+  const [duplicate,       setDuplicate]       = useState(null)  // { entity_id, nome } when VAL_004
+  const [solicitoLoading, setSolicitoLoading] = useState(false)
+  const [solicitoSent,    setSolicitoSent]    = useState(false)
 
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
 
@@ -27,9 +30,65 @@ export default function RegisterUser() {
     setLoading(true)
     const res = await talentApi.registerStep1({ ...form, gdpr_consent: true })
     setLoading(false)
-    if (!res.success) { setError(getErrorMessage(res.error)); return }
+    if (!res.success) {
+      if (res.error?.code === 'VAL_004') {
+        // Email già registrata — cerca il lead per permettere reinvio link
+        const leadRes = await leadApi.getByEmail(form.email)
+        if (leadRes.success) {
+          setDuplicate(leadRes.data)
+        } else {
+          // Lead non trovato (account già completo) — mostra messaggio generico
+          setDuplicate({ entity_id: null, nome: form.nome })
+        }
+        return
+      }
+      setError(getErrorMessage(res.error))
+      return
+    }
     setSentTo(form.email)
     setDone(true)
+  }
+
+  const handleReinvia = async () => {
+    if (!duplicate?.entity_id) return
+    setSolicitoLoading(true)
+    await leadApi.solicit(duplicate.entity_id)
+    setSolicitoLoading(false)
+    setSolicitoSent(true)
+  }
+
+  if (duplicate) {
+    return (
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'40px 24px', background:'#FAFAFA' }}>
+        <div style={{ maxWidth:'480px', textAlign:'center' }}>
+          <div style={{ width:'64px', height:'64px', borderRadius:'50%', background:'#FFF3E0', color:'#F57C00', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'28px', margin:'0 auto 28px' }}>ℹ</div>
+          <h1 style={{ fontSize:'20px', fontWeight:300, letterSpacing:'2px', textTransform:'uppercase', marginBottom:'12px', color:COLORS.text }}>
+            Già registrato
+          </h1>
+          <p style={{ fontSize:'14px', color:COLORS.textSecondary, lineHeight:1.8, marginBottom:'32px' }}>
+            Sei già registrato con questa email.<br />
+            Controlla la tua casella per il link di completamento.
+          </p>
+          {solicitoSent ? (
+            <p style={{ fontSize:'14px', color:'#2E7D32', background:'#E8F5E9', padding:'12px 20px', borderRadius:8, marginBottom:'24px' }}>
+              Link reinviato! Controlla la tua casella email.
+            </p>
+          ) : duplicate.entity_id ? (
+            <Button loading={solicitoLoading} onClick={handleReinvia} style={{ marginBottom:'16px', width:'100%' }}>
+              Reinvia link
+            </Button>
+          ) : null}
+          <div style={{ marginTop:'8px' }}>
+            <a href="mailto:info@madeevent.it" style={{ display:'inline-block', padding:'10px 24px', border:`1px solid ${COLORS.border}`, borderRadius:6, fontSize:'13px', color:COLORS.textSecondary, textDecoration:'none' }}>
+              Contatta l&apos;agenzia
+            </a>
+          </div>
+          <div style={{ marginTop:'24px', fontSize:'12px', color:COLORS.textSecondary }}>
+            <Link to="/login" style={{ color:COLORS.accent }}>Accedi con il tuo account</Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (done) {

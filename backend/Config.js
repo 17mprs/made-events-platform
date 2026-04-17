@@ -5,7 +5,15 @@
 // DATABASE
 // ---------------------------------------------------------------------------
 
-var SPREADSHEET_ID = '12ITb5K_ZcskSFgLmpdWXvqqP2oh5cJ51KKhPq2PhlHQ';
+var _SPREADSHEET_ID_FALLBACK = '12ITb5K_ZcskSFgLmpdWXvqqP2oh5cJ51KKhPq2PhlHQ';
+
+function getSpreadsheetId_() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID') || _SPREADSHEET_ID_FALLBACK;
+  } catch (e) {
+    return _SPREADSHEET_ID_FALLBACK;
+  }
+}
 
 var SHEET_NAMES = {
   Tenants:      'Tenants',
@@ -61,11 +69,13 @@ var ENTITY_STATUS = {
     CANCELLED: 'CANCELLED'
   },
   APPLICATION: {
-    INVITED:   'INVITED',
-    PENDING:   'PENDING',
-    APPROVED:  'APPROVED',
-    REJECTED:  'REJECTED',
-    WITHDRAWN: 'WITHDRAWN'
+    INVITED:         'INVITED',
+    PENDING:         'PENDING',
+    DOCS_REQUESTED:  'DOCS_REQUESTED',
+    DOCS_RECEIVED:   'DOCS_RECEIVED',
+    APPROVED:        'APPROVED',
+    REJECTED:        'REJECTED',
+    WITHDRAWN:       'WITHDRAWN'
   },
   ASSIGNMENT: {
     CONFIRMED:   'CONFIRMED',
@@ -103,7 +113,7 @@ var DRIVE_CONFIG = {
 // ---------------------------------------------------------------------------
 
 function getSpreadsheet() {
-  return SpreadsheetApp.openById(SPREADSHEET_ID);
+  return SpreadsheetApp.openById(getSpreadsheetId_());
 }
 
 function getSheet(sheetName) {

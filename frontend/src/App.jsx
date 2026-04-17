@@ -16,6 +16,7 @@ import RegisterUser       from './pages/RegisterUser'
 import RegisterAzienda    from './pages/RegisterAzienda'
 import RegisterComplete   from './pages/RegisterComplete'
 import DemoReset          from './pages/DemoReset'
+import FAQPage            from './pages/FAQPage'
 
 // ---------------------------------------------------------------------------
 // ROUTE GUARDS
@@ -89,6 +90,10 @@ export default function App() {
         element={<RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN']}><CandidaturePage /></RequireAuth>}
       />
 
+      <Route
+        path="/portale/faq"
+        element={<RequireAuth allowedRoles={['USER']}><FAQPage /></RequireAuth>}
+      />
       <Route
         path="/portale/*"
         element={

@@ -36,7 +36,10 @@ var STATE_TRANSITIONS = {
     // CANCELLED: terminale
   },
   APPLICATION: {
-    PENDING: ['APPROVED', 'REJECTED', 'WITHDRAWN']
+    INVITED:        ['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'DOCS_REQUESTED'],
+    PENDING:        ['APPROVED', 'REJECTED', 'WITHDRAWN', 'DOCS_REQUESTED'],
+    DOCS_REQUESTED: ['DOCS_RECEIVED', 'REJECTED'],
+    DOCS_RECEIVED:  ['APPROVED', 'REJECTED'],
     // APPROVED, REJECTED, WITHDRAWN: terminali
   },
   ASSIGNMENT: {
@@ -258,7 +261,26 @@ function handleTalentApprove(payload, auth) {
   if (valid) return valid;
 
   var lead = getEntityById(payload.entity_id, auth.tenant_id);
-  if (!lead || lead.type !== 'LEAD_TALENT') return errorResponse('SYS_002', 'Lead talent non trovato');
+  if (!lead) return errorResponse('SYS_002', 'Entità non trovata');
+
+  // TALENT_PROFILE in PENDING_REVIEW → approva le modifiche talent
+  if (lead.type === 'TALENT_PROFILE') {
+    if (lead.status !== ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW) {
+      return errorResponse('WF_002', 'Il profilo deve essere in PENDING_REVIEW. Stato attuale: ' + lead.status);
+    }
+    var pendingData = lead.data.pending_data || {};
+    var mergedData = Object.assign({}, lead.data, pendingData);
+    delete mergedData.pending_data;
+    delete mergedData.pending_submitted_at;
+    updateRow('Entities', lead.entity_id, {
+      status:     ENTITY_STATUS.TALENT_PROFILE.APPROVED,
+      data:       serializeJSON(mergedData),
+      updated_at: new Date()
+    });
+    return successResponse({ profile_id: lead.entity_id, status: ENTITY_STATUS.TALENT_PROFILE.APPROVED });
+  }
+
+  if (lead.type !== 'LEAD_TALENT') return errorResponse('SYS_002', 'Lead talent non trovato');
 
   if (lead.status !== ENTITY_STATUS.LEAD_TALENT.COMPLETED_PENDING_APPROVAL) {
     return errorResponse('WF_002',
@@ -384,7 +406,26 @@ function handleTalentReject(payload, auth) {
   if (valid) return valid;
 
   var lead = getEntityById(payload.entity_id, auth.tenant_id);
-  if (!lead || lead.type !== 'LEAD_TALENT') return errorResponse('SYS_002', 'Lead talent non trovato');
+  if (!lead) return errorResponse('SYS_002', 'Entità non trovata');
+
+  // TALENT_PROFILE in PENDING_REVIEW → rifiuta le modifiche, ripristina APPROVED
+  if (lead.type === 'TALENT_PROFILE') {
+    if (lead.status !== ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW) {
+      return errorResponse('WF_002', 'Il profilo deve essere in PENDING_REVIEW. Stato attuale: ' + lead.status);
+    }
+    var restoredData = Object.assign({}, lead.data);
+    delete restoredData.pending_data;
+    delete restoredData.pending_submitted_at;
+    if (payload.nota_rifiuto) restoredData.nota_rifiuto_modifiche = payload.nota_rifiuto;
+    updateRow('Entities', lead.entity_id, {
+      status:     ENTITY_STATUS.TALENT_PROFILE.APPROVED,
+      data:       serializeJSON(restoredData),
+      updated_at: new Date()
+    });
+    return successResponse({ profile_id: lead.entity_id, status: ENTITY_STATUS.TALENT_PROFILE.APPROVED });
+  }
+
+  if (lead.type !== 'LEAD_TALENT') return errorResponse('SYS_002', 'Lead talent non trovato');
 
   if (lead.status !== ENTITY_STATUS.LEAD_TALENT.COMPLETED_PENDING_APPROVAL) {
     return errorResponse('WF_002',
@@ -426,8 +467,8 @@ function handleApplicationApprove(payload, auth) {
 
     // Rileggi lo stato dopo aver acquisito il lock (anti-race condition)
     var freshApp = getEntityById(payload.entity_id, auth.tenant_id);
-    if (freshApp.status !== ENTITY_STATUS.APPLICATION.PENDING) {
-      return errorResponse('WF_002', 'La candidatura è già stata processata da un altro admin');
+    if (!isTransitionAllowed_('APPLICATION', freshApp.status, ENTITY_STATUS.APPLICATION.APPROVED)) {
+      return errorResponse('WF_002', 'Transizione APPROVED non consentita dallo stato: ' + freshApp.status);
     }
 
     // Esegui transizione (side effect: crea ASSIGNMENT)
@@ -449,8 +490,8 @@ function handleApplicationReject(payload, auth) {
   if (!application || application.type !== 'APPLICATION') {
     return errorResponse('SYS_002', 'Candidatura non trovata');
   }
-  if (application.status !== ENTITY_STATUS.APPLICATION.PENDING) {
-    return errorResponse('WF_002', 'Candidatura non in stato PENDING. Stato attuale: ' + application.status);
+  if (!isTransitionAllowed_('APPLICATION', application.status, ENTITY_STATUS.APPLICATION.REJECTED)) {
+    return errorResponse('WF_002', 'Transizione REJECTED non consentita dallo stato: ' + application.status);
   }
 
   if (payload.nota_rifiuto) {
@@ -487,6 +528,35 @@ function handleApplicationWithdraw(payload, auth) {
 // ---------------------------------------------------------------------------
 // HELPER
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// APPLICATION.UPDATESTATUS — aggiorna a DOCS_REQUESTED o DOCS_RECEIVED (admin only)
+// ---------------------------------------------------------------------------
+
+function handleApplicationUpdateStatus(payload, auth) {
+  var valid = requireFields(payload, ['entity_id', 'new_status']);
+  if (valid) return valid;
+
+  var allowed = [ENTITY_STATUS.APPLICATION.DOCS_REQUESTED, ENTITY_STATUS.APPLICATION.DOCS_RECEIVED];
+  if (allowed.indexOf(payload.new_status) === -1) {
+    return errorResponse('VAL_002', 'Status non supportato: ' + payload.new_status);
+  }
+
+  var application = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!application || application.type !== 'APPLICATION') {
+    return errorResponse('SYS_002', 'Candidatura non trovata');
+  }
+
+  if (!isTransitionAllowed_('APPLICATION', application.status, payload.new_status)) {
+    return errorResponse('WF_001', 'Transizione non consentita: ' + application.status + ' → ' + payload.new_status);
+  }
+
+  updateRow('Entities', payload.entity_id, { status: payload.new_status, updated_at: new Date() });
+  logStateTransition('APPLICATION', payload.entity_id, application.status, payload.new_status,
+    auth.user_id, auth.tenant_id, 'application.updateStatus');
+
+  return successResponse({ entity_id: payload.entity_id, new_status: payload.new_status });
+}
 
 function findAssignment_(shiftId, talentProfileId, tenantId) {
   var all = getAllRows('Entities');

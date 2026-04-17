@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getErrorMessage } from '../api/client'
+import { getErrorMessage, decodeToken } from '../api/client'
 import { COLORS, LETTER_SPACING, FONTS, COMPONENT_STYLES } from '../styles/theme'
 import Button from '../components/Button'
 import Input  from '../components/Input'
@@ -40,7 +40,11 @@ export default function LoginPage() {
       return
     }
 
-    navigate('/admin', { replace: true })
+    const decoded = decodeToken(res.data.token)
+    const role = decoded?.role
+    if (role === 'USER') navigate('/portale', { replace: true })
+    else if (role === 'CLIENTE') navigate('/cliente', { replace: true })
+    else navigate('/admin', { replace: true })
   }
 
   return (

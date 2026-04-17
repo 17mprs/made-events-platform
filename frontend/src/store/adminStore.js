@@ -47,18 +47,19 @@ async function _fetch() {
     if (res.success && res.data) {
       const d = res.data
       // Deduplica per entity_id — previene duplicati da reset parziali del DB
-      const leads        = _dedupeById(d.leads)
-      const events       = _dedupeById(d.events)
-      const applications = _dedupeById(d.applications)
-      const clients      = _dedupeById(d.clients || [])
-      // Ricalcola pendingTalent dal raw array — il backend usa TALENT_PROFILE
-      // ma i lead con COMPLETED_PENDING_APPROVAL sono la fonte corretta
-      const pendingTalent = leads.filter(l => l.status === 'COMPLETED_PENDING_APPROVAL').length
+      const leads           = _dedupeById(d.leads)
+      const events          = _dedupeById(d.events)
+      const applications    = _dedupeById(d.applications)
+      const clients         = _dedupeById(d.clients || [])
+      const talent_profiles = _dedupeById(d.talent_profiles || [])
+      const pendingTalent   = leads.filter(l => l.status === 'COMPLETED_PENDING_APPROVAL').length
+                            + talent_profiles.filter(p => p.status === 'PENDING_REVIEW').length
       _data = {
         leads,
         events,
         applications,
         clients,
+        talent_profiles,
         stats: { ...(d.stats ?? {}), pendingTalent },
       }
       _lastUpdate = Date.now()

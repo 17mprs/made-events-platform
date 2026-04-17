@@ -45,13 +45,14 @@ function RadioGroup({ label, name, value, onChange, required, error }) {
 
 export default function Section2({ data, onChange, onNext, onBack, loading }) {
   const [errors, setErrors] = useState({})
+  const isMale = data.genere === 'M'
 
   function validate() {
     const e = {}
     if (!data.altezza)           e.altezza = 'Obbligatorio'
     if (!data.taglia_tshirt)     e.taglia_tshirt = 'Obbligatorio'
     if (!data.taglia_pantalone)  e.taglia_pantalone = 'Obbligatorio'
-    if (!data.taglia_gonna)      e.taglia_gonna = 'Obbligatorio'
+    if (!isMale && !data.taglia_gonna) e.taglia_gonna = 'Obbligatorio'
     if (!data.numero_scarpe)     e.numero_scarpe = 'Obbligatorio'
     if (!data.piercing_visibili) e.piercing_visibili = 'Seleziona un\'opzione'
     if (!data.tatuaggi_visibili) e.tatuaggi_visibili = 'Seleziona un\'opzione'
@@ -104,9 +105,9 @@ export default function Section2({ data, onChange, onNext, onBack, loading }) {
         {sel('altezza')}
         {sel('taglia_tshirt')}
         {sel('taglia_pantalone')}
-        {sel('taglia_gonna')}
+        {!isMale && sel('taglia_gonna')}
         {sel('numero_scarpe')}
-        <div /> {/* placeholder griglia */}
+        {!isMale && <div />}
       </div>
 
       <div style={{ marginTop: '28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
