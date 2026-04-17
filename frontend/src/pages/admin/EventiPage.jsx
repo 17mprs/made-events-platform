@@ -1,4 +1,5 @@
 // === EVENTI PAGE — MADE EVENTS Platform ===
+import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, AlignmentType } from 'docx'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { clientApi, eventApi, talentApi, applicationApi, contractApi, getErrorMessage } from '../../api/client'
@@ -398,8 +399,6 @@ export function ContractPreviewModal({ talent, event, onClose }) {
   )
 
   const downloadDocx = async () => {
-    if (!window.docx) { alert('Libreria .docx non disponibile. Ricarica la pagina.'); return }
-    const { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, AlignmentType } = window.docx
 
     const MAROON = '7A1E2C'; const GRAY = '888888'; const RED = 'C62828'
     const PT11 = 22; const PT14 = 28; const PT9 = 18
