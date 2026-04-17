@@ -12,7 +12,7 @@ import Input  from '../components/Input'
 // ---------------------------------------------------------------------------
 
 export default function RegisterUser() {
-  const [form,            setForm]            = useState({ nome: '', cognome: '', email: '', telefono: '', gdpr_consent: false })
+  const [form,            setForm]            = useState({ nome: '', cognome: '', email: '', telefono: '', citta: '', gdpr_consent: false })
   const [loading,         setLoading]         = useState(false)
   const [error,           setError]           = useState(null)
   const [done,            setDone]            = useState(false)
@@ -25,6 +25,7 @@ export default function RegisterUser() {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!form.citta.trim()) { setError('Città di residenza obbligatoria.'); return }
     if (!form.gdpr_consent) { setError('Devi accettare il trattamento dei dati per procedere.'); return }
     setError(null)
     setLoading(true)
@@ -152,6 +153,7 @@ export default function RegisterUser() {
               </div>
               <Input label="Email *"   type="email" value={form.email}    onChange={f('email')}    required />
               <Input label="Telefono"  type="tel"   value={form.telefono} onChange={f('telefono')} />
+              <Input label="Città di residenza *" value={form.citta} onChange={f('citta')} placeholder="es. Roma" required />
 
               <div style={{ display:'flex', gap:'12px', alignItems:'flex-start', padding:'16px', background: COLORS.surface, borderRadius:'4px', border:`1px solid ${COLORS.border}` }}>
                 <input

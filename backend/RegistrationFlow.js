@@ -103,6 +103,7 @@ function handleRegisterStep2(payload) {
     sezione_completata: sezione,
     ultimo_accesso:     now,
     // Sezione 1 — Dati Personali
+    genere:             payload.genere             || entity.data.genere             || '',
     nascita_nazione:    payload.nascita_nazione    || entity.data.nascita_nazione    || 'Italia',
     nascita_regione:    payload.nascita_regione    || entity.data.nascita_regione    || '',
     nascita_provincia:  payload.nascita_provincia  || entity.data.nascita_provincia  || '',
@@ -258,7 +259,7 @@ function handleRegisterStep3(payload) {
   // Merge dei dati finali (sezione 8: URL documenti)
   var current = entity.data;
   var docFields = ['doc_identita_url','doc_cf_url','foto_busto_url','foto_intera_url','foto_extra_url','cv_url','attestato_haccp_url','attestato_sicurezza_url'];
-  var updates = { sezione_completata: 8, stato_profilo: 'in_attesa', registration_completed_at: new Date().toISOString() };
+  var updates = { sezione_completata: 7, stato_profilo: 'in_attesa', registration_completed_at: new Date().toISOString() };
   docFields.forEach(function(f) {
     updates[f] = payload[f] || current[f] || '';
   });
@@ -424,6 +425,7 @@ function handleGetLead(payload) {
       // Restituisce i campi del form salvati (no dati sensibili come lead_token, password, ecc.)
       var savedData = {};
       var CAMPI_PUBBLICI = [
+        'genere',
         'nascita_nazione','nascita_regione','nascita_provincia','nascita_citta','nascita_paese',
         'residenza_nazione','residenza_regione','residenza_provincia','residenza_citta','residenza_paese',
         'domicilio_coincide','domicilio_provincia','instagram','facebook',

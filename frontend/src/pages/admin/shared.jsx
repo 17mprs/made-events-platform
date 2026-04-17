@@ -191,7 +191,7 @@ export function LeadDrawer({ lead, nota, onNotaChange, onClose, onAction, action
           {row('Telefono', d.telefono)}
           {row('Città', d.citta)}
           {row('Residenza', d.residenza_citta ? `${d.residenza_citta}${d.residenza_provincia ? ' ('+d.residenza_provincia+')' : ''}` : null)}
-          {row('Sezione completata', d.sezione_completata > 0 ? `${d.sezione_completata} / 8` : '1 / 8 (solo dati base)')}
+          {row('Sezione completata', d.sezione_completata > 0 ? `${d.sezione_completata} / 7` : '1 / 7 (solo dati base)')}
           {row('Registrazione', d.registration_completed_at ? new Date(d.registration_completed_at).toLocaleDateString('it-IT') : null)}
         </div>
 

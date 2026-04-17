@@ -7,7 +7,7 @@ import Layout from '../../components/Layout'
 import { COLORS } from '../../styles/theme'
 import {
   ADMIN_SIDEBAR, PageHeader,
-  TalentAvatar, LeadBadge, ScoreBar, LeadDrawer,
+  TalentAvatar, LeadBadge, ScoreBar,
   FILTER_INPUT, PAGE_SIZE, Pagination,
 } from './shared'
 
@@ -30,6 +30,342 @@ function photoExpiryStatus(talent) {
   if (msLeft < 0) return { status: 'expired',  label: `Scadute il ${expiry.toLocaleDateString('it-IT')}`,              color: '#EF4444', days: daysLeft }
   if (msLeft < twoMonthsMs) return { status: 'expiring', label: `Scade tra ${daysLeft} giorni (${expiry.toLocaleDateString('it-IT')})`, color: '#F97316', days: daysLeft }
   return { status: 'ok', label: `Valide fino al ${expiry.toLocaleDateString('it-IT')}`, color: '#10B981', days: daysLeft }
+}
+
+// ---------------------------------------------------------------------------
+// REVIEW DRAWER — scheda completa revisione per COMPLETED_PENDING_APPROVAL
+// ---------------------------------------------------------------------------
+
+function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
+  const d = lead.data ?? {}
+  const nome = `${d.nome ?? ''} ${d.cognome ?? ''}`.trim() || '—'
+
+  const [nota,              setNota]             = useState('')
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false)
+  const [lightboxUrl,       setLightboxUrl]       = useState(null)
+  const [showEmailModal,    setShowEmailModal]     = useState(false)
+  const [showSocialModal,   setShowSocialModal]    = useState(false)
+  const [emailBody,         setEmailBody]          = useState(
+    `Ciao ${d.nome || ''},\n\nIl team MADE EVENTS ha esaminato il tuo profilo.\n\nPer ulteriori informazioni non esitare a contattarci.\n\nIl team MADE EVENTS`
+  )
+  const [copied,            setCopied]             = useState(false)
+  const [openSections,      setOpenSections]       = useState({ dati: true, fisico: false, disp: false, lingue: false, exp: false, dot: false })
+
+  const toggleSection = (k) => setOpenSections(prev => ({ ...prev, [k]: !prev[k] }))
+
+  const photos = [
+    { key: 'foto_busto',  label: 'Mezzo busto',   url: d.foto_busto_url  },
+    { key: 'foto_intera', label: 'Figura intera',  url: d.foto_intera_url },
+    { key: 'foto_extra',  label: 'Aggiuntiva',     url: d.foto_extra_url  },
+  ].filter(p => p.url)
+
+  const socialText = `Ciao ${d.nome || ''}, seguici su Instagram @madeevents e Facebook Made Events per restare aggiornata sulle opportunità!`
+
+  const accSection = (k, label, children) => (
+    <div key={k} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+      <button
+        onClick={() => toggleSection(k)}
+        style={{
+          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '12px 0', fontFamily: 'Montserrat, sans-serif',
+        }}
+      >
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: COLORS.textSecondary }}>
+          {label}
+        </span>
+        <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{openSections[k] ? '▲' : '▼'}</span>
+      </button>
+      {openSections[k] && <div style={{ paddingBottom: 16 }}>{children}</div>}
+    </div>
+  )
+
+  const field = (label, value) => value ? (
+    <div key={label} style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 10, letterSpacing: '1px', textTransform: 'uppercase', color: COLORS.textSecondary, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, color: COLORS.text }}>{value}</div>
+    </div>
+  ) : null
+
+  const grid = (items) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+      {items}
+    </div>
+  )
+
+  return (
+    <>
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <img src={lightboxUrl} alt="foto" style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
+          <button onClick={() => setLightboxUrl(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <>
+          <div onClick={() => setShowEmailModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 650 }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            background: '#fff', borderRadius: 8, padding: 28, width: 480, maxWidth: '90vw', zIndex: 651,
+            fontFamily: 'Montserrat, sans-serif', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: COLORS.text }}>Invia email a {d.nome}</h3>
+            <div style={{ fontSize: 11, color: COLORS.textSecondary, marginBottom: 10 }}>A: <strong>{d.email}</strong></div>
+            <textarea
+              value={emailBody}
+              onChange={e => setEmailBody(e.target.value)}
+              rows={7}
+              style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '8px 12px', fontSize: 13, fontFamily: 'Montserrat, sans-serif', resize: 'vertical', boxSizing: 'border-box', color: COLORS.text }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowEmailModal(false)} style={{ padding: '8px 16px', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', color: COLORS.text }}>
+                Annulla
+              </button>
+              <button
+                onClick={() => { window.open(`mailto:${d.email}?subject=MADE EVENTS&body=${encodeURIComponent(emailBody)}`); setShowEmailModal(false) }}
+                style={{ padding: '8px 16px', background: COLORS.accent, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'Montserrat, sans-serif' }}
+              >
+                Apri client email →
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Social Modal */}
+      {showSocialModal && (
+        <>
+          <div onClick={() => setShowSocialModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 650 }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            background: '#fff', borderRadius: 8, padding: 28, width: 420, maxWidth: '90vw', zIndex: 651,
+            fontFamily: 'Montserrat, sans-serif', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: COLORS.text }}>Invita sui social</h3>
+            <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '12px 16px', fontSize: 13, color: COLORS.text, lineHeight: 1.7, marginBottom: 16 }}>
+              {socialText}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button
+                onClick={() => { navigator.clipboard?.writeText(socialText); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                style={{ flex: 1, padding: '9px 0', background: copied ? '#10B981' : 'none', color: copied ? '#fff' : COLORS.text, border: `1px solid ${copied ? '#10B981' : COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', fontWeight: 600, transition: 'all 0.2s' }}
+              >
+                {copied ? '✓ Copiato' : 'Copia testo'}
+              </button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(socialText)}`}
+                target="_blank" rel="noreferrer"
+                style={{ flex: 1, padding: '9px 0', background: '#25D366', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontFamily: 'Montserrat, sans-serif', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                Apri WhatsApp
+              </a>
+            </div>
+            <button onClick={() => setShowSocialModal(false)} style={{ width: '100%', padding: '8px 0', background: 'none', border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Montserrat, sans-serif', color: COLORS.textSecondary }}>
+              Chiudi
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500 }} />
+
+      {/* Drawer */}
+      <div style={{
+        position: 'fixed', right: 0, top: 0, bottom: 0, width: 620, maxWidth: '96vw',
+        background: '#fff', borderLeft: `1px solid ${COLORS.border}`,
+        zIndex: 501, display: 'flex', flexDirection: 'column', fontFamily: 'Montserrat, sans-serif',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: COLORS.text }}>{nome}</h2>
+              <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 3 }}>{d.email}</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#666', padding: '4px 8px', lineHeight: 1 }}>✕</button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+            <LeadBadge status={lead.status} />
+            <div style={{ flex: 1, maxWidth: 200 }}><ScoreBar score={d.score} /></div>
+            {d.ranking && <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textSecondary }}>Rank {d.ranking}</span>}
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+          {/* FOTO */}
+          {photos.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: COLORS.textSecondary, marginBottom: 12 }}>Foto</div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {photos.map(p => (
+                  <div key={p.key} style={{ textAlign: 'center' }}>
+                    <img
+                      src={p.url}
+                      alt={p.label}
+                      onClick={() => setLightboxUrl(p.url)}
+                      style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 6, border: `1px solid ${COLORS.border}`, cursor: 'zoom-in', display: 'block' }}
+                    />
+                    <div style={{ fontSize: 10, color: COLORS.textSecondary, marginTop: 4 }}>{p.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* DATI QUESTIONARIO — accordion */}
+          <div style={{ marginBottom: 20 }}>
+            {accSection('dati', 'Dati Personali', grid([
+              field('Genere', d.genere === 'F' ? 'Donna' : d.genere === 'M' ? 'Uomo' : d.genere),
+              field('Data nascita', d.data_nascita),
+              field('Città nascita', d.nascita_citta ? `${d.nascita_citta}${d.nascita_provincia ? ' ('+d.nascita_provincia+')' : ''}` : null),
+              field('Nazionalità', d.nazionalita),
+              field('Città residenza', d.residenza_citta ? `${d.residenza_citta}${d.residenza_provincia ? ' ('+d.residenza_provincia+')' : ''}` : null),
+              field('Città', d.citta),
+              field('Telefono', d.telefono),
+              field('Instagram', d.instagram),
+              field('Facebook', d.facebook),
+            ]))}
+
+            {accSection('fisico', 'Profilo Fisico', grid([
+              field('Altezza', d.altezza ? `${d.altezza} cm` : null),
+              field('Taglia t-shirt', d.taglia_tshirt),
+              field('Taglia pantalone', d.taglia_pantalone),
+              field('Taglia gonna', d.taglia_gonna),
+              field('N° scarpe', d.numero_scarpe),
+              field('Piercing visibili', d.piercing_visibili),
+              field('Tatuaggi visibili', d.tatuaggi_visibili),
+              field('Dove tatuaggi', d.tatuaggi_dove),
+            ]))}
+
+            {accSection('disp', 'Disponibilità', grid([
+              field('Province lavoro', (d.province_lavoro ?? []).join(', ') || null),
+              field('Patente', (d.patente_tipologie ?? []).join(', ') || null),
+              field('Automunita', d.automunita),
+              field('Trasferte', d.disponibilita_trasferte),
+              field('Weekend', d.disponibilita_weekend),
+              field('Serate', d.disponibilita_serali),
+            ]))}
+
+            {accSection('lingue', 'Lingue', grid([
+              field('Inglese', d.lingua_inglese),
+              field('Francese', d.lingua_francese && d.lingua_francese !== 'Non conosco' ? d.lingua_francese : null),
+              field('Spagnolo', d.lingua_spagnolo && d.lingua_spagnolo !== 'Non conosco' ? d.lingua_spagnolo : null),
+              field('Tedesco', d.lingua_tedesco && d.lingua_tedesco !== 'Non conosco' ? d.lingua_tedesco : null),
+              ...(d.altre_lingue ?? []).map((l, i) =>
+                field(`Altra ${i+1}`, l.nome && l.livello ? `${l.nome}: ${l.livello}` : l.nome || null)
+              ),
+            ]))}
+
+            {accSection('exp', 'Esperienza Professionale', grid([
+              field('Titolo studio', d.titolo_studio),
+              field('Indirizzo studio', d.titolo_studio_indirizzo),
+              field('Professione attuale', (d.professione_attuale ?? []).join(', ') || null),
+              field('Anni esperienza', d.anni_esperienza_settore),
+              field('Tipologie', (d.tipologie_esperienza ?? []).join(', ') || null),
+            ]))}
+
+            {accSection('dot', 'Dotazione', (d.dotazione_personale ?? []).length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {(d.dotazione_personale ?? []).map(item => (
+                  <span key={item} style={{ fontSize: 11, background: '#f5f5f5', color: COLORS.text, padding: '3px 10px', borderRadius: 10 }}>{item}</span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: COLORS.textSecondary }}>Nessun capo indicato</div>
+            ))}
+          </div>
+
+          {/* SCORE */}
+          <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '16px 20px', marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: COLORS.textSecondary, marginBottom: 12 }}>Score Profilo</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ fontSize: 36, fontWeight: 300, color: COLORS.text, minWidth: 52 }}>{d.score ?? '—'}</div>
+              <div style={{ flex: 1 }}><ScoreBar score={d.score} /></div>
+            </div>
+          </div>
+
+          {/* Documenti */}
+          {(d.cv_url || d.doc_identita_url || d.doc_cf_url) && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: COLORS.textSecondary, marginBottom: 10 }}>Documenti</div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {[['CV', d.cv_url], ['Documento identità', d.doc_identita_url], ['Cod. fiscale doc.', d.doc_cf_url]]
+                  .filter(([, u]) => u)
+                  .map(([label, url]) => (
+                    <a key={label} href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: COLORS.accent, textDecoration: 'underline' }}>
+                      {label} →
+                    </a>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ height: 16 }} />
+        </div>
+
+        {/* Sticky bottom actions */}
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, padding: '12px 24px', flexShrink: 0, background: '#fff' }}>
+          {showRejectConfirm && (
+            <div style={{ marginBottom: 10 }}>
+              <textarea
+                value={nota}
+                onChange={e => setNota(e.target.value)}
+                placeholder="Motivo del rifiuto (obbligatorio)..."
+                rows={2}
+                style={{ width: '100%', border: `1px solid #EF4444`, borderRadius: 6, padding: '8px 10px', fontSize: 12, fontFamily: 'Montserrat, sans-serif', resize: 'vertical', boxSizing: 'border-box', color: COLORS.text }}
+              />
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => onApprove(lead.entity_id)}
+              disabled={!!actionLoading}
+              style={{ flex: '1 1 100px', padding: '9px 12px', background: '#10B981', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: actionLoading ? 'wait' : 'pointer', fontFamily: 'Montserrat, sans-serif' }}
+            >
+              {actionLoading === lead.entity_id + '_approve' ? 'Approvando…' : 'APPROVA'}
+            </button>
+            {!showRejectConfirm ? (
+              <button
+                onClick={() => setShowRejectConfirm(true)}
+                style={{ flex: '1 1 100px', padding: '9px 12px', background: 'none', color: '#EF4444', border: '1px solid #EF4444', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}
+              >
+                RIFIUTA
+              </button>
+            ) : (
+              <button
+                onClick={() => { if (!nota.trim()) return; onReject(lead.entity_id, nota) }}
+                disabled={!nota.trim() || !!actionLoading}
+                style={{ flex: '1 1 100px', padding: '9px 12px', background: !nota.trim() ? '#f5f5f5' : '#EF4444', color: !nota.trim() ? '#999' : '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: !nota.trim() ? 'not-allowed' : 'pointer', fontFamily: 'Montserrat, sans-serif' }}
+              >
+                {actionLoading === lead.entity_id + '_reject' ? 'Rifiutando…' : 'Conferma rifiuto'}
+              </button>
+            )}
+            <button
+              onClick={() => setShowEmailModal(true)}
+              style={{ padding: '9px 12px', background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
+            >
+              Invia email
+            </button>
+            <button
+              onClick={() => setShowSocialModal(true)}
+              style={{ padding: '9px 12px', background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
+            >
+              Invita social
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +513,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#666', padding:'4px 8px', lineHeight:1 }}>✕</button>
         </div>
 
-        {/* Foto + info base */}
         <div style={{ display:'flex', gap:20, marginBottom:24, alignItems:'flex-start' }}>
           <TalentAvatar nome={nome} fotoUrl={d.foto_busto_url} size={80} />
           <div style={{ flex:1 }}>
@@ -188,7 +523,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         </div>
 
-        {/* Timer scadenza foto */}
         {photoExp.label && (
           <div style={{
             padding:'12px 14px', borderRadius:8, marginBottom:20,
@@ -218,7 +552,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         )}
 
-        {/* Score */}
         <div style={{ marginBottom:20 }}>
           <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Score</div>
           <div style={{ display:'flex', alignItems:'center', gap:16 }}>
@@ -227,7 +560,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         </div>
 
-        {/* Dati anagrafici */}
         <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
           <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:12 }}>Dati anagrafici</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -253,7 +585,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         </div>
 
-        {/* Skills */}
         {(d.skills ?? []).length > 0 && (
           <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Skills</div>
@@ -265,7 +596,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         )}
 
-        {/* Foto galleria */}
         {(d.foto_busto_url || d.foto_intera_url || d.foto_profilo_url) && (
           <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:10 }}>Foto</div>
@@ -284,7 +614,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         )}
 
-        {/* CV */}
         {d.cv_url && (
           <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20, marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Curriculum</div>
@@ -294,7 +623,6 @@ function TalentProfileDrawer({ talent, onClose }) {
           </div>
         )}
 
-        {/* Note */}
         {d.note && (
           <div style={{ borderTop:`1px solid ${COLORS.border}`, paddingTop:20 }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>Note</div>
@@ -307,22 +635,42 @@ function TalentProfileDrawer({ talent, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
+// GROUP HEADER — used inside TalentsSection to separate the two groups
+// ---------------------------------------------------------------------------
+
+function GroupHeader({ label, count, badgeColor }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '28px 0 12px' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: COLORS.textSecondary }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: 11, fontWeight: 700, background: badgeColor + '22', color: badgeColor,
+        border: `1px solid ${badgeColor}44`, borderRadius: 12, padding: '2px 10px', whiteSpace: 'nowrap',
+      }}>
+        {count} profil{count !== 1 ? 'i' : 'o'}
+      </span>
+      <div style={{ flex: 1, height: 1, background: COLORS.border }} />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // TALENTS SECTION — exported for reuse in AdminDashboard overview
 // ---------------------------------------------------------------------------
 
 export function TalentsSection({ handleApiResponse }) {
   const [items,          setItems]          = useState([])
-  const [profiles,       setProfiles]       = useState([])   // TALENT_PROFILE entities
+  const [profiles,       setProfiles]       = useState([])
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState(null)
   const [search,         setSearch]         = useState('')
   const [filterStatus,   setFilterStatus]   = useState('ALL')
   const [sortScore,      setSortScore]      = useState('DESC')
   const [page,           setPage]           = useState(1)
-  const [selected,       setSelected]       = useState(null)        // LeadDrawer
-  const [selectedScheda, setSelectedScheda] = useState(null)        // TalentProfileDrawer
-  const [selectedChanges,setSelectedChanges]= useState(null)        // TalentChangesDrawer
-  const [nota,           setNota]           = useState('')
+  const [selectedReview, setSelectedReview] = useState(null)   // ReviewDrawer
+  const [selectedScheda, setSelectedScheda] = useState(null)   // TalentProfileDrawer
+  const [selectedChanges,setSelectedChanges]= useState(null)   // TalentChangesDrawer
   const [actionLoading,  setActionLoading]  = useState(null)
 
   const load = useCallback(async () => {
@@ -344,7 +692,6 @@ export function TalentsSection({ handleApiResponse }) {
   useEffect(() => { load() }, [load])
   useEffect(() => { setPage(1) }, [filterStatus, search, sortScore])
 
-  // Build a map email→profile for badge lookup
   const profileByEmail = useMemo(() => {
     const m = {}
     profiles.forEach(p => {
@@ -375,26 +722,24 @@ export function TalentsSection({ handleApiResponse }) {
     return list
   }, [items, filterStatus, search, sortScore])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const pendingList  = filtered.filter(l => l.status === 'COMPLETED_PENDING_APPROVAL')
+  const approvedList = filtered.filter(l => l.status === 'APPROVED')
 
-  const handleAction = async (type, entity_id) => {
-    if (type === 'approve') {
-      setActionLoading(entity_id + '_approve')
-      const res = handleApiResponse(await talentApi.approve(entity_id, nota))
-      setActionLoading(null)
-      if (res.success) { setSelected(null); await adminStore.refresh(); load() }
-      else alert(getErrorMessage(res.error))
-    } else if (type === 'reject') {
-      const motivo = nota.trim() || window.prompt('Motivo del rifiuto:') || ''
-      setActionLoading(entity_id + '_reject')
-      const res = handleApiResponse(await talentApi.reject(entity_id, motivo))
-      setActionLoading(null)
-      if (res.success) { setSelected(null); await adminStore.refresh(); load() }
-      else alert(getErrorMessage(res.error))
-    } else if (type === 'modifiche') {
-      alert('Funzione in arrivo: invierà un email al candidato con richiesta di aggiornamento profilo.')
-    }
+  const handleApprove = async (entity_id) => {
+    setActionLoading(entity_id + '_approve')
+    const res = handleApiResponse(await talentApi.approve(entity_id))
+    setActionLoading(null)
+    if (res.success) { setSelectedReview(null); await adminStore.refresh(); load() }
+    else alert(getErrorMessage(res.error))
+  }
+
+  const handleReject = async (entity_id, nota) => {
+    const motivo = nota.trim() || window.prompt('Motivo del rifiuto:') || ''
+    setActionLoading(entity_id + '_reject')
+    const res = handleApiResponse(await talentApi.reject(entity_id, motivo))
+    setActionLoading(null)
+    if (res.success) { setSelectedReview(null); await adminStore.refresh(); load() }
+    else alert(getErrorMessage(res.error))
   }
 
   const handleApproveChanges = async (profile_id) => {
@@ -427,6 +772,90 @@ export function TalentsSection({ handleApiResponse }) {
     e.currentTarget.style.color      = on ? '#fff'    : '#7A1E2C'
   }
 
+  const renderRow = (l) => {
+    const photoExp      = photoExpiryStatus(l)
+    const email         = (l.data?.email ?? '').toLowerCase()
+    const linkedProfile = profileByEmail[email]
+    const hasPending    = linkedProfile?.status === 'PENDING_REVIEW'
+    return (
+      <tr key={l.entity_id}>
+        <td><TalentAvatar nome={l.data?.nome} fotoUrl={l.data?.foto_busto_url} size={36} /></td>
+        <td>
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            {l.data?.nome} {l.data?.cognome}
+            {hasPending && (
+              <span style={{
+                fontSize:9, fontWeight:700, background:'#FFF3E0', color:'#E65100',
+                border:'1px solid #F9A825', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap',
+              }}>
+                MODIFICHE IN ATTESA
+              </span>
+            )}
+          </div>
+        </td>
+        <td style={{ color:'#8888A0', fontSize:12 }}>{l.data?.email}</td>
+        <td>{l.data?.citta ?? '—'}</td>
+        <td><ScoreBar score={l.data?.score} /></td>
+        <td>
+          {photoExp.status === 'expired' && (
+            <span style={{ fontSize:10, fontWeight:700, color:'#EF4444', background:'#FFEBEE', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
+              Foto scadute
+            </span>
+          )}
+          {photoExp.status === 'expiring' && (
+            <span style={{ fontSize:10, fontWeight:700, color:'#F97316', background:'#FFF3E0', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
+              In scadenza
+            </span>
+          )}
+        </td>
+        <td>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            {linkedProfile && (
+              <button
+                onClick={() => setSelectedScheda(linkedProfile)}
+                onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)}
+                style={BTN}
+              >
+                Scheda
+              </button>
+            )}
+            {hasPending && (
+              <button
+                onClick={() => setSelectedChanges(linkedProfile)}
+                style={{ ...BTN, border:'1px solid #E65100', color:'#E65100' }}
+              >
+                Modifiche →
+              </button>
+            )}
+            {l.status === 'COMPLETED_PENDING_APPROVAL' && (
+              <button
+                onClick={() => setSelectedReview(l)}
+                onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)}
+                style={BTN}
+              >
+                Revisiona →
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  const tableHead = (
+    <thead>
+      <tr>
+        <th style={{ width:48 }}></th>
+        <th>Nome</th>
+        <th>Email</th>
+        <th>Città</th>
+        <th style={{ minWidth:120 }}>Score</th>
+        <th>Foto</th>
+        <th></th>
+      </tr>
+    </thead>
+  )
+
   return (
     <div>
       {/* Banner modifiche in attesa dai profili TALENT_PROFILE */}
@@ -454,6 +883,7 @@ export function TalentsSection({ handleApiResponse }) {
         </div>
       )}
 
+      {/* Filters */}
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16, alignItems:'center' }}>
         <input
           placeholder="Cerca nome o email…"
@@ -479,107 +909,50 @@ export function TalentsSection({ handleApiResponse }) {
         <div className="empty-state">Nessun profilo talent.</div>
       ) : (
         <>
-          <div style={{ overflowX:'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width:48 }}></th>
-                  <th>Nome</th>
-                  <th>Email</th>
-                  <th>Città</th>
-                  <th style={{ minWidth:120 }}>Score</th>
-                  <th>Stato</th>
-                  <th>Foto</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map(l => {
-                  const photoExp = photoExpiryStatus(l)
-                  const email    = (l.data?.email ?? '').toLowerCase()
-                  const linkedProfile = profileByEmail[email]
-                  const hasPending    = linkedProfile?.status === 'PENDING_REVIEW'
-                  return (
-                    <tr key={l.entity_id}>
-                      <td><TalentAvatar nome={l.data?.nome} fotoUrl={l.data?.foto_busto_url} size={36} /></td>
-                      <td>
-                        <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                          {l.data?.nome} {l.data?.cognome}
-                          {hasPending && (
-                            <span style={{
-                              fontSize:9, fontWeight:700, background:'#FFF3E0', color:'#E65100',
-                              border:'1px solid #F9A825', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap',
-                            }}>
-                              MODIFICHE IN ATTESA
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ color:'#8888A0', fontSize:12 }}>{l.data?.email}</td>
-                      <td>{l.data?.citta ?? '—'}</td>
-                      <td><ScoreBar score={l.data?.score} /></td>
-                      <td><LeadBadge status={l.status} /></td>
-                      <td>
-                        {photoExp.status === 'expired' && (
-                          <span style={{ fontSize:10, fontWeight:700, color:'#EF4444', background:'#FFEBEE', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
-                            Foto scadute
-                          </span>
-                        )}
-                        {photoExp.status === 'expiring' && (
-                          <span style={{ fontSize:10, fontWeight:700, color:'#F97316', background:'#FFF3E0', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
-                            In scadenza
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          {linkedProfile && (
-                            <button
-                              onClick={() => setSelectedScheda(linkedProfile)}
-                              onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)}
-                              style={BTN}
-                            >
-                              Scheda
-                            </button>
-                          )}
-                          {hasPending && (
-                            <button
-                              onClick={() => setSelectedChanges(linkedProfile)}
-                              style={{
-                                ...BTN, border:'1px solid #E65100', color:'#E65100',
-                              }}
-                            >
-                              Modifiche →
-                            </button>
-                          )}
-                          {l.status === 'COMPLETED_PENDING_APPROVAL' && (
-                            <button
-                              onClick={() => { setSelected(l); setNota('') }}
-                              onMouseEnter={e => hover(e,true)} onMouseLeave={e => hover(e,false)}
-                              style={BTN}
-                            >
-                              Revisiona →
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+          {/* GROUP: IN ATTESA */}
+          {(filterStatus === 'ALL' || filterStatus === 'COMPLETED_PENDING_APPROVAL') && (
+            <>
+              <GroupHeader label="In attesa di approvazione" count={pendingList.length} badgeColor="#E65100" />
+              {pendingList.length === 0 ? (
+                <div style={{ fontSize:12, color:COLORS.textSecondary, padding:'12px 0 4px' }}>Nessun profilo in attesa.</div>
+              ) : (
+                <div style={{ overflowX:'auto' }}>
+                  <table className="data-table">
+                    {tableHead}
+                    <tbody>{pendingList.map(renderRow)}</tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* GROUP: APPROVATI */}
+          {(filterStatus === 'ALL' || filterStatus === 'APPROVED') && (
+            <>
+              <GroupHeader label="Profili approvati — Database Talent" count={approvedList.length} badgeColor="#2E7D32" />
+              {approvedList.length === 0 ? (
+                <div style={{ fontSize:12, color:COLORS.textSecondary, padding:'12px 0 4px' }}>Nessun profilo approvato.</div>
+              ) : (
+                <div style={{ overflowX:'auto' }}>
+                  <table className="data-table">
+                    {tableHead}
+                    <tbody>{approvedList.map(renderRow)}</tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          <Pagination page={page} totalPages={Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))} onPage={setPage} />
         </>
       )}
 
-      {selected && (
-        <LeadDrawer
-          lead={selected}
-          nota={nota}
-          onNotaChange={setNota}
-          onClose={() => setSelected(null)}
-          onAction={handleAction}
+      {selectedReview && (
+        <ReviewDrawer
+          lead={selectedReview}
+          onClose={() => setSelectedReview(null)}
+          onApprove={handleApprove}
+          onReject={handleReject}
           actionLoading={actionLoading}
         />
       )}
@@ -597,6 +970,114 @@ export function TalentsSection({ handleApiResponse }) {
           onClose={() => setSelectedChanges(null)}
           onApprove={handleApproveChanges}
           onReject={handleRejectChanges}
+          actionLoading={actionLoading}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PENDING APPROVAL SECTION — compact, for AdminDashboard overview
+// ---------------------------------------------------------------------------
+
+export function PendingApprovalSection({ handleApiResponse }) {
+  const [items,         setItems]         = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [selectedReview,setSelectedReview]= useState(null)
+  const [actionLoading, setActionLoading] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const data = await adminStore.ensure()
+    setLoading(false)
+    if (!data) return
+    const seen = new Set()
+    const pending = (data.leads ?? []).filter(l => {
+      const key = (l.data?.email ?? l.entity_id ?? '').toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return l.status === 'COMPLETED_PENDING_APPROVAL'
+    })
+    setItems(pending)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleApprove = async (entity_id) => {
+    setActionLoading(entity_id + '_approve')
+    const res = handleApiResponse(await talentApi.approve(entity_id))
+    setActionLoading(null)
+    if (res.success) { setSelectedReview(null); await adminStore.refresh(); load() }
+    else alert(getErrorMessage(res.error))
+  }
+
+  const handleReject = async (entity_id, nota) => {
+    setActionLoading(entity_id + '_reject')
+    const res = handleApiResponse(await talentApi.reject(entity_id, nota))
+    setActionLoading(null)
+    if (res.success) { setSelectedReview(null); await adminStore.refresh(); load() }
+    else alert(getErrorMessage(res.error))
+  }
+
+  if (loading) return <div className="spinner" />
+
+  if (items.length === 0) return (
+    <div className="empty-state" style={{ padding: '20px 0' }}>Nessun profilo in attesa di approvazione.</div>
+  )
+
+  return (
+    <div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th style={{ width: 48 }}></th>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Città</th>
+              <th style={{ minWidth: 120 }}>Score</th>
+              <th>Data invio</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map(l => (
+              <tr key={l.entity_id}>
+                <td><TalentAvatar nome={l.data?.nome} fotoUrl={l.data?.foto_busto_url} size={36} /></td>
+                <td style={{ fontWeight: 600 }}>{l.data?.nome} {l.data?.cognome}</td>
+                <td style={{ color: '#8888A0', fontSize: 12 }}>{l.data?.email}</td>
+                <td>{l.data?.citta ?? l.data?.residenza_citta ?? '—'}</td>
+                <td><ScoreBar score={l.data?.score} /></td>
+                <td style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                  {l.data?.registration_completed_at
+                    ? new Date(l.data.registration_completed_at).toLocaleDateString('it-IT')
+                    : '—'}
+                </td>
+                <td>
+                  <button
+                    onClick={() => setSelectedReview(l)}
+                    style={{
+                      background: 'none', border: '1px solid #7A1E2C', color: '#7A1E2C',
+                      borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                      fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Revisiona →
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {selectedReview && (
+        <ReviewDrawer
+          lead={selectedReview}
+          onClose={() => setSelectedReview(null)}
+          onApprove={handleApprove}
+          onReject={handleReject}
           actionLoading={actionLoading}
         />
       )}
