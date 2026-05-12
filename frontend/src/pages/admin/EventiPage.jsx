@@ -23,7 +23,7 @@ function fmtDate(iso) {
 function statusMeta(status) {
   if (status === 'DRAFT')     return { label:'Bozza',         dot:'#9CA3AF', bg:'#F3F4F6', color:'#4B5563' }
   if (status === 'PLANNING')  return { label:'Pianificazione', dot:'#F97316', bg:'#FFF7ED', color:'#C2410C' }
-  if (status === 'LIVE')      return { label:'Live',           dot:'#4CAF50', bg:'#F0FDF4', color:'#15803D' }
+  if (status === 'LIVE')      return { label:'Attivo',         dot:'#4CAF50', bg:'#F0FDF4', color:'#15803D' }
   if (status === 'COMPLETED') return { label:'Completato',     dot:'#42A5F5', bg:'#E3F2FD', color:'#1565C0' }
   if (status === 'CANCELLED') return { label:'Annullato',      dot:'#EF5350', bg:'#FFEBEE', color:'#C62828' }
   return                             { label:status,           dot:'#9CA3AF', bg:'#F3F4F6', color:'#4B5563' }
@@ -78,18 +78,17 @@ function SaturationBar({ confirmed, required, onCountClick }) {
 // ---------------------------------------------------------------------------
 
 const STATUS_TRANSITIONS = {
-  DRAFT:     ['PLANNING', 'CANCELLED'],
-  PLANNING:  ['LIVE', 'CANCELLED'],
-  LIVE:      ['COMPLETED', 'CANCELLED'],
-  COMPLETED: [],
-  CANCELLED: [],
+  DRAFT:     ['PLANNING', 'LIVE', 'COMPLETED'],
+  PLANNING:  ['DRAFT',    'LIVE', 'COMPLETED'],
+  LIVE:      ['DRAFT', 'PLANNING', 'COMPLETED'],
+  COMPLETED: ['DRAFT', 'PLANNING', 'LIVE'],
 }
 
 // ---------------------------------------------------------------------------
-// CANCEL CONFIRM MODAL
+// DELETE CONFIRM MODAL
 // ---------------------------------------------------------------------------
 
-function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
+function DeleteConfirmModal({ event, onConfirm, onClose, loading }) {
   const [code, setCode] = useState('')
   const isValid = code === '12345'
   return (
@@ -100,9 +99,9 @@ function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
         background:'#fff', borderRadius:8, padding:32, width:420, maxWidth:'92vw',
         zIndex:301, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', fontFamily:'Montserrat,sans-serif',
       }}>
-        <h3 style={{ margin:'0 0 8px', fontSize:16, fontWeight:700, color:'#C62828' }}>Annullamento evento</h3>
+        <h3 style={{ margin:'0 0 8px', fontSize:16, fontWeight:700, color:'#C62828' }}>Elimina evento</h3>
         <p style={{ margin:'0 0 16px', fontSize:13, color:COLORS.textSecondary }}>
-          Stai per annullare <strong>"{event.data?.titolo}"</strong>. Questa operazione non è reversibile.
+          Stai per eliminare <strong>"{event.data?.titolo}"</strong>. L'evento sparirà dalla lista. Questa azione non è reversibile dall'interfaccia.
         </p>
         <div style={{ marginBottom:20 }}>
           <label style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:COLORS.textSecondary, display:'block', marginBottom:4 }}>
@@ -132,7 +131,7 @@ function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
             Annulla operazione
           </button>
           <Button variant="danger" disabled={!isValid} loading={loading} onClick={() => onConfirm(event.entity_id)}>
-            Annulla evento
+            Elimina evento
           </Button>
         </div>
       </div>
@@ -144,7 +143,7 @@ function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
 // EVENT STATUS TOGGLE
 // ---------------------------------------------------------------------------
 
-function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging }) {
+function EventStatusToggle({ event, onChangeStatus, onRequestDelete, isChanging }) {
   const [open, setOpen] = useState(false)
   const [pos,  setPos]  = useState(null)
   const buttonRef = useRef(null)
@@ -227,21 +226,16 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
           }}>
             {options.map((next, idx) => {
               const nm = statusMeta(next)
-              const isCancel = next === 'CANCELLED'
               return (
                 <button
                   key={next}
-                  onClick={() => {
-                    setOpen(false)
-                    if (isCancel) onRequestCancel(event)
-                    else          onChangeStatus(event.entity_id, next)
-                  }}
+                  onClick={() => { setOpen(false); onChangeStatus(event.entity_id, next) }}
                   style={{
                     width:'100%', textAlign:'left', background:'none',
                     border:'none',
                     borderBottom: idx < options.length - 1 ? `1px solid ${COLORS.border}` : 'none',
                     padding:'10px 14px', cursor:'pointer',
-                    fontSize:12, fontWeight:600, color: isCancel ? nm.color : COLORS.text,
+                    fontSize:12, fontWeight:600, color:COLORS.text,
                     display:'flex', alignItems:'center', gap:8, transition:'background 0.12s',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = nm.bg }}
@@ -252,6 +246,21 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
                 </button>
               )
             })}
+            <button
+              onClick={() => { setOpen(false); onRequestDelete(event) }}
+              style={{
+                width:'100%', textAlign:'left', background:'none',
+                border:'none', borderTop:`1px solid ${COLORS.border}`,
+                padding:'10px 14px', cursor:'pointer',
+                fontSize:12, fontWeight:600, color:'#C62828',
+                display:'flex', alignItems:'center', gap:8, transition:'background 0.12s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#FFEBEE' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+            >
+              <span style={{ fontSize:14 }}>🗑</span>
+              Elimina evento
+            </button>
           </div>
         </>,
         document.body
@@ -1125,7 +1134,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
 // EVENT CARD
 // ---------------------------------------------------------------------------
 
-function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onChangeStatus, onRequestCancel, isChanging, closedSet, onToggleClosed, richieste, onSetRichieste, onSaveRichieste }) {
+function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onChangeStatus, onRequestDelete, isChanging, closedSet, onToggleClosed, richieste, onSetRichieste, onSaveRichieste }) {
   const d       = event.data ?? {}
   const sm      = statusMeta(event.status)
   const client  = clients.find(c => c.entity_id === d.client_id)
@@ -1215,7 +1224,7 @@ function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onCha
         <EventStatusToggle
           event={event}
           onChangeStatus={onChangeStatus}
-          onRequestCancel={onRequestCancel}
+          onRequestDelete={onRequestDelete}
           isChanging={isChanging}
         />
 
@@ -1286,8 +1295,7 @@ export default function EventiPage() {
 
   // UI state
   const [toggling,     setToggling]     = useState(null)
-  const [cancelModal,  setCancelModal]  = useState(null)
-  const [showCancelled, setShowCancelled] = useState(false)
+  const [deleteModal,  setDeleteModal]  = useState(null)
   const [showForm,     setShowForm]     = useState(false)
   const [formPrefill,  setFormPrefill]  = useState(null)
   const [isEdit,       setIsEdit]       = useState(false)
@@ -1321,7 +1329,6 @@ export default function EventiPage() {
   // Filtered + sorted events
   const displayed = useMemo(() => {
     let list = [...events]
-    if (!showCancelled) list = list.filter(e => e.status !== 'CANCELLED')
     if (filterStatus !== 'ALL') list = list.filter(e => e.status === filterStatus)
     if (filterCitta.trim()) {
       const q = filterCitta.trim().toLowerCase()
@@ -1342,27 +1349,32 @@ export default function EventiPage() {
   }, [events, filterStatus, filterCitta, sortBy, richieste])
 
   const doUpdateStatus = async (entity_id, new_status) => {
-    setToggling(entity_id)
+    const prevEvents = events
+    setEvents(prev => prev.map(e => e.entity_id === entity_id ? { ...e, status: new_status } : e))
     const res = handleApiResponse(await eventApi.updateStatus(entity_id, new_status))
-    setToggling(null)
-    if (!res.success) alert(getErrorMessage(res.error))
-    else load()
+    if (!res.success) {
+      setEvents(prevEvents)
+      alert(getErrorMessage(res.error))
+    }
   }
 
   const handleChangeStatus = (entity_id, new_status) => {
     doUpdateStatus(entity_id, new_status)
   }
 
-  const handleRequestCancel = (event) => {
-    setCancelModal(event)
+  const handleRequestDelete = (event) => {
+    setDeleteModal(event)
   }
 
-  const handleConfirmCancel = async (entity_id) => {
-    setToggling(entity_id)
-    const res = handleApiResponse(await eventApi.cancel(entity_id))
-    setToggling(null)
-    if (!res.success) alert(getErrorMessage(res.error))
-    else { setCancelModal(null); load() }
+  const handleConfirmDelete = async (entity_id) => {
+    const prevEvents = events
+    setEvents(prev => prev.filter(e => e.entity_id !== entity_id))
+    setDeleteModal(null)
+    const res = handleApiResponse(await eventApi.softDelete(entity_id))
+    if (!res.success) {
+      setEvents(prevEvents)
+      alert(getErrorMessage(res.error))
+    }
   }
 
   const handleDuplica = (event) => {
@@ -1436,24 +1448,15 @@ export default function EventiPage() {
         />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={FILTER_INPUT}>
           <option value="ALL">Tutti gli stati</option>
+          <option value="DRAFT">Bozze</option>
+          <option value="PLANNING">Pianificazione</option>
           <option value="LIVE">Attivi</option>
-          <option value="PLANNING">Non attivi</option>
           <option value="COMPLETED">Completati</option>
-          <option value="CANCELLED">Annullati</option>
         </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={FILTER_INPUT}>
           <option value="data">Ordina per data</option>
           <option value="saturazione">Ordina per saturazione</option>
         </select>
-        <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:COLORS.textSecondary, cursor:'pointer', userSelect:'none' }}>
-          <input
-            type="checkbox"
-            checked={showCancelled}
-            onChange={e => setShowCancelled(e.target.checked)}
-            style={{ cursor:'pointer' }}
-          />
-          Mostra annullati
-        </label>
         <span style={{ fontSize:12, color:'#8888A0', marginLeft:'auto', whiteSpace:'nowrap' }}>
           {displayed.length} eventi
         </span>
@@ -1476,7 +1479,7 @@ export default function EventiPage() {
               onModifica={handleModifica}
               onMatchTalent={(ev, tab = 'potenziali') => { setMatchEvent(ev); setMatchTab(tab) }}
               onChangeStatus={handleChangeStatus}
-              onRequestCancel={handleRequestCancel}
+              onRequestDelete={handleRequestDelete}
               isChanging={toggling === ev.entity_id}
               closedSet={closedSet}
               onToggleClosed={handleToggleClosed}
@@ -1488,12 +1491,12 @@ export default function EventiPage() {
         </div>
       )}
 
-      {cancelModal && (
-        <CancelConfirmModal
-          event={cancelModal}
-          onConfirm={handleConfirmCancel}
-          onClose={() => setCancelModal(null)}
-          loading={toggling === cancelModal?.entity_id}
+      {deleteModal && (
+        <DeleteConfirmModal
+          event={deleteModal}
+          onConfirm={handleConfirmDelete}
+          onClose={() => setDeleteModal(null)}
+          loading={false}
         />
       )}
 

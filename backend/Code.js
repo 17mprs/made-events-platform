@@ -135,6 +135,7 @@ function handleRequest(action, payload, token) {
     case 'event.update':       return handleEventUpdate(payload, auth);
     case 'event.updateStatus': return handleEventUpdateStatus(payload, auth);
     case 'event.cancel':       return handleEventCancel(payload, auth);
+    case 'event.softDelete':   return handleEventSoftDelete(payload, auth);
 
     // SHIFT
     case 'shift.create':       return handleShiftCreate(payload, auth);

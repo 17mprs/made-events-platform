@@ -141,12 +141,19 @@ function handleClientCreate(payload, auth) {
   var valid = requireFields(payload, ['ragione_sociale']);
   if (valid) return valid;
 
-  var entity = createEntity('CLIENT_COMPANY', 'active', {
-    ragione_sociale: payload.ragione_sociale,
-    piva:            payload.piva            || '',
-    referenti:       payload.referenti       || [],
-    sede_legale:     payload.sede_legale     || '',
-    note:            payload.note            || ''
+  if (!payload.ragione_sociale || !payload.ragione_sociale.trim()) {
+    return errorResponse('VAL_001', 'Ragione sociale obbligatoria', 'ragione_sociale');
+  }
+
+  var entity = createEntity('CLIENT', 'ACTIVE', {
+    ragione_sociale:   payload.ragione_sociale.trim(),
+    partita_iva:       payload.partita_iva       || '',
+    email:             payload.email             || '',
+    telefono:          payload.telefono          || '',
+    referente_nome:    payload.referente_nome    || '',
+    referente_cognome: payload.referente_cognome || '',
+    indirizzo:         payload.indirizzo         || '',
+    citta:             payload.citta             || ''
   }, auth.tenant_id, auth.user_id);
 
   return successResponse({ client: entityToPublic(entity) });
@@ -154,7 +161,7 @@ function handleClientCreate(payload, auth) {
 
 function handleClientList(payload, auth) {
   var tenantId = resolvedTenantId_(payload, auth);
-  var result = listEntities('CLIENT_COMPANY', tenantId, null, payload.page, payload.limit);
+  var result = listEntities('CLIENT', tenantId, null, payload.page, payload.limit);
   result.items = result.items.map(entityToPublic);
   return successResponse(result);
 }
@@ -164,7 +171,7 @@ function handleClientGet(payload, auth) {
   if (valid) return valid;
 
   var entity = getEntityById(payload.entity_id, auth.tenant_id);
-  if (!entity || entity.type !== 'CLIENT_COMPANY') {
+  if (!entity || entity.type !== 'CLIENT') {
     return errorResponse('SYS_002', 'Cliente non trovato');
   }
 
@@ -184,11 +191,11 @@ function handleClientUpdate(payload, auth) {
   if (valid) return valid;
 
   var entity = getEntityById(payload.entity_id, auth.tenant_id);
-  if (!entity || entity.type !== 'CLIENT_COMPANY') {
+  if (!entity || entity.type !== 'CLIENT') {
     return errorResponse('SYS_002', 'Cliente non trovato');
   }
 
-  var allowedFields = ['ragione_sociale', 'piva', 'referenti', 'sede_legale', 'note'];
+  var allowedFields = ['ragione_sociale', 'partita_iva', 'email', 'telefono', 'referente_nome', 'referente_cognome', 'indirizzo', 'citta'];
   var updates = {};
   for (var i = 0; i < allowedFields.length; i++) {
     var f = allowedFields[i];
@@ -204,26 +211,54 @@ function handleClientUpdate(payload, auth) {
 // ---------------------------------------------------------------------------
 
 function handleEventCreate(payload, auth) {
-  var valid = requireFields(payload, ['nome_evento', 'client_company_id']);
+  var valid = requireFields(payload, ['titolo', 'client_id']);
   if (valid) return valid;
 
   // Verifica che il client esista nello stesso tenant
-  var client = getEntityById(payload.client_company_id, auth.tenant_id);
-  if (!client || client.type !== 'CLIENT_COMPANY') {
-    return errorResponse('SYS_002', 'CLIENT_COMPANY non trovata', 'client_company_id');
+  var client = getEntityById(payload.client_id, auth.tenant_id);
+  if (!client || client.type !== 'CLIENT') {
+    return errorResponse('SYS_002', 'Cliente non trovato', 'client_id');
   }
 
   var entity = createEntity('EVENT', ENTITY_STATUS.EVENT.DRAFT, {
-    client_company_id: payload.client_company_id,
-    nome_evento:       payload.nome_evento,
-    citta:             payload.citta             || '',
-    location:          payload.location          || '',
-    note_admin:        payload.note_admin        || '',
-    data_inizio:       payload.data_inizio       || '',
-    data_fine:         payload.data_fine         || ''
+    titolo:                    payload.titolo,
+    client_id:                 payload.client_id,
+    descrizione:               payload.descrizione               || '',
+    data_inizio:               payload.data_inizio               || '',
+    data_fine:                 payload.data_fine                 || '',
+    luogo:                     payload.luogo                     || '',
+    foto_url:                  payload.foto_url                  || '',
+    foto_copertina_url:        payload.foto_url                  || '',
+    hostess_richieste:         payload.hostess_richieste         || 0,
+    anni_esperienza_minimi:    payload.anni_esperienza_minimi    || 0,
+    richiede_trasferte:        !!payload.richiede_trasferte,
+    richiede_weekend:          !!payload.richiede_weekend,
+    sesso_richiesto:           payload.sesso_richiesto           || '',
+    altezza_minima:            payload.altezza_minima            || 0,
+    taglia_richiesta:          payload.taglia_richiesta          || '',
+    lingue_richieste:          payload.lingue_richieste          || [],
+    ruoli_richiesti:           payload.ruoli_richiesti           || [],
+    automunita:                payload.automunita                || '',
+    priorita_lavorato_con_noi: !!payload.priorita_lavorato_con_noi,
+    note_admin:                payload.note_admin                || ''
   }, auth.tenant_id, auth.user_id);
 
   return successResponse({ event: entityToPublic(entity) });
+}
+
+function handleEventSoftDelete(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity || entity.type !== 'EVENT') {
+    return errorResponse('SYS_002', 'Evento non trovato');
+  }
+
+  var ok = softDeleteEntity(payload.entity_id, auth.tenant_id, auth.user_id);
+  if (!ok) return errorResponse('SYS_001', 'Impossibile eliminare l\'evento');
+
+  return successResponse({ entity_id: payload.entity_id });
 }
 
 function handleEventList(payload, auth) {
@@ -234,7 +269,7 @@ function handleEventList(payload, auth) {
   if (auth.role === ROLES.CLIENTE) {
     var company = findClienteCompany_(auth.user_id, tenantId);
     if (!company) return successResponse({ items: [], total: 0, page: 1, limit: 50, pages: 0 });
-    filters = { client_company_id: company.entity_id };
+    filters = { client_id: company.entity_id };
   }
 
   if (payload.status) {
@@ -272,7 +307,7 @@ function handleEventGet(payload, auth) {
 
   if (auth.role === ROLES.CLIENTE) {
     var company = findClienteCompany_(auth.user_id, auth.tenant_id);
-    if (!company || entity.data.client_company_id !== company.entity_id) {
+    if (!company || entity.data.client_id !== company.entity_id) {
       return errorResponse('AUTH_005', 'Accesso non consentito');
     }
   }
@@ -310,11 +345,11 @@ function handleEventUpdate(payload, auth) {
   }
 
   var allowedFields = [
-    'titolo', 'nome_evento', 'descrizione', 'luogo', 'citta',
-    'client_company_id', 'client_id', 'foto_url',
-    'data_inizio', 'data_fine', 'hostess_richieste',
-    'selezioni_chiuse', 'note_admin',
-    'anni_esperienza_minimi', 'richiede_trasferte', 'richiede_weekend'
+    'titolo', 'descrizione', 'luogo', 'client_id', 'foto_url', 'foto_copertina_url',
+    'data_inizio', 'data_fine', 'hostess_richieste', 'selezioni_chiuse', 'note_admin',
+    'anni_esperienza_minimi', 'richiede_trasferte', 'richiede_weekend',
+    'sesso_richiesto', 'altezza_minima', 'taglia_richiesta',
+    'lingue_richieste', 'ruoli_richiesti', 'automunita', 'priorita_lavorato_con_noi'
   ];
   var updates = {};
   for (var i = 0; i < allowedFields.length; i++) {
@@ -384,7 +419,7 @@ function handleShiftList(payload, auth) {
       return e.type === 'EVENT' &&
              String(e.tenant_id) === String(tenantId) &&
              String(e.deleted) !== 'true' &&
-             parseJSON(e.data).client_company_id === company.entity_id;
+             parseJSON(e.data).client_id === company.entity_id;
     }).map(function(e) { return e.entity_id; });
 
     var result = listEntities('SHIFT', tenantId, filters, payload.page, payload.limit);
@@ -530,7 +565,7 @@ function handleAssignmentList(payload, auth) {
       return e.type === 'EVENT' &&
              String(e.tenant_id) === String(tenantId) &&
              String(e.deleted) !== 'true' &&
-             parseJSON(e.data).client_company_id === company.entity_id;
+             parseJSON(e.data).client_id === company.entity_id;
     }).map(function(e) { return e.entity_id; });
 
     var clientShifts = getAllRows('Entities').filter(function(e) {
@@ -567,7 +602,7 @@ function handleAssignmentValidate(payload, auth) {
     var shift = getEntityById(entity.data.shift_id, auth.tenant_id);
     if (!shift) return errorResponse('SYS_002', 'Shift non trovato');
     var event = getEntityById(shift.data.event_id, auth.tenant_id);
-    if (!event || event.data.client_company_id !== company.entity_id) {
+    if (!event || event.data.client_id !== company.entity_id) {
       return errorResponse('AUTH_005', 'Puoi validare solo assignment dei tuoi eventi');
     }
   }
@@ -760,7 +795,7 @@ function findClienteCompany_(userId, tenantId) {
   var all = getAllRows('Entities');
   for (var i = 0; i < all.length; i++) {
     var e = all[i];
-    if (e.type !== 'CLIENT_COMPANY') continue;
+    if (e.type !== 'CLIENT') continue;
     if (tenantId && String(e.tenant_id) !== String(tenantId)) continue;
     var d = parseJSON(e.data);
     if (String(d.cliente_user_id) === String(userId)) {

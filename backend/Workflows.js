@@ -23,11 +23,10 @@ var STATE_TRANSITIONS = {
     INACTIVE:       ['ACTIVE']
   },
   EVENT: {
-    DRAFT:    ['PLANNING', 'CANCELLED'],
-    PLANNING: ['LIVE',     'CANCELLED'],
-    LIVE:     ['COMPLETED','CANCELLED'],
-    // COMPLETED e CANCELLED: terminali
-    '*':      ['CANCELLED']  // fallback: da qualsiasi stato si può cancellare
+    DRAFT:     ['PLANNING', 'LIVE', 'COMPLETED'],
+    PLANNING:  ['DRAFT',    'LIVE', 'COMPLETED'],
+    LIVE:      ['DRAFT', 'PLANNING', 'COMPLETED'],
+    COMPLETED: ['DRAFT', 'PLANNING', 'LIVE'],
   },
   SHIFT: {
     OPEN:  ['FULL', 'CLOSED', 'CANCELLED'],
