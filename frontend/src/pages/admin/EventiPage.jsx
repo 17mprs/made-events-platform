@@ -1,6 +1,7 @@
 // === EVENTI PAGE — MADE EVENTS Platform ===
 import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, AlignmentType } from 'docx'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { clientApi, eventApi, talentApi, applicationApi, contractApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
@@ -144,8 +145,8 @@ function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
 // ---------------------------------------------------------------------------
 
 function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging }) {
-  const [open,      setOpen]      = useState(false)
-  const [openUpward, setOpenUpward] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [pos,  setPos]  = useState(null)
   const buttonRef = useRef(null)
   const meta    = statusMeta(event.status)
   const options = STATUS_TRANSITIONS[event.status] ?? []
@@ -154,12 +155,29 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
     if (isChanging) return
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - rect.bottom
       const dropdownHeight = options.length * 40 + 16
-      setOpenUpward(spaceBelow < dropdownHeight + 20)
+      const spaceBelow = window.innerHeight - rect.bottom
+      const openUpward = spaceBelow < dropdownHeight + 20
+      setPos({
+        top:        openUpward ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+        left:       rect.left,
+        openUpward,
+      })
     }
     setOpen(o => !o)
   }
+
+  // Chiude il dropdown se l'utente scrolla o ridimensiona la finestra
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [open])
 
   if (!options.length) {
     return (
@@ -194,16 +212,17 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
         {!isChanging && <span style={{ fontSize:8, marginLeft:2, opacity:0.6 }}>▾</span>}
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <>
-          <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:200 }} />
+          <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:2000 }} />
           <div style={{
-            position:'absolute',
-            [openUpward ? 'bottom' : 'top']: 'calc(100% + 4px)',
-            left:0, zIndex:201,
+            position:'fixed',
+            top:  pos.top,
+            left: pos.left,
+            zIndex:2001,
             background:'#fff', border:`1px solid ${COLORS.border}`,
             borderRadius:8,
-            boxShadow: openUpward ? '0 -4px 16px rgba(0,0,0,0.12)' : '0 4px 16px rgba(0,0,0,0.12)',
+            boxShadow: pos.openUpward ? '0 -4px 16px rgba(0,0,0,0.12)' : '0 4px 16px rgba(0,0,0,0.12)',
             minWidth:160, overflow:'hidden', fontFamily:'Montserrat,sans-serif',
           }}>
             {options.map((next, idx) => {
@@ -234,7 +253,8 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
               )
             })}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
