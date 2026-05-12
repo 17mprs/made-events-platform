@@ -1,6 +1,6 @@
 // === EVENTI PAGE — MADE EVENTS Platform ===
 import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, AlignmentType } from 'docx'
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { clientApi, eventApi, talentApi, applicationApi, contractApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
@@ -144,9 +144,22 @@ function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
 // ---------------------------------------------------------------------------
 
 function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging }) {
-  const [open, setOpen] = useState(false)
+  const [open,      setOpen]      = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const buttonRef = useRef(null)
   const meta    = statusMeta(event.status)
   const options = STATUS_TRANSITIONS[event.status] ?? []
+
+  const handleToggle = () => {
+    if (isChanging) return
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const dropdownHeight = options.length * 40 + 16
+      setOpenUpward(spaceBelow < dropdownHeight + 20)
+    }
+    setOpen(o => !o)
+  }
 
   if (!options.length) {
     return (
@@ -164,7 +177,8 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
   return (
     <div style={{ position:'relative' }}>
       <button
-        onClick={() => !isChanging && setOpen(o => !o)}
+        ref={buttonRef}
+        onClick={handleToggle}
         disabled={isChanging}
         style={{
           display:'inline-flex', alignItems:'center', gap:5,
@@ -184,9 +198,12 @@ function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging 
         <>
           <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:200 }} />
           <div style={{
-            position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:201,
+            position:'absolute',
+            [openUpward ? 'bottom' : 'top']: 'calc(100% + 4px)',
+            left:0, zIndex:201,
             background:'#fff', border:`1px solid ${COLORS.border}`,
-            borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
+            borderRadius:8,
+            boxShadow: openUpward ? '0 -4px 16px rgba(0,0,0,0.12)' : '0 4px 16px rgba(0,0,0,0.12)',
             minWidth:160, overflow:'hidden', fontFamily:'Montserrat,sans-serif',
           }}>
             {options.map((next, idx) => {
