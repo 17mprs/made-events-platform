@@ -20,11 +20,12 @@ function fmtDate(iso) {
 }
 
 function statusMeta(status) {
-  if (status === 'LIVE')      return { label:'Attivo',     dot:'#4CAF50', bg:'#E8F5E9', color:'#2E7D32' }
-  if (status === 'PLANNING')  return { label:'Non attivo', dot:'#bbb',    bg:'#f5f5f5', color:'#666' }
-  if (status === 'COMPLETED') return { label:'Completato', dot:'#42A5F5', bg:'#E3F2FD', color:'#1565C0' }
-  if (status === 'CANCELLED') return { label:'Annullato',  dot:'#EF5350', bg:'#FFEBEE', color:'#C62828' }
-  return                             { label:status,       dot:'#bbb',    bg:'#f5f5f5', color:'#666' }
+  if (status === 'DRAFT')     return { label:'Bozza',         dot:'#9CA3AF', bg:'#F3F4F6', color:'#4B5563' }
+  if (status === 'PLANNING')  return { label:'Pianificazione', dot:'#F97316', bg:'#FFF7ED', color:'#C2410C' }
+  if (status === 'LIVE')      return { label:'Live',           dot:'#4CAF50', bg:'#F0FDF4', color:'#15803D' }
+  if (status === 'COMPLETED') return { label:'Completato',     dot:'#42A5F5', bg:'#E3F2FD', color:'#1565C0' }
+  if (status === 'CANCELLED') return { label:'Annullato',      dot:'#EF5350', bg:'#FFEBEE', color:'#C62828' }
+  return                             { label:status,           dot:'#9CA3AF', bg:'#F3F4F6', color:'#4B5563' }
 }
 
 // Parses anni_esperienza_settore string to number
@@ -72,43 +73,153 @@ function SaturationBar({ confirmed, required, onCountClick }) {
 }
 
 // ---------------------------------------------------------------------------
-// ACTIVATION MODAL
+// STATUS TRANSITIONS (specchio delle regole backend Workflows.js)
 // ---------------------------------------------------------------------------
 
-function ActivationModal({ event, onConfirm, onCancel, loading }) {
-  const d = event.data ?? {}
+const STATUS_TRANSITIONS = {
+  DRAFT:     ['PLANNING', 'CANCELLED'],
+  PLANNING:  ['LIVE', 'CANCELLED'],
+  LIVE:      ['COMPLETED', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+}
+
+// ---------------------------------------------------------------------------
+// CANCEL CONFIRM MODAL
+// ---------------------------------------------------------------------------
+
+function CancelConfirmModal({ event, onConfirm, onClose, loading }) {
+  const [code, setCode] = useState('')
+  const isValid = code === '12345'
   return (
     <>
-      <div onClick={onCancel} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300 }} />
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300 }} />
       <div style={{
         position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-        background:'#fff', borderRadius:8, padding:32, width:400, maxWidth:'92vw',
+        background:'#fff', borderRadius:8, padding:32, width:420, maxWidth:'92vw',
         zIndex:301, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', fontFamily:'Montserrat,sans-serif',
       }}>
-        <h3 style={{ margin:'0 0 8px', fontSize:16, fontWeight:700, color:COLORS.text }}>Attiva evento</h3>
+        <h3 style={{ margin:'0 0 8px', fontSize:16, fontWeight:700, color:'#C62828' }}>Annullamento evento</h3>
         <p style={{ margin:'0 0 16px', fontSize:13, color:COLORS.textSecondary }}>
-          Stai per rendere questo evento <strong>pubblicamente attivo</strong>.
+          Stai per annullare <strong>"{event.data?.titolo}"</strong>. Questa operazione non è reversibile.
         </p>
-        <div style={{ background:'#fafafa', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'14px 16px', marginBottom:20 }}>
-          <div style={{ fontWeight:600, fontSize:14, marginBottom:6, color:COLORS.text }}>{d.titolo}</div>
-          {d.luogo && <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:3 }}>📍 {d.luogo}</div>}
-          <div style={{ fontSize:12, color:COLORS.textSecondary }}>
-            🗓 {fmtDate(d.data_inizio)}{d.data_fine ? ` → ${fmtDate(d.data_fine)}` : ''}
+        <div style={{ marginBottom:20 }}>
+          <label style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:COLORS.textSecondary, display:'block', marginBottom:4 }}>
+            Per confermare digita il codice
+          </label>
+          <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:8 }}>
+            Codice: <strong style={{ fontFamily:'monospace', fontSize:14 }}>12345</strong>
           </div>
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            placeholder="12345"
+            autoFocus
+            style={{
+              border:`1.5px solid ${isValid ? '#4CAF50' : COLORS.border}`,
+              borderRadius:4, padding:'9px 12px', fontSize:15,
+              fontFamily:'Montserrat,sans-serif', width:'100%',
+              boxSizing:'border-box', outline:'none', transition:'border-color 0.2s',
+            }}
+          />
         </div>
-        {!d.data_inizio && (
-          <div style={{ background:COLORS.warningLight, color:COLORS.warning, padding:'10px 14px', borderRadius:6, fontSize:12, marginBottom:16 }}>
-            ⚠ Nessuna data impostata. Aggiungi una data prima di attivare.
-          </div>
-        )}
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-          <button onClick={onCancel} style={{ background:'none', border:'1px solid #e0e0e0', borderRadius:6, padding:'9px 20px', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif', color:'#333' }}>
-            Annulla
+          <button
+            onClick={onClose}
+            style={{ background:'none', border:'1px solid #e0e0e0', borderRadius:6, padding:'9px 20px', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif', color:'#333' }}
+          >
+            Annulla operazione
           </button>
-          <Button onClick={onConfirm} loading={loading} disabled={!d.data_inizio}>Attiva</Button>
+          <Button variant="danger" disabled={!isValid} loading={loading} onClick={() => onConfirm(event.entity_id)}>
+            Annulla evento
+          </Button>
         </div>
       </div>
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// EVENT STATUS TOGGLE
+// ---------------------------------------------------------------------------
+
+function EventStatusToggle({ event, onChangeStatus, onRequestCancel, isChanging }) {
+  const [open, setOpen] = useState(false)
+  const meta    = statusMeta(event.status)
+  const options = STATUS_TRANSITIONS[event.status] ?? []
+
+  if (!options.length) {
+    return (
+      <span style={{
+        display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px',
+        borderRadius:20, background:meta.bg, color:meta.color,
+        fontSize:10, fontWeight:700, letterSpacing:'0.3px',
+      }}>
+        <span style={{ width:6, height:6, borderRadius:'50%', background:meta.dot, flexShrink:0 }} />
+        {meta.label}
+      </span>
+    )
+  }
+
+  return (
+    <div style={{ position:'relative' }}>
+      <button
+        onClick={() => !isChanging && setOpen(o => !o)}
+        disabled={isChanging}
+        style={{
+          display:'inline-flex', alignItems:'center', gap:5,
+          background:meta.bg, border:`1px solid ${meta.color}44`,
+          borderRadius:20, padding:'4px 12px', fontSize:10, fontWeight:700,
+          cursor: isChanging ? 'not-allowed' : 'pointer',
+          color:meta.color, fontFamily:'Montserrat,sans-serif',
+          opacity: isChanging ? 0.6 : 1, letterSpacing:'0.3px', transition:'opacity 0.15s',
+        }}
+      >
+        <span style={{ width:6, height:6, borderRadius:'50%', background: isChanging ? '#bbb' : meta.dot, flexShrink:0 }} />
+        {isChanging ? '…' : meta.label}
+        {!isChanging && <span style={{ fontSize:8, marginLeft:2, opacity:0.6 }}>▾</span>}
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, zIndex:200 }} />
+          <div style={{
+            position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:201,
+            background:'#fff', border:`1px solid ${COLORS.border}`,
+            borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
+            minWidth:160, overflow:'hidden', fontFamily:'Montserrat,sans-serif',
+          }}>
+            {options.map((next, idx) => {
+              const nm = statusMeta(next)
+              const isCancel = next === 'CANCELLED'
+              return (
+                <button
+                  key={next}
+                  onClick={() => {
+                    setOpen(false)
+                    if (isCancel) onRequestCancel(event)
+                    else          onChangeStatus(event.entity_id, next)
+                  }}
+                  style={{
+                    width:'100%', textAlign:'left', background:'none',
+                    border:'none',
+                    borderBottom: idx < options.length - 1 ? `1px solid ${COLORS.border}` : 'none',
+                    padding:'10px 14px', cursor:'pointer',
+                    fontSize:12, fontWeight:600, color: isCancel ? nm.color : COLORS.text,
+                    display:'flex', alignItems:'center', gap:8, transition:'background 0.12s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = nm.bg }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                >
+                  <span style={{ width:7, height:7, borderRadius:'50%', background:nm.dot, flexShrink:0 }} />
+                  {nm.label}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -977,13 +1088,11 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
 // EVENT CARD
 // ---------------------------------------------------------------------------
 
-function EventCard({ event, clients, onToggle, onDuplica, onModifica, onMatchTalent, toggling, closedSet, onToggleClosed, richieste, onSetRichieste, onSaveRichieste }) {
-  const d          = event.data ?? {}
-  const sm         = statusMeta(event.status)
-  const client     = clients.find(c => c.entity_id === d.client_id)
-  const canToggle  = event.status === 'LIVE' || event.status === 'PLANNING'
-  const isToggling = toggling === event.entity_id
-  const isClosed   = closedSet.has(event.entity_id)
+function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onChangeStatus, onRequestCancel, isChanging, closedSet, onToggleClosed, richieste, onSetRichieste, onSaveRichieste }) {
+  const d       = event.data ?? {}
+  const sm      = statusMeta(event.status)
+  const client  = clients.find(c => c.entity_id === d.client_id)
+  const isClosed = closedSet.has(event.entity_id)
   const confirmed  = Number(d.confirmed_count ?? d.posti_confermati ?? 0)
   const required   = richieste[event.entity_id] ?? Number(d.hostess_richieste ?? 0)
 
@@ -1065,24 +1174,13 @@ function EventCard({ event, clients, onToggle, onDuplica, onModifica, onMatchTal
 
       {/* Actions row */}
       <div style={{ padding:'10px 12px 12px', borderTop:`1px solid ${COLORS.border}`, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-        {/* Toggle ATTIVO/NON ATTIVO */}
-        {canToggle && (
-          <button
-            onClick={() => onToggle(event)}
-            disabled={isToggling}
-            style={{
-              display:'inline-flex', alignItems:'center', gap:5,
-              background:'none', border:`1px solid ${isToggling ? '#e0e0e0' : sm.color + '66'}`,
-              borderRadius:20, padding:'4px 12px', fontSize:10, fontWeight:600,
-              cursor: isToggling ? 'not-allowed' : 'pointer',
-              color:sm.color, fontFamily:'Montserrat,sans-serif',
-              opacity: isToggling ? 0.6 : 1,
-            }}
-          >
-            <span style={{ width:7, height:7, borderRadius:'50%', background: isToggling ? '#bbb' : sm.dot, flexShrink:0 }} />
-            {isToggling ? '…' : sm.label}
-          </button>
-        )}
+        {/* Status toggle */}
+        <EventStatusToggle
+          event={event}
+          onChangeStatus={onChangeStatus}
+          onRequestCancel={onRequestCancel}
+          isChanging={isChanging}
+        />
 
         {/* CHIUDI / APRI SELEZIONI */}
         <button
@@ -1151,7 +1249,8 @@ export default function EventiPage() {
 
   // UI state
   const [toggling,     setToggling]     = useState(null)
-  const [activModal,   setActivModal]   = useState(null)
+  const [cancelModal,  setCancelModal]  = useState(null)
+  const [showCancelled, setShowCancelled] = useState(false)
   const [showForm,     setShowForm]     = useState(false)
   const [formPrefill,  setFormPrefill]  = useState(null)
   const [isEdit,       setIsEdit]       = useState(false)
@@ -1185,6 +1284,7 @@ export default function EventiPage() {
   // Filtered + sorted events
   const displayed = useMemo(() => {
     let list = [...events]
+    if (!showCancelled) list = list.filter(e => e.status !== 'CANCELLED')
     if (filterStatus !== 'ALL') list = list.filter(e => e.status === filterStatus)
     if (filterCitta.trim()) {
       const q = filterCitta.trim().toLowerCase()
@@ -1204,14 +1304,6 @@ export default function EventiPage() {
     return list
   }, [events, filterStatus, filterCitta, sortBy, richieste])
 
-  const handleToggle = (event) => {
-    if (event.status === 'LIVE') {
-      if (window.confirm(`Disattivare "${event.data?.titolo}"?`)) doUpdateStatus(event.entity_id, 'PLANNING')
-    } else if (event.status === 'PLANNING') {
-      setActivModal(event)
-    }
-  }
-
   const doUpdateStatus = async (entity_id, new_status) => {
     setToggling(entity_id)
     const res = handleApiResponse(await eventApi.updateStatus(entity_id, new_status))
@@ -1220,10 +1312,20 @@ export default function EventiPage() {
     else load()
   }
 
-  const handleActivConfirm = async () => {
-    if (!activModal) return
-    await doUpdateStatus(activModal.entity_id, 'LIVE')
-    setActivModal(null)
+  const handleChangeStatus = (entity_id, new_status) => {
+    doUpdateStatus(entity_id, new_status)
+  }
+
+  const handleRequestCancel = (event) => {
+    setCancelModal(event)
+  }
+
+  const handleConfirmCancel = async (entity_id) => {
+    setToggling(entity_id)
+    const res = handleApiResponse(await eventApi.cancel(entity_id))
+    setToggling(null)
+    if (!res.success) alert(getErrorMessage(res.error))
+    else { setCancelModal(null); load() }
   }
 
   const handleDuplica = (event) => {
@@ -1306,6 +1408,15 @@ export default function EventiPage() {
           <option value="data">Ordina per data</option>
           <option value="saturazione">Ordina per saturazione</option>
         </select>
+        <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:COLORS.textSecondary, cursor:'pointer', userSelect:'none' }}>
+          <input
+            type="checkbox"
+            checked={showCancelled}
+            onChange={e => setShowCancelled(e.target.checked)}
+            style={{ cursor:'pointer' }}
+          />
+          Mostra annullati
+        </label>
         <span style={{ fontSize:12, color:'#8888A0', marginLeft:'auto', whiteSpace:'nowrap' }}>
           {displayed.length} eventi
         </span>
@@ -1324,11 +1435,12 @@ export default function EventiPage() {
               key={ev.entity_id}
               event={ev}
               clients={clients}
-              onToggle={handleToggle}
               onDuplica={handleDuplica}
               onModifica={handleModifica}
               onMatchTalent={(ev, tab = 'potenziali') => { setMatchEvent(ev); setMatchTab(tab) }}
-              toggling={toggling}
+              onChangeStatus={handleChangeStatus}
+              onRequestCancel={handleRequestCancel}
+              isChanging={toggling === ev.entity_id}
               closedSet={closedSet}
               onToggleClosed={handleToggleClosed}
               richieste={richieste}
@@ -1339,12 +1451,12 @@ export default function EventiPage() {
         </div>
       )}
 
-      {activModal && (
-        <ActivationModal
-          event={activModal}
-          onConfirm={handleActivConfirm}
-          onCancel={() => setActivModal(null)}
-          loading={toggling === activModal?.entity_id}
+      {cancelModal && (
+        <CancelConfirmModal
+          event={cancelModal}
+          onConfirm={handleConfirmCancel}
+          onClose={() => setCancelModal(null)}
+          loading={toggling === cancelModal?.entity_id}
         />
       )}
 
