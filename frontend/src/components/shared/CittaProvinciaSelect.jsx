@@ -22,11 +22,13 @@ export default function CittaProvinciaSelect({
   const handleSearch = (e) => {
     const val = e.target.value
     setSearch(val)
-    const matches = PROVINCE_ALFA.filter(p =>
-      p.sigla.toLowerCase().includes(val.toLowerCase()) ||
-      p.nome.toLowerCase().includes(val.toLowerCase())
-    )
-    if (matches.length === 1) onChange({ citta, provincia: matches[0].sigla })
+    if (val.trim()) {
+      const matches = PROVINCE_ALFA.filter(p =>
+        p.sigla.toLowerCase().includes(val.toLowerCase()) ||
+        p.nome.toLowerCase().includes(val.toLowerCase())
+      )
+      if (matches.length === 1) onChange({ citta, provincia: matches[0].sigla })
+    }
   }
 
   const handleProvinciaChange = (e) => {
@@ -34,13 +36,14 @@ export default function CittaProvinciaSelect({
     setSearch('')
   }
 
+  const handleClear = () => {
+    setSearch('')
+    onChange({ citta, provincia: '' })
+  }
+
   const handleCittaChange = (e) => {
     onChange({ citta: e.target.value, provincia })
   }
-
-  const selectedLabel = provincia
-    ? PROVINCE_ALFA.find(p => p.sigla === provincia)?.nome || ''
-    : ''
 
   return (
     <div>
@@ -51,19 +54,41 @@ export default function CittaProvinciaSelect({
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <input
-            type="text"
-            placeholder="🔍 Cerca provincia..."
-            value={search || (provincia && !search ? selectedLabel : '')}
-            onChange={handleSearch}
-            onFocus={() => setSearch('')}
-            disabled={disabled}
-            style={{
-              ...COMPONENT_STYLES.input,
-              fontSize: 13,
-              fontFamily: 'Montserrat, sans-serif',
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="🔍 Cerca provincia..."
+              value={search}
+              onChange={handleSearch}
+              disabled={disabled}
+              style={{
+                ...COMPONENT_STYLES.input,
+                fontSize: 13,
+                fontFamily: 'Montserrat, sans-serif',
+                paddingRight: provincia ? 28 : undefined,
+              }}
+            />
+            {provincia && !disabled && (
+              <button
+                type="button"
+                onClick={handleClear}
+                title="Cancella selezione"
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: COLORS.textSecondary,
+                  fontSize: 14,
+                  lineHeight: 1,
+                  padding: '2px 4px',
+                }}
+              >✕</button>
+            )}
+          </div>
           <select
             value={provincia}
             onChange={handleProvinciaChange}
