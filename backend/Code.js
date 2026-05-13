@@ -60,6 +60,9 @@ function doPost(e) {
 // Actions pubbliche (nessun token richiesto)
 var PUBLIC_ACTIONS = {
   'auth.login':                    true,
+  'auth.requestPasswordReset':     true,
+  'auth.validateResetToken':       true,
+  'auth.confirmPasswordReset':     true,
   'talent.registerStep1':          true,
   'talent.registerStep2':          true,
   'talent.registerStep3':          true,
@@ -72,7 +75,10 @@ function handleRequest(action, payload, token) {
   // --- Azioni pubbliche ---
   if (PUBLIC_ACTIONS[action]) {
     switch (action) {
-      case 'auth.login':           return login(payload.email, payload.password);
+      case 'auth.login':                return login(payload.email, payload.password);
+      case 'auth.requestPasswordReset': return handleRequestPasswordReset(payload);
+      case 'auth.validateResetToken':   return handleValidateResetToken(payload);
+      case 'auth.confirmPasswordReset': return handleConfirmPasswordReset(payload);
       case 'talent.registerStep1': return handleRegisterStep1(payload);
       case 'talent.registerStep2': return handleRegisterStep2(payload);
       case 'talent.registerStep3': return handleRegisterStep3(payload);

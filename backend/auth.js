@@ -419,3 +419,114 @@ function handleUserDeactivate(payload, authPayload) {
   logUserDeactivated(payload.user_id, authPayload.user_id, authPayload.tenant_id);
   return { success: true, data: { message: 'Utente disattivato', user_id: payload.user_id } };
 }
+
+// ---------------------------------------------------------------------------
+// PASSWORD RESET — Request / Validate / Confirm
+// ---------------------------------------------------------------------------
+
+function handleRequestPasswordReset(payload) {
+  var email = ((payload && payload.email) || '').toLowerCase().trim();
+  if (!email || !isValidEmail(email)) {
+    return errorResponse('VAL_002', 'Email non valida', 'email');
+  }
+
+  // Rate limit: max 3 richieste in 24h (stesso risultato se email non esiste)
+  if (countRecentResets(email) >= 3) {
+    return errorResponse('AUTH_005', 'Troppi tentativi di recupero. Riprova domani.');
+  }
+
+  // Cerca utente (ma non rivela se esiste: risponde sempre success)
+  var users = getAllRows('Users');
+  var user = null;
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].email).toLowerCase().trim() === email) {
+      user = users[i];
+      break;
+    }
+  }
+
+  if (user && user.status === 'active') {
+    var token = createPasswordResetToken(email, (payload && payload.ip) || '');
+    sendPasswordResetEmail_(email, token);
+  }
+
+  return successResponse({ message: 'Se l\'email è registrata, riceverai le istruzioni a breve.' });
+}
+
+function handleValidateResetToken(payload) {
+  var valid = requireFields(payload, ['token']);
+  if (valid) return valid;
+
+  var row = getResetToken(payload.token);
+  if (!row) return successResponse({ valid: false });
+  return successResponse({ valid: true, email: row.email });
+}
+
+function handleConfirmPasswordReset(payload) {
+  var valid = requireFields(payload, ['token', 'new_password']);
+  if (valid) return valid;
+
+  var row = getResetToken(payload.token);
+  if (!row) return errorResponse('AUTH_001', 'Link non valido o scaduto');
+
+  var pwd = String(payload.new_password);
+  if (pwd.length < 8) {
+    return errorResponse('VAL_002', 'La password deve essere di almeno 8 caratteri', 'new_password');
+  }
+  if (!/[A-Z]/.test(pwd)) {
+    return errorResponse('VAL_002', 'La password deve contenere almeno una lettera maiuscola', 'new_password');
+  }
+  if (!/[0-9]/.test(pwd)) {
+    return errorResponse('VAL_002', 'La password deve contenere almeno un numero', 'new_password');
+  }
+
+  var users = getAllRows('Users');
+  var user = null;
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].email).toLowerCase().trim() === String(row.email).toLowerCase().trim()) {
+      user = users[i];
+      break;
+    }
+  }
+
+  if (!user || user.status !== 'active') {
+    return errorResponse('AUTH_004', 'Account non trovato o non attivo');
+  }
+
+  var newVersion = parseInt(user.pwd_version || 0) + 1;
+  updateRow('Users', user.user_id, {
+    password_hash: hashPassword(pwd),
+    pwd_version:   newVersion
+  });
+
+  markTokenAsUsed(payload.token);
+
+  return successResponse({ message: 'Password aggiornata. Effettua il login con la nuova password.' });
+}
+
+function sendPasswordResetEmail_(email, token) {
+  var resetUrl = 'https://made-events-platform.vercel.app/reset-password/confirm?token=' + token;
+  var html =
+    '<div style="font-family:Montserrat,Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;">' +
+    '<div style="background:#7A1E2C;padding:28px 40px;">' +
+    '<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;letter-spacing:2px;">MADE EVENTS</h1>' +
+    '</div>' +
+    '<div style="padding:40px;">' +
+    '<h2 style="color:#1A1A24;font-size:18px;margin:0 0 16px;font-weight:700;">Recupera la tua password</h2>' +
+    '<p style="color:#555;font-size:14px;line-height:1.7;margin:0 0 28px;">Hai richiesto il recupero della password per il tuo account.<br>' +
+    'Clicca il pulsante qui sotto per impostarne una nuova. Il link è valido per <strong>1 ora</strong>.</p>' +
+    '<a href="' + resetUrl + '" style="display:inline-block;background:#7A1E2C;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.5px;">Reimposta password</a>' +
+    '<p style="color:#999;font-size:12px;margin:32px 0 0;line-height:1.6;">Non hai richiesto il recupero password? Ignora questa email — il tuo account è al sicuro.</p>' +
+    '<p style="color:#ccc;font-size:11px;margin:6px 0 0;word-break:break-all;">Link: ' + resetUrl + '</p>' +
+    '</div>' +
+    '<div style="background:#F8F8F8;padding:16px 40px;border-top:1px solid #eee;">' +
+    '<p style="color:#aaa;font-size:11px;margin:0;">MADE EVENTS Platform · noreply@madeevent.it</p>' +
+    '</div>' +
+    '</div>';
+  var text =
+    'Recupera la tua password MADE EVENTS\n\n' +
+    'Clicca il link per impostare una nuova password (valido 1 ora):\n\n' +
+    resetUrl + '\n\n' +
+    'Se non hai richiesto il recupero password, ignora questa email.';
+  sendEmail_(email, 'Recupera la tua password - MADE EVENTS', html, text);
+}

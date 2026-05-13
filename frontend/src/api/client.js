@@ -124,11 +124,14 @@ export function isAuthError(error) {
 const t = () => getToken()
 
 export const authApi = {
-  login:          (email, password) => gasPost('auth.login',         { email, password }),
-  logout:         ()                 => gasPost('auth.logout',        {}, t()),
-  getMe:          ()                 => gasPost('auth.getMe',         {}, t()),
-  changePassword: (old_password, new_password) =>
-                                        gasPost('auth.changePassword', { old_password, new_password }, t()),
+  login:                (email, password)           => gasPost('auth.login',                { email, password }),
+  logout:               ()                          => gasPost('auth.logout',               {}, t()),
+  getMe:                ()                          => gasPost('auth.getMe',                {}, t()),
+  changePassword:       (old_password, new_password) =>
+                                                       gasPost('auth.changePassword',       { old_password, new_password }, t()),
+  requestPasswordReset: (email)                     => gasPost('auth.requestPasswordReset', { email }),
+  validateResetToken:   (token)                     => gasPost('auth.validateResetToken',   { token }),
+  confirmPasswordReset: (token, new_password)       => gasPost('auth.confirmPasswordReset', { token, new_password }),
 }
 
 export const userApi = {

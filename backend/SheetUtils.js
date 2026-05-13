@@ -183,3 +183,56 @@ function queryRows(sheetName, filters) {
   }
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// PASSWORD RESET TOKEN HELPERS
+// Sheet: PasswordResetTokens (token è col 0, usato come PK da updateRow)
+// Schema: token | email | created_at | expires_at | used | used_at | ip_address
+// ---------------------------------------------------------------------------
+
+function createPasswordResetToken(email, ipAddress) {
+  var token = Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,'');
+  var now = new Date();
+  var expiresAt = new Date(now.getTime() + 3600000); // 1h
+  appendRow_('PasswordResetTokens', {
+    token:      token,
+    email:      (email || '').toLowerCase().trim(),
+    created_at: now,
+    expires_at: expiresAt,
+    used:       false,
+    used_at:    '',
+    ip_address: ipAddress || ''
+  });
+  return token;
+}
+
+function getResetToken(token) {
+  if (!token) return null;
+  var rows = queryRows('PasswordResetTokens', { token: String(token) });
+  if (!rows || rows.length === 0) return null;
+  var row = rows[0];
+  if (String(row.used) === 'true' || row.used === true) return null;
+  var expiresAt = row.expires_at instanceof Date ? row.expires_at : new Date(row.expires_at);
+  if (isNaN(expiresAt.getTime()) || Date.now() > expiresAt.getTime()) return null;
+  return row;
+}
+
+function markTokenAsUsed(token) {
+  return updateRow('PasswordResetTokens', token, {
+    used:    true,
+    used_at: new Date()
+  });
+}
+
+function countRecentResets(email) {
+  var emailLower = (email || '').toLowerCase().trim();
+  var rows = queryRows('PasswordResetTokens', { email: emailLower });
+  if (!rows || rows.length === 0) return 0;
+  var cutoff = Date.now() - 86400000; // ultime 24h
+  var count = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var createdAt = rows[i].created_at instanceof Date ? rows[i].created_at : new Date(rows[i].created_at);
+    if (!isNaN(createdAt.getTime()) && createdAt.getTime() > cutoff) count++;
+  }
+  return count;
+}

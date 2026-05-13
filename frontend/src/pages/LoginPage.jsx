@@ -153,7 +153,13 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div style={{ marginTop:'32px', textAlign:'center', fontSize:'12px', color:COLORS.textSecondary }}>
+          <div style={{ marginTop:'16px', textAlign:'center' }}>
+            <Link to="/reset-password" style={{ color:COLORS.accent, fontSize:'12px', textDecoration:'none' }}>
+              Password dimenticata?
+            </Link>
+          </div>
+
+          <div style={{ marginTop:'20px', textAlign:'center', fontSize:'12px', color:COLORS.textSecondary }}>
             <Link to="/registrazione" style={{ color:COLORS.accent }}>Candidati come Talent</Link>
             {' · '}
             <Link to="/azienda" style={{ color:COLORS.accent }}>Sei un'azienda?</Link>

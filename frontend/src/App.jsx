@@ -15,8 +15,10 @@ import ClientPortal       from './pages/ClientPortal'
 import RegisterUser       from './pages/RegisterUser'
 import RegisterAzienda    from './pages/RegisterAzienda'
 import RegisterComplete   from './pages/RegisterComplete'
-import DemoReset          from './pages/DemoReset'
-import FAQPage            from './pages/FAQPage'
+import DemoReset              from './pages/DemoReset'
+import FAQPage                from './pages/FAQPage'
+import ResetPasswordRequest   from './pages/ResetPasswordRequest'
+import ResetPasswordConfirm   from './pages/ResetPasswordConfirm'
 
 // ---------------------------------------------------------------------------
 // ROUTE GUARDS
@@ -58,6 +60,8 @@ export default function App() {
     <Routes>
       <Route path="/"              element={<RootRedirect />} />
       <Route path="/login"         element={<LoginPage />} />
+      <Route path="/reset-password"         element={<ResetPasswordRequest />} />
+      <Route path="/reset-password/confirm" element={<ResetPasswordConfirm />} />
       <Route path="/registrazione"          element={<RegisterUser />} />
       <Route path="/registrazione/completa" element={<RegisterComplete />} />
       <Route path="/azienda"                element={<RegisterAzienda />} />
