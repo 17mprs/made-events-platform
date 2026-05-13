@@ -10,6 +10,7 @@ import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 import Input from '../../components/Input'
 import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT } from './shared'
+import CittaProvinciaSelect from '../../components/shared/CittaProvinciaSelect'
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -280,6 +281,8 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     data_inizio:        isEdit ? (prefill?.data_inizio ? prefill.data_inizio.slice(0,16) : '') : '',
     data_fine:          isEdit ? (prefill?.data_fine   ? prefill.data_fine.slice(0,16)   : '') : '',
     luogo:              prefill?.luogo              ?? '',
+    citta:              prefill?.citta              ?? '',
+    provincia:          prefill?.provincia          ?? '',
     client_id:          prefill?.client_id          ?? '',
     foto_url:           prefill?.foto_url           ?? '',
     hostess_richieste:  prefill?.hostess_richieste  ?? '',
@@ -303,6 +306,14 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     e.preventDefault()
     if (!form.client_id) {
       alert('Seleziona un cliente per questo evento')
+      return
+    }
+    if (!form.provincia) {
+      alert('Seleziona la provincia dell\'evento')
+      return
+    }
+    if (!form.citta || form.citta.trim().length < 2) {
+      alert('Inserisci la città dell\'evento')
       return
     }
     setSaving(true)
@@ -362,7 +373,14 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               )}
             </div>
 
-            <Input label="Luogo / Città" value={form.luogo} onChange={set('luogo')} />
+            <CittaProvinciaSelect
+              label="Località evento"
+              citta={form.citta}
+              provincia={form.provincia}
+              onChange={({ citta, provincia }) => setForm(p => ({ ...p, citta, provincia }))}
+              required
+            />
+            <Input label="Indirizzo/Sede" value={form.luogo} onChange={set('luogo')} placeholder="Indirizzo dettagliato (via, numero, padiglione)" />
             <Input label="Data inizio *" type="datetime-local" value={form.data_inizio} onChange={set('data_inizio')} required={!isEdit} />
             <Input label="Data fine" type="datetime-local" value={form.data_fine} onChange={set('data_fine')} />
 

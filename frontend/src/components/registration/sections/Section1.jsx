@@ -4,6 +4,7 @@ import { COLORS, COMPONENT_STYLES } from '../../../styles/theme'
 import Input from '../../Input'
 import SectionShell from '../SectionShell'
 import { REGIONI, provinceByRegione, PROVINCE_ALFA } from '../data/province'
+import CittaProvinciaSelect from '../../shared/CittaProvinciaSelect'
 
 // Cascata luogo: gestisce il triplice select Nazione→Regione→Provincia + campo Città
 function LuogoSelect({ prefix, label, data, onChange, required }) {
@@ -105,8 +106,8 @@ export default function Section1({ data, onChange, onNext, loading }) {
     if (data.nascita_nazione === 'Italia' && !data.nascita_regione) e.nascita_regione = 'Seleziona la regione'
     if (data.nascita_nazione === 'Estero'  && !data.nascita_paese)   e.nascita_paese   = 'Inserisci il paese'
     // Residenza
-    if (!data.residenza_citta) e.residenza_citta = 'Campo obbligatorio'
-    if (data.residenza_nazione === 'Italia' && !data.residenza_regione) e.residenza_regione = 'Seleziona la regione'
+    if (!data.residenza_citta || data.residenza_citta.trim().length < 2) e.residenza_citta = 'Campo obbligatorio'
+    if (!data.residenza_provincia) e.residenza_provincia = 'Seleziona la provincia'
     // Domicilio
     if (!data.domicilio_coincide && !data.domicilio_provincia) e.domicilio_provincia = 'Seleziona la provincia'
     setErrors(e)
@@ -152,7 +153,22 @@ export default function Section1({ data, onChange, onNext, loading }) {
       <LuogoSelect prefix="nascita" label="Luogo di nascita" data={data} onChange={onChange} required />
 
       {/* Residenza */}
-      <LuogoSelect prefix="residenza" label="Città di residenza" data={data} onChange={onChange} required />
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: COLORS.textSecondary, fontWeight: 500, marginBottom: '16px' }}>
+          Città di residenza
+        </div>
+        <CittaProvinciaSelect
+          citta={data.residenza_citta || ''}
+          provincia={data.residenza_provincia || ''}
+          onChange={({ citta, provincia }) => {
+            onChange('residenza_citta', citta)
+            onChange('residenza_provincia', provincia)
+          }}
+          required
+        />
+        {errors.residenza_citta && <p style={{ fontSize: '12px', color: COLORS.error, marginTop: '6px' }}>{errors.residenza_citta}</p>}
+        {errors.residenza_provincia && <p style={{ fontSize: '12px', color: COLORS.error, marginTop: '4px' }}>{errors.residenza_provincia}</p>}
+      </div>
 
       {/* Domicilio */}
       <div style={{ marginBottom: '28px' }}>

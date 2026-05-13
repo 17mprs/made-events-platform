@@ -227,6 +227,8 @@ function handleEventCreate(payload, auth) {
     data_inizio:               payload.data_inizio               || '',
     data_fine:                 payload.data_fine                 || '',
     luogo:                     payload.luogo                     || '',
+    citta:                     payload.citta                     || '',
+    provincia:                 payload.provincia                 || '',
     foto_url:                  payload.foto_url                  || '',
     foto_copertina_url:        payload.foto_url                  || '',
     hostess_richieste:         payload.hostess_richieste         || 0,
@@ -345,7 +347,7 @@ function handleEventUpdate(payload, auth) {
   }
 
   var allowedFields = [
-    'titolo', 'descrizione', 'luogo', 'client_id', 'foto_url', 'foto_copertina_url',
+    'titolo', 'descrizione', 'luogo', 'citta', 'provincia', 'client_id', 'foto_url', 'foto_copertina_url',
     'data_inizio', 'data_fine', 'hostess_richieste', 'selezioni_chiuse', 'note_admin',
     'anni_esperienza_minimi', 'richiede_trasferte', 'richiede_weekend',
     'sesso_richiesto', 'altezza_minima', 'taglia_richiesta',
