@@ -120,6 +120,14 @@ export default function ClientiPage() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('action') === 'new') {
+      setEditing(null)
+      setShowForm(true)
+    }
+  }, [])
+
   const handleClose = () => { setShowForm(false); setEditing(null) }
   const handleSaved = () => { handleClose(); load() }
 

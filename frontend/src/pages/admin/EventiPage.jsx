@@ -373,6 +373,17 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               {!form.client_id && (
                 <div style={{ fontSize:11, color:'#C2410C', marginTop:3 }}>Obbligatorio</div>
               )}
+              <button
+                type="button"
+                onClick={() => window.open('/admin/clienti?action=new', '_blank')}
+                style={{
+                  background: 'none', border: 'none', color: COLORS.accent,
+                  fontSize: 12, cursor: 'pointer', padding: '4px 0',
+                  marginTop: 4, textDecoration: 'underline',
+                }}
+              >
+                ⊕ Crea nuovo cliente
+              </button>
             </div>
 
             <CittaProvinciaSelect
