@@ -286,6 +286,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     client_id:          prefill?.client_id          ?? '',
     foto_url:           prefill?.foto_url           ?? '',
     hostess_richieste:  prefill?.hostess_richieste  ?? '',
+    steward_richiesti:  prefill?.steward_richiesti  ?? 0,
     anni_esperienza_minimi: prefill?.anni_esperienza_minimi ?? '',
     richiede_trasferte: prefill?.richiede_trasferte ?? false,
     richiede_weekend:   prefill?.richiede_weekend   ?? false,
@@ -298,6 +299,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     automunita:                prefill?.automunita                ?? 'Indifferente',
     priorita_lavorato_con_noi: prefill?.priorita_lavorato_con_noi ?? false,
   })
+  const [richiedeStewarde, setRichiedeStewarde] = useState((prefill?.steward_richiesti ?? 0) > 0)
   const [saving, setSaving] = useState(false)
   const set = key => e => setForm(p => ({ ...p, [key]: e.target.value }))
   const setCheck = key => e => setForm(p => ({ ...p, [key]: e.target.checked }))
@@ -388,6 +390,31 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               <Input label="Hostess richieste" type="number" min="1" value={form.hostess_richieste} onChange={set('hostess_richieste')} placeholder="es. 10" />
               <Input label="Min. anni esperienza" type="number" min="0" value={form.anni_esperienza_minimi} onChange={set('anni_esperienza_minimi')} placeholder="es. 2" />
             </div>
+
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8, marginTop: 4,
+              fontSize: 13, color: COLORS.textSecondary, cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={richiedeStewarde}
+                onChange={(e) => {
+                  setRichiedeStewarde(e.target.checked)
+                  if (!e.target.checked) setForm(prev => ({ ...prev, steward_richiesti: 0 }))
+                }}
+              />
+              Servono anche steward
+            </label>
+
+            {richiedeStewarde && (
+              <Input
+                label="Steward richiesti"
+                type="number"
+                min="1"
+                value={form.steward_richiesti || ''}
+                onChange={(e) => setForm(prev => ({ ...prev, steward_richiesti: parseInt(e.target.value) || 0 }))}
+              />
+            )}
 
             <div style={{ display:'flex', gap:20 }}>
               <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, cursor:'pointer' }}>
