@@ -103,8 +103,7 @@ export default function Section1({ data, onChange, onNext, loading }) {
     if (!data.genere) e.genere = 'Seleziona un\'opzione'
     // Luogo di nascita
     if (!data.nascita_citta) e.nascita_citta = 'Campo obbligatorio'
-    if (data.nascita_nazione === 'Italia' && !data.nascita_regione) e.nascita_regione = 'Seleziona la regione'
-    if (data.nascita_nazione === 'Estero'  && !data.nascita_paese)   e.nascita_paese   = 'Inserisci il paese'
+    if (!data.nascita_provincia) e.nascita_provincia = 'Seleziona la provincia'
     // Residenza
     if (!data.residenza_citta || data.residenza_citta.trim().length < 2) e.residenza_citta = 'Campo obbligatorio'
     if (!data.residenza_provincia) e.residenza_provincia = 'Seleziona la provincia'
@@ -150,7 +149,19 @@ export default function Section1({ data, onChange, onNext, loading }) {
       </div>
 
       {/* Luogo di nascita */}
-      <LuogoSelect prefix="nascita" label="Luogo di nascita" data={data} onChange={onChange} required />
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: COLORS.textSecondary, fontWeight: 500, marginBottom: '16px' }}>
+          Luogo di nascita
+        </div>
+        <CittaProvinciaSelect
+          citta={data.nascita_citta || ''}
+          provincia={data.nascita_provincia || ''}
+          onChange={({ citta, provincia }) => {
+            onChange('nascita_citta', citta)
+            onChange('nascita_provincia', provincia)
+          }}
+        />
+      </div>
 
       {/* Residenza */}
       <div style={{ marginBottom: '28px' }}>
