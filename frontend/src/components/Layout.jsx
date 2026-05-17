@@ -12,10 +12,19 @@ function Header({ onMenuToggle, showMenu }) {
   const { user, logout, isAuthenticated, role } = useAuth()
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/login')
+    setLoggingOut(true)
+    try {
+      await logout()
+      navigate('/login')
+    } catch (err) {
+      console.error('Logout error:', err)
+      navigate('/login')
+    } finally {
+      setLoggingOut(false)
+    }
   }
 
   const navLinks = []
@@ -111,6 +120,7 @@ function Header({ onMenuToggle, showMenu }) {
               }}>
                 <button
                   onClick={handleLogout}
+                  disabled={loggingOut}
                   style={{
                     ...COMPONENT_STYLES.navLink,
                     display:  'block',
@@ -119,9 +129,11 @@ function Header({ onMenuToggle, showMenu }) {
                     textAlign:'left',
                     fontSize: '13px',
                     color:    COLORS.error,
+                    opacity:  loggingOut ? 0.6 : 1,
+                    cursor:   loggingOut ? 'wait' : 'pointer',
                   }}
                 >
-                  Logout
+                  {loggingOut ? 'Disconnessione...' : 'Logout'}
                 </button>
               </div>
             )}
