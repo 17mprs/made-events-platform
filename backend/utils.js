@@ -42,6 +42,7 @@ var PERMISSION_MATRIX = {
   'event.get':            { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'Y', CLIENTE:'O' },
   'event.updateStatus':   { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'event.cancel':         { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'event.softDelete':     { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // SHIFT
   'shift.create':         { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },

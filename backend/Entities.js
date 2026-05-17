@@ -250,6 +250,10 @@ function handleEventCreate(payload, auth) {
 }
 
 function handleEventSoftDelete(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato: solo gli admin possono eliminare entity');
+  }
+
   var valid = requireFields(payload, ['entity_id']);
   if (valid) return valid;
 
