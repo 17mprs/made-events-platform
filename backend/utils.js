@@ -105,7 +105,11 @@ var PERMISSION_MATRIX = {
   'talent.updateScoreAdmin':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // MATCHING
-  'event.getMatchingTalents': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
+  'event.getMatchingTalents': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // TRACKING EVENTI
+  'application.markEventCompleted': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'talent.updateEventiPreCRM':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
 };
 
 // ---------------------------------------------------------------------------

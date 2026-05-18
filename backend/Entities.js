@@ -766,6 +766,45 @@ function handleUpdateScoreAdmin(payload, auth) {
   });
 }
 
+function handleUpdateEventiPreCRM(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+
+  var valid = requireFields(payload, ['entity_id', 'eventi_precrm']);
+  if (valid) return valid;
+
+  var eventiPreCRM = parseInt(payload.eventi_precrm);
+  if (isNaN(eventiPreCRM) || eventiPreCRM < 0) {
+    return errorResponse('VAL_002', 'eventi_precrm deve essere un numero >= 0');
+  }
+
+  var talent = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!talent || talent.type !== 'TALENT_PROFILE') {
+    return errorResponse('SYS_002', 'Talent non trovato');
+  }
+
+  var td       = talent.data || {};
+  var eventiCRM = parseInt(td.eventi_crm_completati) || 0;
+
+  var scoreQuestionario = calculateQuestionarioScore(td);
+  var scoreAdmin        = td.score_admin || 5;
+  var scoreFinal        = calculateFinalScore(scoreQuestionario, scoreAdmin);
+
+  updateEntityData(payload.entity_id, {
+    eventi_precrm:      eventiPreCRM,
+    eventi_made_totali: eventiCRM + eventiPreCRM,
+    score_questionario: scoreQuestionario,
+    score:              scoreFinal
+  }, auth.tenant_id, auth.user_id);
+
+  return successResponse({
+    eventi_precrm:      eventiPreCRM,
+    eventi_made_totali: eventiCRM + eventiPreCRM,
+    score:              scoreFinal
+  });
+}
+
 function handleGetMatchingTalents(payload, auth) {
   if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
     return errorResponse('AUTH_003', 'Permesso negato');

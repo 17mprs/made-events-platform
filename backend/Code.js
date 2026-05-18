@@ -122,12 +122,13 @@ function handleRequest(action, payload, token) {
     case 'user.deactivate': return handleUserDeactivate(payload, auth);
 
     // TALENT
-    case 'talent.approve':       return handleTalentApprove(payload, auth);
-    case 'talent.reject':        return handleTalentReject(payload, auth);
-    case 'talent.list':          return handleTalentList(payload, auth);
-    case 'talent.get':           return handleTalentGet(payload, auth);
-    case 'talent.updateProfile':   return handleTalentUpdateProfile(payload, auth);
-    case 'talent.updateScoreAdmin': return handleUpdateScoreAdmin(payload, auth);
+    case 'talent.approve':           return handleTalentApprove(payload, auth);
+    case 'talent.reject':            return handleTalentReject(payload, auth);
+    case 'talent.list':              return handleTalentList(payload, auth);
+    case 'talent.get':               return handleTalentGet(payload, auth);
+    case 'talent.updateProfile':     return handleTalentUpdateProfile(payload, auth);
+    case 'talent.updateScoreAdmin':  return handleUpdateScoreAdmin(payload, auth);
+    case 'talent.updateEventiPreCRM': return handleUpdateEventiPreCRM(payload, auth);
 
     // CLIENT
     case 'client.create': return handleClientCreate(payload, auth);
@@ -154,11 +155,12 @@ function handleRequest(action, payload, token) {
     // APPLICATION
     case 'application.submit':       return handleApplicationSubmit(payload, auth);
     case 'application.invite':       return handleApplicationInvite(payload, auth);
-    case 'application.approve':      return handleApplicationApprove(payload, auth);
-    case 'application.reject':       return handleApplicationReject(payload, auth);
-    case 'application.withdraw':     return handleApplicationWithdraw(payload, auth);
-    case 'application.list':         return handleApplicationList(payload, auth);
-    case 'application.updateStatus': return handleApplicationUpdateStatus(payload, auth);
+    case 'application.approve':            return handleApplicationApprove(payload, auth);
+    case 'application.reject':             return handleApplicationReject(payload, auth);
+    case 'application.withdraw':           return handleApplicationWithdraw(payload, auth);
+    case 'application.list':               return handleApplicationList(payload, auth);
+    case 'application.updateStatus':       return handleApplicationUpdateStatus(payload, auth);
+    case 'application.markEventCompleted': return handleMarkEventCompleted(payload, auth);
 
     // ASSIGNMENT
     case 'assignment.list':          return handleAssignmentList(payload, auth);

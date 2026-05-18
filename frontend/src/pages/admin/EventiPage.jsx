@@ -988,7 +988,8 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const [applications,  setApplications]  = useState([])
   const [loading,       setLoading]       = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
-  const [contractData,  setContractData]  = useState(null)
+  const [contractData,    setContractData]    = useState(null)
+  const [markingCompleted, setMarkingCompleted] = useState(null)
 
   const loadApps = useCallback(async () => {
     setLoading(true)
@@ -1095,6 +1096,18 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     setActionLoading(null)
     if (res.success && res.data?.url) {
       window.open(res.data.url, '_blank')
+    } else {
+      alert(getErrorMessage(res.error))
+    }
+  }
+
+  const handleMarkCompleted = async (applicationId) => {
+    if (!window.confirm('Confermi che questo evento è stato completato per questo talent?')) return
+    setMarkingCompleted(applicationId)
+    const res = handleApiResponse(await applicationApi.markEventCompleted(applicationId))
+    setMarkingCompleted(null)
+    if (res.success) {
+      await loadApps()
     } else {
       alert(getErrorMessage(res.error))
     }
@@ -1247,6 +1260,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                 {approvedApps.map(a => {
                   const t = talentMap[a.data?.talent_profile_id]
                   const ctBusy = actionLoading === a.entity_id + '_ct'
+                  const mcBusy = markingCompleted === a.entity_id
                   return (
                     <TRow key={a.entity_id} t={t} app={a}>
                       <button
@@ -1264,6 +1278,18 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                       >
                         .docx
                       </button>
+                      {a.data?.evento_completato ? (
+                        <span style={{ fontSize:10, color:'#16A34A', fontWeight:700, whiteSpace:'nowrap', padding:'5px 6px' }}>✓ Done</span>
+                      ) : (
+                        <button
+                          onClick={() => handleMarkCompleted(a.entity_id)}
+                          disabled={mcBusy}
+                          style={{ ...BTN('#16A34A'), color:'#16A34A', opacity: mcBusy ? 0.5 : 1 }}
+                          title="Segna evento completato per questo talent"
+                        >
+                          {mcBusy ? '…' : '✓'}
+                        </button>
+                      )}
                     </TRow>
                   )
                 })}

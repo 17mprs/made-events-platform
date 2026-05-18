@@ -652,6 +652,18 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
 
   // Eventi pre-CRM
   const [editableEventiPreCRM, setEditableEventiPreCRM] = useState(d.eventi_precrm ?? 0)
+  const [savedEventiPreCRM,    setSavedEventiPreCRM]    = useState(d.eventi_precrm ?? 0)
+
+  const handleSaveEventiPreCRM = async () => {
+    const res = handleApiResponse
+      ? handleApiResponse(await talentApi.updateEventiPreCRM(talent.entity_id, editableEventiPreCRM))
+      : await talentApi.updateEventiPreCRM(talent.entity_id, editableEventiPreCRM)
+    if (res.success) {
+      setSavedEventiPreCRM(editableEventiPreCRM)
+    } else {
+      alert(getErrorMessage(res.error))
+    }
+  }
 
   const [history,        setHistory]        = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -1027,9 +1039,9 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
                     style={{ width:52, border:`1px solid ${COLORS.border}`, borderRadius:4, padding:'4px 6px', fontSize:13, fontFamily:'Montserrat,sans-serif', textAlign:'center' }}
                   />
                 </div>
-                {editableEventiPreCRM !== (d.eventi_precrm ?? 0) && (
+                {editableEventiPreCRM !== savedEventiPreCRM && (
                   <button
-                    onClick={() => alert('Funzionalità in arrivo nello Sprint C')}
+                    onClick={handleSaveEventiPreCRM}
                     style={{ marginTop:16, background:'none', border:`1px solid ${COLORS.accent}`, color:COLORS.accent, borderRadius:6, padding:'4px 10px', fontSize:11, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}
                   >
                     Salva

@@ -561,6 +561,79 @@ function handleApplicationUpdateStatus(payload, auth) {
   return successResponse({ entity_id: payload.entity_id, new_status: payload.new_status });
 }
 
+// ---------------------------------------------------------------------------
+// APPLICATION: MARK EVENT COMPLETED
+// ---------------------------------------------------------------------------
+
+function handleMarkEventCompleted(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+
+  var valid = requireFields(payload, ['application_id']);
+  if (valid) return valid;
+
+  var app = getEntityById(payload.application_id, auth.tenant_id);
+  if (!app || app.type !== 'APPLICATION') {
+    return errorResponse('SYS_002', 'Candidatura non trovata');
+  }
+
+  if (app.status !== ENTITY_STATUS.APPLICATION.APPROVED) {
+    return errorResponse('VAL_001', 'Solo candidature approvate possono essere segnate come completate');
+  }
+
+  var appData = app.data || {};
+  if (appData.evento_completato === true) {
+    return errorResponse('VAL_001', 'Evento già segnato come completato');
+  }
+
+  updateEntityData(payload.application_id, {
+    evento_completato:    true,
+    evento_completato_at: new Date().toISOString()
+  }, auth.tenant_id, auth.user_id);
+
+  var talentId = appData.talent_profile_id;
+  var eventId  = appData.event_id;
+
+  if (!talentId) {
+    return errorResponse('SYS_002', 'talent_profile_id mancante in application');
+  }
+
+  var talent = getEntityById(talentId, auth.tenant_id);
+  if (!talent || talent.type !== 'TALENT_PROFILE') {
+    return errorResponse('SYS_002', 'Talent non trovato');
+  }
+
+  var td          = talent.data || {};
+  var eventiCRM   = parseInt(td.eventi_crm_completati) || 0;
+  var eventiPreCRM = parseInt(td.eventi_precrm) || 0;
+  var eventiIDs   = Array.isArray(td.eventi_crm_ids) ? td.eventi_crm_ids : [];
+
+  eventiCRM += 1;
+  if (eventId && eventiIDs.indexOf(eventId) === -1) {
+    eventiIDs.push(eventId);
+  }
+
+  var scoreQuestionario = calculateQuestionarioScore(td);
+  var scoreAdmin        = td.score_admin || 5;
+  var scoreFinal        = calculateFinalScore(scoreQuestionario, scoreAdmin);
+
+  updateEntityData(talentId, {
+    eventi_crm_completati: eventiCRM,
+    eventi_crm_ids:        eventiIDs,
+    eventi_made_totali:    eventiCRM + eventiPreCRM,
+    score_questionario:    scoreQuestionario,
+    score:                 scoreFinal
+  }, auth.tenant_id, auth.user_id);
+
+  return successResponse({
+    message:               'Evento segnato come completato',
+    eventi_crm_completati: eventiCRM,
+    eventi_made_totali:    eventiCRM + eventiPreCRM,
+    score:                 scoreFinal
+  });
+}
+
 function findAssignment_(shiftId, talentProfileId, tenantId) {
   var all = getAllRows('Entities');
   var activeStatuses = [

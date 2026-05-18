@@ -155,7 +155,8 @@ export const talentApi = {
   reject:         (entity_id, nota_rifiuto) =>
                                   gasPost('talent.reject',        { entity_id, nota_rifiuto }, t()),
   updateProfile:    (payload)               => gasPost('talent.updateProfile',    payload, t()),
-  updateScoreAdmin: (entity_id, score_admin) => gasPost('talent.updateScoreAdmin', { entity_id, score_admin }, t()),
+  updateScoreAdmin:    (entity_id, score_admin)   => gasPost('talent.updateScoreAdmin',    { entity_id, score_admin }, t()),
+  updateEventiPreCRM: (entity_id, eventi_precrm) => gasPost('talent.updateEventiPreCRM', { entity_id, eventi_precrm }, t()),
 }
 
 export const leadApi = {
@@ -205,6 +206,7 @@ export const applicationApi = {
   withdraw:       (entity_id)              => gasPost('application.withdraw',     { entity_id }, t()),
   list:           (payload = {})           => gasPost('application.list',         payload, t()),
   updateStatus:   (entity_id, new_status)  => gasPost('application.updateStatus', { entity_id, new_status }, t()),
+  markEventCompleted: (application_id)     => gasPost('application.markEventCompleted', { application_id }, t()),
 }
 
 export const assignmentApi = {
