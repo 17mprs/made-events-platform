@@ -126,7 +126,8 @@ function handleRequest(action, payload, token) {
     case 'talent.reject':        return handleTalentReject(payload, auth);
     case 'talent.list':          return handleTalentList(payload, auth);
     case 'talent.get':           return handleTalentGet(payload, auth);
-    case 'talent.updateProfile': return handleTalentUpdateProfile(payload, auth);
+    case 'talent.updateProfile':   return handleTalentUpdateProfile(payload, auth);
+    case 'talent.updateScoreAdmin': return handleUpdateScoreAdmin(payload, auth);
 
     // CLIENT
     case 'client.create': return handleClientCreate(payload, auth);

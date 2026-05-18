@@ -99,7 +99,10 @@ var PERMISSION_MATRIX = {
   // SYSTEM
   'config.get':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'config.update': { SUPER_ADMIN:'Y', ADMIN:'N', USER:'N', CLIENTE:'N' },
-  'log.view':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
+  'log.view':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // TALENT SCORING
+  'talent.updateScoreAdmin': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
 };
 
 // ---------------------------------------------------------------------------
@@ -259,4 +262,73 @@ function generateTempPassword() {
     pwd += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return pwd;
+}
+
+// ---------------------------------------------------------------------------
+// TALENT SCORING — Algoritmo questionario + formula pesata admin
+// ---------------------------------------------------------------------------
+
+function calculateQuestionarioScore(data) {
+  var score = 0;
+
+  // 1. INGLESE (14%)
+  var ingleseMap = { 'Madrelingua':100, 'Fluente':90, 'Intermedio':60, 'Base':30 };
+  var ingleseScore = ingleseMap[data.lingua_inglese] || 0;
+  if (data.inglese_certificato && ingleseScore >= 60) ingleseScore = Math.min(ingleseScore + 10, 100);
+  score += ingleseScore * 0.14;
+
+  // 2. TAGLIA PANTALONE (10%)
+  var taglia = parseInt(data.taglia_pantalone) || 0;
+  var tagliaScore = taglia === 40 ? 100 : taglia === 38 ? 95 : taglia === 42 ? 80 : taglia === 44 ? 50 : taglia > 44 ? 20 : 60;
+  score += tagliaScore * 0.10;
+
+  // 3. ALTEZZA (10%)
+  var altezza = parseInt(data.altezza) || 0;
+  var altezzaScore = (altezza >= 170 && altezza <= 178) ? 100
+    : (altezza >= 165 && altezza < 170) ? 80
+    : (altezza > 178 && altezza <= 182) ? 85
+    : altezza < 160 ? 0 : 50;
+  score += altezzaScore * 0.10;
+
+  // 4. ESPERIENZA ANNI (11%)
+  var expMap = { 'Oltre 5':100, '3–5':80, '1–3':50, '0–1':10 };
+  score += (expMap[data.anni_esperienza_settore] || 0) * 0.11;
+
+  // 5. ALTRE LINGUE (8%)
+  var altreLingue = Array.isArray(data.altre_lingue) ? data.altre_lingue.filter(function(l) { return l.nome && l.livello && l.livello !== 'Non conosco'; }).length : 0;
+  // Conta anche lingue standard (francese, spagnolo, tedesco)
+  var stdLingue = ['lingua_francese','lingua_spagnolo','lingua_tedesco'];
+  for (var i = 0; i < stdLingue.length; i++) {
+    if (data[stdLingue[i]] && data[stdLingue[i]] !== 'Non conosco') altreLingue++;
+  }
+  score += Math.min(altreLingue * 33, 100) * 0.08;
+
+  // 6. AUTOMUNITA (7%)
+  score += (data.automunita === 'Sì' ? 100 : 0) * 0.07;
+
+  // 7. TAILLEUR (7%)
+  var dotazione = Array.isArray(data.dotazione_personale) ? data.dotazione_personale : [];
+  var hasTailleur = dotazione.some(function(d) { return d.indexOf('Tailleur') > -1 || d.indexOf('pantalone e giacca') > -1; });
+  score += (hasTailleur ? 100 : 0) * 0.07;
+
+  // 8. TATUAGGI (7%)
+  score += (data.tatuaggi_visibili === 'No' ? 100 : 0) * 0.07;
+
+  // 9. PIERCING (5%)
+  score += (data.piercing_visibili === 'No' ? 100 : 0) * 0.05;
+
+  // 10. TITOLO STUDIO (8%)
+  var titoloMap = { 'Laurea magistrale':100, 'Laurea triennale':90, 'Laurea':85, 'Diploma':60, 'Media superiore':40, 'Licenza media':0 };
+  score += (titoloMap[data.titolo_studio] || 0) * 0.08;
+
+  // 11. TIPOLOGIE ESPERIENZA (10%)
+  var tipologie = Array.isArray(data.tipologie_esperienza) ? data.tipologie_esperienza : [];
+  score += Math.min((tipologie.length / 8) * 100, 100) * 0.10;
+
+  return Math.round(Math.min(100, Math.max(0, score)));
+}
+
+function calculateFinalScore(scoreQuestionario, scoreAdmin) {
+  var scoreAdminNorm = ((scoreAdmin || 5) / 10) * 100;
+  return Math.round((scoreQuestionario * 0.65) + (scoreAdminNorm * 0.35));
 }

@@ -64,7 +64,7 @@ export default function Section4({ data, onChange, onNext, onBack, loading }) {
       loading={loading}
     >
       {/* Lingue principali */}
-      <div className="form-grid" style={{ marginBottom: '28px' }}>
+      <div className="form-grid" style={{ marginBottom: data.lingua_inglese ? '8px' : '28px' }}>
         <LinguaSelect
           label="Inglese"
           fieldKey="lingua_inglese"
@@ -96,6 +96,22 @@ export default function Section4({ data, onChange, onNext, onBack, loading }) {
           options={LIVELLI_ALTRA}
         />
       </div>
+
+      {/* Certificazione inglese */}
+      {data.lingua_inglese && (
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: '28px',
+          fontSize: 13, color: COLORS.textSecondary, cursor: 'pointer',
+        }}>
+          <input
+            type="checkbox"
+            checked={data.inglese_certificato || false}
+            onChange={e => onChange('inglese_certificato', e.target.checked)}
+            style={{ accentColor: COLORS.accent }}
+          />
+          Ho una certificazione linguistica (C1/C2)
+        </label>
+      )}
 
       {/* Altre lingue */}
       <div>

@@ -154,7 +154,8 @@ export const talentApi = {
   approve:        (entity_id, nota) => gasPost('talent.approve',  { entity_id, nota }, t()),
   reject:         (entity_id, nota_rifiuto) =>
                                   gasPost('talent.reject',        { entity_id, nota_rifiuto }, t()),
-  updateProfile:  (payload)   => gasPost('talent.updateProfile',  payload, t()),
+  updateProfile:    (payload)               => gasPost('talent.updateProfile',    payload, t()),
+  updateScoreAdmin: (entity_id, score_admin) => gasPost('talent.updateScoreAdmin', { entity_id, score_admin }, t()),
 }
 
 export const leadApi = {

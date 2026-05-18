@@ -366,8 +366,12 @@ function handleTalentApprove(payload, auth) {
         foto: leadData.foto_url ? { file_id: '', url: leadData.foto_url, status: 'valid', uploaded_at: new Date().toISOString() } : {},
         carta_identita: {}
       },
-      score:   leadData.score   || 0,
-      ranking: leadData.ranking || 'D'
+      score:                 leadData.score                 || 0,
+      score_questionario:   leadData.score_questionario    || 0,
+      score_admin:          leadData.score_admin           || 5,
+      ranking:              leadData.ranking               || 'D',
+      eventi_crm_completati: 0,
+      eventi_precrm:        leadData.eventi_precrm         || 0
     }, auth.tenant_id, auth.user_id);
     profileId = profile.entity_id;
   }

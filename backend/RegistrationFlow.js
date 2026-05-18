@@ -135,11 +135,12 @@ function handleRegisterStep2(payload) {
     disponibilita_weekend:   payload.disponibilita_weekend   || entity.data.disponibilita_weekend   || '',
     disponibilita_serali:    payload.disponibilita_serali    || entity.data.disponibilita_serali    || '',
     // Sezione 4 — Lingue
-    lingua_inglese:     payload.lingua_inglese     || entity.data.lingua_inglese     || '',
-    lingua_francese:    payload.lingua_francese    || entity.data.lingua_francese    || '',
-    lingua_spagnolo:    payload.lingua_spagnolo    || entity.data.lingua_spagnolo    || '',
-    lingua_tedesco:     payload.lingua_tedesco     || entity.data.lingua_tedesco     || '',
-    altre_lingue:       payload.altre_lingue       || entity.data.altre_lingue       || [],
+    lingua_inglese:      payload.lingua_inglese      || entity.data.lingua_inglese      || '',
+    inglese_certificato: payload.inglese_certificato !== undefined ? !!payload.inglese_certificato : (entity.data.inglese_certificato || false),
+    lingua_francese:     payload.lingua_francese     || entity.data.lingua_francese     || '',
+    lingua_spagnolo:     payload.lingua_spagnolo     || entity.data.lingua_spagnolo     || '',
+    lingua_tedesco:      payload.lingua_tedesco      || entity.data.lingua_tedesco      || '',
+    altre_lingue:        payload.altre_lingue        || entity.data.altre_lingue        || [],
     // Sezione 5 — Profilo Professionale
     titolo_studio:      payload.titolo_studio      || entity.data.titolo_studio      || '',
     titolo_studio_indirizzo: payload.titolo_studio_indirizzo || entity.data.titolo_studio_indirizzo || '',
@@ -269,8 +270,9 @@ function handleRegisterStep3(payload) {
   for (var k in current) allData[k] = current[k];
   for (var k in updates) allData[k] = updates[k];
   var scoreResult = calculateScore_(allData);
-  updates.score   = scoreResult.score;
-  updates.ranking = scoreResult.ranking;
+  updates.ranking            = scoreResult.ranking;
+  updates.score_questionario = calculateQuestionarioScore(allData);
+  updates.score              = calculateFinalScore(updates.score_questionario, allData.score_admin || 5);
 
   // Crea cartella Drive personale
   var driveFolder = null;
@@ -433,7 +435,7 @@ function handleGetLead(payload) {
         'piercing_visibili','tatuaggi_visibili','tatuaggi_dove',
         'patente_tipologie','automunita','province_lavoro',
         'disponibilita_trasferte','disponibilita_weekend','disponibilita_serali',
-        'lingua_inglese','lingua_francese','lingua_spagnolo','lingua_tedesco','altre_lingue',
+        'lingua_inglese','inglese_certificato','lingua_francese','lingua_spagnolo','lingua_tedesco','altre_lingue',
         'titolo_studio','titolo_studio_indirizzo','professione_attuale','tipologie_esperienza','anni_esperienza_settore',
         'dotazione_personale',
         'codice_fiscale','partita_iva','iban','disponibile_chiamata','disponibile_ritenuta',

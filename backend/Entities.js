@@ -735,6 +735,37 @@ function handleTalentUpdateProfile(payload, auth) {
   return successResponse({ talent: talentToPublic(updated, auth.role) });
 }
 
+function handleUpdateScoreAdmin(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+
+  var valid = requireFields(payload, ['entity_id', 'score_admin']);
+  if (valid) return valid;
+
+  var scoreAdmin = parseInt(payload.score_admin);
+  if (isNaN(scoreAdmin) || scoreAdmin < 1 || scoreAdmin > 10) {
+    return errorResponse('VAL_002', 'Score admin deve essere tra 1 e 10');
+  }
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity) return errorResponse('SYS_002', 'Talent non trovato');
+
+  var scoreQuestionario = entity.data.score_questionario || 0;
+  var scoreFinal = calculateFinalScore(scoreQuestionario, scoreAdmin);
+
+  updateEntityData(payload.entity_id, {
+    score_admin: scoreAdmin,
+    score:       scoreFinal
+  }, auth.tenant_id, auth.user_id);
+
+  return successResponse({
+    score_admin:       scoreAdmin,
+    score_questionario: scoreQuestionario,
+    score:             scoreFinal
+  });
+}
+
 // ---------------------------------------------------------------------------
 // SERIALIZZAZIONE PUBBLICA
 // ---------------------------------------------------------------------------

@@ -628,6 +628,31 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
   const [contractLoading,   setContractLoading]   = useState(false)
   const [contractResult,    setContractResult]    = useState(null)
 
+  // Score admin override
+  const [localScore,          setLocalScore]          = useState(d.score ?? null)
+  const [editableScoreAdmin,  setEditableScoreAdmin]  = useState(d.score_admin ?? 5)
+  const [scoreAdminSaving,    setScoreAdminSaving]    = useState(false)
+  const scoreQuestionario = d.score_questionario ?? 0
+
+  const calculatePreviewScore = (scoreQ, scoreA) =>
+    Math.round((scoreQ * 0.65) + ((scoreA / 10) * 100 * 0.35))
+
+  const handleSaveScoreAdmin = async () => {
+    setScoreAdminSaving(true)
+    const res = handleApiResponse
+      ? handleApiResponse(await talentApi.updateScoreAdmin(talent.entity_id, editableScoreAdmin))
+      : await talentApi.updateScoreAdmin(talent.entity_id, editableScoreAdmin)
+    setScoreAdminSaving(false)
+    if (res.success) {
+      setLocalScore(res.data?.score ?? calculatePreviewScore(scoreQuestionario, editableScoreAdmin))
+    } else {
+      alert(getErrorMessage(res.error))
+    }
+  }
+
+  // Eventi pre-CRM
+  const [editableEventiPreCRM, setEditableEventiPreCRM] = useState(d.eventi_precrm ?? 0)
+
   const [history,        setHistory]        = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
 
@@ -934,13 +959,89 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:12 }}>
             <LeadBadge status={talent.status} />
-            <div style={{ flex:1, maxWidth:200 }}><ScoreBar score={d.score} /></div>
-            {d.score != null && <span style={{ fontSize:13, fontWeight:700, color:COLORS.text }}>{d.score}<span style={{ fontSize:10, color:COLORS.textSecondary }}>/100</span></span>}
+            <div style={{ flex:1, maxWidth:200 }}><ScoreBar score={localScore ?? d.score} /></div>
+            {(localScore ?? d.score) != null && <span style={{ fontSize:13, fontWeight:700, color:COLORS.text }}>{localScore ?? d.score}<span style={{ fontSize:10, color:COLORS.textSecondary }}>/100</span></span>}
           </div>
         </div>
 
         {/* Scrollable body */}
         <div style={{ flex:1, overflowY:'auto', padding:'20px 28px' }}>
+
+          {/* SCORE BREAKDOWN + ADMIN OVERRIDE */}
+          <div style={{ marginBottom:20, padding:'16px 18px', background:'#F8F8FB', borderRadius:8, border:`1px solid ${COLORS.border}` }}>
+            <div style={{ display:'flex', gap:24, marginBottom:12 }}>
+              <div>
+                <div style={{ fontSize:10, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:2 }}>Score finale</div>
+                <div style={{ fontSize:28, fontWeight:700, color:COLORS.accent, lineHeight:1 }}>{localScore ?? d.score ?? 0}<span style={{ fontSize:12, color:COLORS.textSecondary, fontWeight:400 }}>/100</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:2 }}>Questionario (65%)</div>
+                <div style={{ fontSize:16, fontWeight:600, color:COLORS.text }}>{scoreQuestionario}/100</div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:2 }}>Admin (35%)</div>
+                <div style={{ fontSize:16, fontWeight:600, color:COLORS.text }}>{editableScoreAdmin}/10</div>
+              </div>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:11, color:COLORS.textSecondary, whiteSpace:'nowrap' }}>Valutazione admin:</span>
+              <input
+                type="range" min="1" max="10" step="1"
+                value={editableScoreAdmin}
+                onChange={e => setEditableScoreAdmin(parseInt(e.target.value))}
+                style={{ flex:1, accentColor: COLORS.accent }}
+              />
+              <span style={{ fontSize:15, fontWeight:700, color:COLORS.accent, minWidth:32 }}>{editableScoreAdmin}/10</span>
+            </div>
+            {editableScoreAdmin !== (d.score_admin ?? 5) && (
+              <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:10 }}>
+                <button
+                  onClick={handleSaveScoreAdmin}
+                  disabled={scoreAdminSaving}
+                  style={{ background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, padding:'6px 14px', fontSize:11, fontWeight:700, cursor: scoreAdminSaving ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif', opacity: scoreAdminSaving ? 0.6 : 1 }}
+                >
+                  {scoreAdminSaving ? 'Salvataggio…' : 'Salva valutazione'}
+                </button>
+                <span style={{ fontSize:11, color:COLORS.textSecondary }}>
+                  Score finale: <strong style={{ color:COLORS.accent }}>{calculatePreviewScore(scoreQuestionario, editableScoreAdmin)}/100</strong>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* EVENTI MADE */}
+          <div style={{ marginBottom:20, padding:'14px 18px', background:'#F8F8FB', borderRadius:8, border:`1px solid ${COLORS.border}` }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:10 }}>🎯 Eventi MADE EVENTS</div>
+            <div style={{ display:'flex', gap:20, flexWrap:'wrap', alignItems:'center' }}>
+              <div>
+                <div style={{ fontSize:10, color:COLORS.textSecondary, marginBottom:2 }}>Dal CRM</div>
+                <div style={{ fontSize:18, fontWeight:700, color:COLORS.text }}>{d.eventi_crm_completati ?? 0}</div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div>
+                  <div style={{ fontSize:10, color:COLORS.textSecondary, marginBottom:2 }}>Pre-CRM</div>
+                  <input
+                    type="number" min="0" max="100"
+                    value={editableEventiPreCRM}
+                    onChange={e => setEditableEventiPreCRM(parseInt(e.target.value) || 0)}
+                    style={{ width:52, border:`1px solid ${COLORS.border}`, borderRadius:4, padding:'4px 6px', fontSize:13, fontFamily:'Montserrat,sans-serif', textAlign:'center' }}
+                  />
+                </div>
+                {editableEventiPreCRM !== (d.eventi_precrm ?? 0) && (
+                  <button
+                    onClick={() => alert('Funzionalità in arrivo nello Sprint C')}
+                    style={{ marginTop:16, background:'none', border:`1px solid ${COLORS.accent}`, color:COLORS.accent, borderRadius:6, padding:'4px 10px', fontSize:11, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}
+                  >
+                    Salva
+                  </button>
+                )}
+              </div>
+              <div style={{ padding:'8px 14px', background:'#fff', borderRadius:6, border:`1px solid ${COLORS.border}` }}>
+                <div style={{ fontSize:10, color:COLORS.textSecondary }}>TOTALE</div>
+                <div style={{ fontSize:20, fontWeight:700, color:COLORS.accent }}>{(d.eventi_crm_completati ?? 0) + editableEventiPreCRM}</div>
+              </div>
+            </div>
+          </div>
 
           {/* FOTO E SCADENZE */}
           {(photos.length > 0 || photoExp.label) && (
