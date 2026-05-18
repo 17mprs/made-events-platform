@@ -895,6 +895,90 @@ export function ContractPreviewModal({ talent, event, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
+// MATCH SCORE (front-end, mirrors backend calculateEventMatch, zero latency)
+// ---------------------------------------------------------------------------
+
+function computeMatchPct(ed, td) {
+  if (!ed || !td) return 50
+  let score = 0, maxScore = 0
+
+  // HARD: sesso (15)
+  if (ed.sesso_richiesto && ed.sesso_richiesto !== 'Indifferente') {
+    maxScore += 15
+    if ((td.genere || td.sesso) === ed.sesso_richiesto) score += 15
+    else return 0
+  }
+  // HARD: altezza (10)
+  if (ed.altezza_minima) {
+    maxScore += 10
+    if (Number(td.altezza) >= Number(ed.altezza_minima)) score += 10
+    else return 0
+  }
+  // HARD: taglia (10)
+  if (ed.taglia_richiesta && ed.taglia_richiesta !== 'Indifferente' && ed.taglia_richiesta !== '') {
+    maxScore += 10
+    if ((td.taglia_pantalone || td.taglia) === ed.taglia_richiesta) score += 10
+    else return 0
+  }
+  // HARD: lingue (15)
+  const lingueRichieste = ed.lingue_richieste ?? []
+  if (lingueRichieste.length > 0) {
+    maxScore += 15
+    const tLingue = [
+      td.lingua_inglese, td.lingua_francese, td.lingua_spagnolo, td.lingua_tedesco,
+      ...((td.altre_lingue ?? []).map(l => l.nome || '')),
+      ...((td.lingue ?? []).map(l => typeof l === 'string' ? l : (l.nome || ''))),
+    ].filter(Boolean).map(l => l.toLowerCase())
+    const hasAll = lingueRichieste.every(r => tLingue.some(tl => tl.includes(r.toLowerCase())))
+    if (hasAll) score += 15
+    else return 0
+  }
+
+  // SOFT: esperienza (12/5)
+  if (Number(ed.anni_esperienza_minimi) > 0) {
+    maxScore += 12
+    if (parseEsperienza(td.anni_esperienza_settore) >= Number(ed.anni_esperienza_minimi)) score += 12
+    else score += 5
+  }
+  // SOFT: provincia (10/3)
+  if (ed.provincia) {
+    maxScore += 10
+    const provs = td.province_lavoro ?? td.province_operativita ?? []
+    if (provs.includes(ed.provincia)) score += 10; else score += 3
+  }
+  // SOFT: automunita (8/2)
+  if (ed.automunita === 'Sì') {
+    maxScore += 8
+    if (td.automunita === 'Sì') score += 8; else score += 2
+  }
+  // SOFT: trasferte (8/2)
+  if (ed.richiede_trasferte) {
+    maxScore += 8
+    if (td.disponibilita_trasferte === 'Sì') score += 8; else score += 2
+  }
+  // SOFT: weekend (6)
+  if (ed.richiede_weekend) {
+    maxScore += 6
+    if (td.disponibilita_weekend === 'Sì') score += 6
+  }
+  // SOFT: ruoli (10/3)
+  const ruoli = ed.ruoli_richiesti ?? []
+  if (ruoli.length > 0) {
+    maxScore += 10
+    const tip = td.tipologie_esperienza ?? []
+    if (ruoli.some(r => tip.includes(r))) score += 10; else score += 3
+  }
+  // Bonus: ha lavorato con noi (10)
+  if (ed.priorita_lavorato_con_noi) {
+    const eventiMade = (Number(td.eventi_crm_completati) || 0) + (Number(td.eventi_precrm) || 0)
+    if (eventiMade > 0) { maxScore += 10; score += 10 }
+  }
+
+  if (maxScore === 0) return 50
+  return Math.round((score / maxScore) * 100)
+}
+
+// ---------------------------------------------------------------------------
 // TALENT EVENT DRAWER — 3 tab: Potenziali / In Attesa / Approvati
 // ---------------------------------------------------------------------------
 
@@ -939,40 +1023,46 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     return { pendingApps, approvedApps, appliedIds }
   }, [applications])
 
-  // TAB A — talent APPROVED non ancora candidati, filtrati per requisiti evento
+  // TAB A — talent APPROVED non ancora candidati, filtrati per requisiti evento + match %
   const potenziali = useMemo(() => {
     const luogo = (d.luogo ?? '').toUpperCase()
-    return allTalents.filter(t => {
-      if (appliedIds.has(t.entity_id)) return false
-      const td = t.data ?? {}
+    return allTalents
+      .filter(t => {
+        if (appliedIds.has(t.entity_id)) return false
+        const td = t.data ?? {}
 
-      // Geo: province_lavoro o città vs luogo evento, o disponibilità trasferte
-      const provinces = td.province_lavoro ?? []
-      const cityMatch = provinces.some(p => luogo.includes(p.toUpperCase())) ||
-        (td.citta && luogo.includes(td.citta.toUpperCase()))
-      if (!cityMatch && td.disponibilita_trasferte !== 'Sì') return false
+        // Geo: province_lavoro o città vs luogo evento, o disponibilità trasferte
+        const provinces = td.province_lavoro ?? td.province_operativita ?? []
+        const cityMatch = provinces.some(p => luogo.includes(p.toUpperCase())) ||
+          (td.citta && luogo.includes(td.citta.toUpperCase()))
+        if (!cityMatch && td.disponibilita_trasferte !== 'Sì') return false
 
-      if (d.richiede_weekend  && td.disponibilita_weekend  !== 'Sì') return false
-      if (d.richiede_trasferte && td.disponibilita_trasferte !== 'Sì') return false
+        if (d.richiede_weekend   && td.disponibilita_weekend   !== 'Sì') return false
+        if (d.richiede_trasferte && td.disponibilita_trasferte !== 'Sì') return false
 
-      const minEsp = Number(d.anni_esperienza_minimi) || 0
-      if (minEsp > 0 && parseEsperienza(td.anni_esperienza_settore) < minEsp) return false
+        const minEsp = Number(d.anni_esperienza_minimi) || 0
+        if (minEsp > 0 && parseEsperienza(td.anni_esperienza_settore) < minEsp) return false
 
-      // Nuovi requisiti evento
-      if (d.sesso_richiesto && d.sesso_richiesto !== 'Indifferente') {
-        if (td.sesso && td.sesso !== d.sesso_richiesto) return false
-      }
-      if (d.altezza_minima && Number(td.altezza) < Number(d.altezza_minima)) return false
-      if (d.automunita && d.automunita !== 'Indifferente') {
-        if (d.automunita === 'Sì' && td.automunita !== 'Sì') return false
-      }
-      if ((d.lingue_richieste ?? []).length > 0) {
-        const talentLingue = (td.lingue ?? []).map(l => l.toLowerCase())
-        if (!d.lingue_richieste.every(l => talentLingue.includes(l.toLowerCase()))) return false
-      }
+        if (d.sesso_richiesto && d.sesso_richiesto !== 'Indifferente') {
+          if ((td.genere || td.sesso) && (td.genere || td.sesso) !== d.sesso_richiesto) return false
+        }
+        if (d.altezza_minima && Number(td.altezza) < Number(d.altezza_minima)) return false
+        if (d.automunita && d.automunita !== 'Indifferente') {
+          if (d.automunita === 'Sì' && td.automunita !== 'Sì') return false
+        }
+        if ((d.lingue_richieste ?? []).length > 0) {
+          const talentLingue = [
+            td.lingua_inglese, td.lingua_francese, td.lingua_spagnolo, td.lingua_tedesco,
+            ...((td.altre_lingue ?? []).map(l => l.nome || '')),
+            ...((td.lingue ?? []).map(l => typeof l === 'string' ? l : (l.nome || ''))),
+          ].filter(Boolean).map(l => l.toLowerCase())
+          if (!d.lingue_richieste.every(l => talentLingue.some(tl => tl.includes(l.toLowerCase())))) return false
+        }
 
-      return true
-    }).sort((a, b) => (Number(b.data?.score) || 0) - (Number(a.data?.score) || 0))
+        return true
+      })
+      .map(t => ({ ...t, _matchPct: computeMatchPct(d, t.data ?? {}) }))
+      .sort((a, b) => b._matchPct - a._matchPct || (Number(b.data?.score) || 0) - (Number(a.data?.score) || 0))
   }, [allTalents, appliedIds, d])
 
   const handleInvite = async (talentId) => {
@@ -1018,14 +1108,22 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const BG = '#0E0E16'; const BD = '#2A2A3A'; const TEXT = '#E8E8F0'; const MUTED = '#8888A0'
 
   // Mini talent row component (defined inline to use closure vars)
-  const TRow = ({ t, app, children }) => {
+  const TRow = ({ t, app, matchPct, children }) => {
     const td   = t?.data ?? app?.data ?? {}
     const nome = td.nome ? `${td.nome} ${td.cognome ?? ''}`.trim() : (app?.data?.talent_name ?? '—')
+    const badgeColor = matchPct >= 80 ? '#16A34A' : matchPct >= 60 ? '#D97706' : '#6B7280'
     return (
       <div style={{ background:'#1A1A24', borderRadius:8, padding:'12px 14px', display:'flex', gap:12, alignItems:'center' }}>
         <TalentAvatar nome={nome} fotoUrl={td.foto_busto_url} size={40} />
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:600, color:TEXT }}>{nome}</div>
+          <div style={{ fontSize:13, fontWeight:600, color:TEXT, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+            {nome}
+            {matchPct != null && (
+              <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:10, background:badgeColor, color:'#fff', flexShrink:0 }}>
+                {matchPct}% match
+              </span>
+            )}
+          </div>
           <div style={{ fontSize:11, color:MUTED, marginTop:2 }}>
             {td.citta ?? '—'}{td.score != null ? ` · score ${td.score}` : ''}
           </div>
@@ -1100,7 +1198,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {potenziali.map(t => (
-                  <TRow key={t.entity_id} t={t}>
+                  <TRow key={t.entity_id} t={t} matchPct={t._matchPct}>
                     <button
                       onClick={() => actionLoading !== t.entity_id && handleInvite(t.entity_id)}
                       disabled={actionLoading === t.entity_id}

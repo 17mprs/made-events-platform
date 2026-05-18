@@ -102,7 +102,10 @@ var PERMISSION_MATRIX = {
   'log.view':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // TALENT SCORING
-  'talent.updateScoreAdmin': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
+  'talent.updateScoreAdmin':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // MATCHING
+  'event.getMatchingTalents': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
 };
 
 // ---------------------------------------------------------------------------
@@ -331,4 +334,121 @@ function calculateQuestionarioScore(data) {
 function calculateFinalScore(scoreQuestionario, scoreAdmin) {
   var scoreAdminNorm = ((scoreAdmin || 5) / 10) * 100;
   return Math.round((scoreQuestionario * 0.65) + (scoreAdminNorm * 0.35));
+}
+
+// ---------------------------------------------------------------------------
+// EVENT-TALENT MATCHING (HARD/SOFT requirements)
+// ---------------------------------------------------------------------------
+
+function calculateEventMatch(evento, talent) {
+  var ed = evento.data || {};
+  var td = talent.data || {};
+  var score = 0;
+  var maxScore = 0;
+
+  // ── HARD REQUIREMENTS (mismatch = 0%) ────────────────────────────────────
+
+  // 1. Sesso (15)
+  if (ed.sesso_richiesto && ed.sesso_richiesto !== 'Indifferente') {
+    maxScore += 15;
+    var tSesso = td.genere || td.sesso || '';
+    if (tSesso === ed.sesso_richiesto) score += 15;
+    else return 0;
+  }
+
+  // 2. Altezza minima (10)
+  if (ed.altezza_minima) {
+    maxScore += 10;
+    if (parseInt(td.altezza) >= parseInt(ed.altezza_minima)) score += 10;
+    else return 0;
+  }
+
+  // 3. Taglia richiesta (10)
+  if (ed.taglia_richiesta && ed.taglia_richiesta !== 'Indifferente' && ed.taglia_richiesta !== '') {
+    maxScore += 10;
+    var tTaglia = td.taglia_pantalone || td.taglia || '';
+    if (tTaglia === ed.taglia_richiesta) score += 10;
+    else return 0;
+  }
+
+  // 4. Lingue richieste (15)
+  var lingueRichieste = Array.isArray(ed.lingue_richieste) ? ed.lingue_richieste : [];
+  if (lingueRichieste.length > 0) {
+    maxScore += 15;
+    // Raccoglie tutte le lingue del talent
+    var tLingue = [];
+    var stdFields = ['lingua_inglese','lingua_francese','lingua_spagnolo','lingua_tedesco'];
+    for (var i = 0; i < stdFields.length; i++) {
+      if (td[stdFields[i]] && td[stdFields[i]] !== 'Non conosco') tLingue.push(stdFields[i].replace('lingua_',''));
+    }
+    var altreLingue = Array.isArray(td.altre_lingue) ? td.altre_lingue : [];
+    for (var j = 0; j < altreLingue.length; j++) {
+      if (altreLingue[j].nome) tLingue.push(altreLingue[j].nome.toLowerCase());
+    }
+    var lingueArr = Array.isArray(td.lingue) ? td.lingue : [];
+    for (var k = 0; k < lingueArr.length; k++) {
+      var l = typeof lingueArr[k] === 'string' ? lingueArr[k] : (lingueArr[k].nome || '');
+      if (l) tLingue.push(l.toLowerCase());
+    }
+    var hasAll = lingueRichieste.every(function(req) {
+      return tLingue.some(function(tl) { return tl.indexOf(req.toLowerCase()) > -1; });
+    });
+    if (hasAll) score += 15;
+    else return 0;
+  }
+
+  // ── SOFT REQUIREMENTS (penalità parziale) ────────────────────────────────
+
+  // 5. Anni esperienza minimi (12/5)
+  if (parseInt(ed.anni_esperienza_minimi) > 0) {
+    maxScore += 12;
+    var expMap = { 'Oltre 5':6, '3–5':4, '1–3':2, '0–1':0.5 };
+    var tExp = expMap[td.anni_esperienza_settore] || parseFloat(td.esperienza_anni) || 0;
+    if (tExp >= parseInt(ed.anni_esperienza_minimi)) score += 12;
+    else score += 5;
+  }
+
+  // 6. Provincia (10/3)
+  if (ed.provincia) {
+    maxScore += 10;
+    var prov = Array.isArray(td.province_lavoro) ? td.province_lavoro : (Array.isArray(td.province_operativita) ? td.province_operativita : []);
+    if (prov.indexOf(ed.provincia) > -1) score += 10;
+    else score += 3;
+  }
+
+  // 7. Automunita (8/2)
+  if (ed.automunita === 'Sì') {
+    maxScore += 8;
+    if (td.automunita === 'Sì') score += 8; else score += 2;
+  }
+
+  // 8. Trasferte (8/2)
+  if (ed.richiede_trasferte) {
+    maxScore += 8;
+    if (td.disponibilita_trasferte === 'Sì') score += 8; else score += 2;
+  }
+
+  // 9. Weekend (6)
+  if (ed.richiede_weekend) {
+    maxScore += 6;
+    if (td.disponibilita_weekend === 'Sì' || td.disponibile_weekend === 'Sì') score += 6;
+  }
+
+  // 10. Ruoli/tipologie (10/3)
+  var ruoliRichiesti = Array.isArray(ed.ruoli_richiesti) ? ed.ruoli_richiesti : [];
+  if (ruoliRichiesti.length > 0) {
+    maxScore += 10;
+    var tTip = Array.isArray(td.tipologie_esperienza) ? td.tipologie_esperienza : [];
+    var hasRole = ruoliRichiesti.some(function(r) { return tTip.indexOf(r) > -1; });
+    if (hasRole) score += 10; else score += 3;
+  }
+
+  // 11. Bonus: ha lavorato con noi (10)
+  if (ed.priorita_lavorato_con_noi) {
+    var eventiMade = parseInt(td.eventi_crm_completati || 0) + parseInt(td.eventi_precrm || 0);
+    if (eventiMade > 0) { maxScore += 10; score += 10; }
+  }
+
+  if (maxScore === 0) return 50;
+  return Math.round((score / maxScore) * 100);
 }

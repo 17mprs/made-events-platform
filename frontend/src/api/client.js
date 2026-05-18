@@ -180,7 +180,8 @@ export const eventApi = {
   updateStatus: (entity_id, new_status) =>
                                       gasPost('event.updateStatus', { entity_id, new_status }, t()),
   cancel:       (entity_id)        => gasPost('event.cancel',       { entity_id }, t()),
-  softDelete:   (entity_id)        => gasPost('event.softDelete',   { entity_id }, t()),
+  softDelete:          (entity_id) => gasPost('event.softDelete',         { entity_id }, t()),
+  getMatchingTalents:  (event_id)  => gasPost('event.getMatchingTalents', { event_id  }, t()),
 }
 
 export const shiftApi = {

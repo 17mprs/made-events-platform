@@ -766,6 +766,42 @@ function handleUpdateScoreAdmin(payload, auth) {
   });
 }
 
+function handleGetMatchingTalents(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+
+  var valid = requireFields(payload, ['event_id']);
+  if (valid) return valid;
+
+  var evento = getEntityById(payload.event_id, auth.tenant_id);
+  if (!evento || evento.type !== 'EVENT') {
+    return errorResponse('SYS_002', 'Evento non trovato');
+  }
+
+  var result = listEntities('TALENT_PROFILE', auth.tenant_id, null, 1, 1000);
+  var talents = (result.items || []).filter(function(t) {
+    return t.status === ENTITY_STATUS.TALENT_PROFILE.APPROVED ||
+           t.status === ENTITY_STATUS.TALENT_PROFILE.ACTIVE;
+  });
+
+  var talentsWithMatch = talents.map(function(talent) {
+    var matchPct = calculateEventMatch(evento, talent);
+    return {
+      entity_id:        talent.entity_id,
+      match_percentage: matchPct,
+      score:            talent.data.score || 0,
+      nome:             talent.data.nome  || '',
+      cognome:          talent.data.cognome || '',
+      data:             talent.data
+    };
+  });
+
+  talentsWithMatch.sort(function(a, b) { return b.match_percentage - a.match_percentage; });
+
+  return successResponse({ talents: talentsWithMatch, count: talentsWithMatch.length });
+}
+
 // ---------------------------------------------------------------------------
 // SERIALIZZAZIONE PUBBLICA
 // ---------------------------------------------------------------------------
