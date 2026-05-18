@@ -1190,32 +1190,39 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
 // EVENT CARD
 // ---------------------------------------------------------------------------
 
-function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onChangeStatus, onRequestDelete, isChanging, closedSet, onToggleClosed, richieste, onSetRichieste, onSaveRichieste }) {
+const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onChangeStatus, onRequestDelete, isChanging, isClosed, onToggleClosed, richiestaVal, onSetRichieste, onSaveRichieste }) {
   const d       = event.data ?? {}
   const sm      = statusMeta(event.status)
   const client  = clients.find(c => c.entity_id === d.client_id)
-  const isClosed = closedSet.has(event.entity_id)
   const confirmed  = Number(d.confirmed_count ?? d.posti_confermati ?? 0)
-  const required   = richieste[event.entity_id] ?? Number(d.hostess_richieste ?? 0)
+  const required   = richiestaVal ?? Number(d.hostess_richieste ?? 0)
 
   const coverUrl = d.foto_copertina_url || d.foto_url
 
   return (
     <div style={{
       borderRadius:12, overflow:'hidden', display:'flex', flexDirection:'column',
-      boxShadow:'0 2px 12px rgba(0,0,0,0.08)', transition:'box-shadow 0.2s, transform 0.2s',
+      boxShadow:'0 2px 12px rgba(0,0,0,0.08)',
+      transition:'transform 0.2s',
+      willChange:'transform',
     }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow='0 6px 24px rgba(0,0,0,0.15)'; e.currentTarget.style.transform='translateY(-2px)' }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.transform='translateY(0)' }}
+      onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)' }}
     >
       {/* MAGAZINE HEADER — photo + bordeaux gradient overlay + white text */}
       <div style={{
         height:220, position:'relative', flexShrink:0, overflow:'hidden',
-        background: coverUrl ? 'transparent' : `linear-gradient(135deg, #4A1020 0%, #7A1E2C 100%)`,
-        backgroundImage: coverUrl ? `url(${coverUrl})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        background:`linear-gradient(135deg, #4A1020 0%, #7A1E2C 100%)`,
       }}>
+        {coverUrl && (
+          <img
+            src={coverUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}
+          />
+        )}
         {/* Bordeaux gradient overlay */}
         <div style={{
           position:'absolute', inset:0,
@@ -1224,7 +1231,7 @@ function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onCha
 
         {/* Status badge — top right */}
         <div style={{ position:'absolute', top:12, right:12, zIndex:2 }}>
-          <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', color:'#fff', fontSize:10, fontWeight:700, letterSpacing:'0.5px', boxShadow:'0 1px 4px rgba(0,0,0,0.3)' }}>
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, background:'rgba(20,10,16,0.72)', color:'#fff', fontSize:10, fontWeight:700, letterSpacing:'0.5px' }}>
             <span style={{ width:6, height:6, borderRadius:'50%', background:sm.dot, flexShrink:0 }} />
             {sm.label}
           </span>
@@ -1256,7 +1263,7 @@ function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onCha
             type="number"
             min="1"
             max="200"
-            value={richieste[event.entity_id] ?? (d.hostess_richieste || '')}
+            value={richiestaVal ?? (d.hostess_richieste || '')}
             placeholder="—"
             onChange={e => onSetRichieste(event.entity_id, e.target.value === '' ? 0 : Number(e.target.value))}
             onBlur={e => onSaveRichieste(event.entity_id, e.target.value === '' ? 0 : Number(e.target.value))}
@@ -1330,7 +1337,7 @@ function EventCard({ event, clients, onDuplica, onModifica, onMatchTalent, onCha
       </div>
     </div>
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // MAIN
@@ -1361,6 +1368,10 @@ export default function EventiPage() {
   // Per-card local state (needs backend to persist)
   const [closedSet,    setClosedSet]    = useState(new Set())   // entity_ids with closed selection
   const [richieste,    setRichieste]    = useState({})          // entity_id → number
+
+  // Ref per accesso stabile a closedSet dentro useCallback senza dipendenza
+  const closedSetRef = useRef(closedSet)
+  closedSetRef.current = closedSet
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1414,13 +1425,13 @@ export default function EventiPage() {
     }
   }
 
-  const handleChangeStatus = (entity_id, new_status) => {
+  const handleChangeStatus = useCallback((entity_id, new_status) => {
     doUpdateStatus(entity_id, new_status)
-  }
+  }, [doUpdateStatus])
 
-  const handleRequestDelete = (event) => {
+  const handleRequestDelete = useCallback((event) => {
     setDeleteModal(event)
-  }
+  }, [])
 
   const handleConfirmDelete = async (entity_id) => {
     const prevEvents = events
@@ -1433,23 +1444,28 @@ export default function EventiPage() {
     }
   }
 
-  const handleDuplica = (event) => {
+  const handleDuplica = useCallback((event) => {
     setFormPrefill(event.data ?? {})
     setIsEdit(false)
     setShowForm(true)
-  }
+  }, [])
 
-  const handleModifica = (event) => {
+  const handleModifica = useCallback((event) => {
     setFormPrefill({ entity_id: event.entity_id, ...(event.data ?? {}) })
     setIsEdit(true)
     setShowForm(true)
-  }
+  }, [])
+
+  const handleMatchTalent = useCallback((ev, tab = 'potenziali') => {
+    setMatchEvent(ev)
+    setMatchTab(tab)
+  }, [])
 
   const handleFormClose = () => { setShowForm(false); setFormPrefill(null); setIsEdit(false) }
   const handleFormSaved = () => { handleFormClose(); load() }
 
-  const handleToggleClosed = async (entity_id) => {
-    const wasClosed = closedSet.has(entity_id)
+  const handleToggleClosed = useCallback(async (entity_id) => {
+    const wasClosed = closedSetRef.current.has(entity_id)
     const newClosed = !wasClosed
     // Aggiornamento ottimistico
     setClosedSet(prev => {
@@ -1467,16 +1483,16 @@ export default function EventiPage() {
       })
       alert(getErrorMessage(res.error))
     }
-  }
+  }, [handleApiResponse])
 
-  const handleSetRichieste = (entity_id, val) => {
+  const handleSetRichieste = useCallback((entity_id, val) => {
     setRichieste(prev => ({ ...prev, [entity_id]: val }))
-  }
+  }, [])
 
-  const handleSaveRichieste = async (entity_id, val) => {
+  const handleSaveRichieste = useCallback(async (entity_id, val) => {
     const res = handleApiResponse(await eventApi.update({ entity_id, hostess_richieste: Number(val) || 0 }))
     if (!res.success) alert(getErrorMessage(res.error))
-  }
+  }, [handleApiResponse])
 
   const TAB = (active) => ({
     padding:'9px 18px', fontSize:13, fontWeight:600,
@@ -1533,13 +1549,13 @@ export default function EventiPage() {
               clients={clients}
               onDuplica={handleDuplica}
               onModifica={handleModifica}
-              onMatchTalent={(ev, tab = 'potenziali') => { setMatchEvent(ev); setMatchTab(tab) }}
+              onMatchTalent={handleMatchTalent}
               onChangeStatus={handleChangeStatus}
               onRequestDelete={handleRequestDelete}
               isChanging={toggling === ev.entity_id}
-              closedSet={closedSet}
+              isClosed={closedSet.has(ev.entity_id)}
               onToggleClosed={handleToggleClosed}
-              richieste={richieste}
+              richiestaVal={richieste[ev.entity_id]}
               onSetRichieste={handleSetRichieste}
               onSaveRichieste={handleSaveRichieste}
             />
