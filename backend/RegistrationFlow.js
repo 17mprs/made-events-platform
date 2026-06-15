@@ -63,7 +63,7 @@ function handleRegisterStep1(payload) {
   }, tenantId, null);
 
   try {
-    var frontendUrl = PropertiesService.getScriptProperties().getProperty('FRONTEND_URL') || 'http://localhost:3000';
+    var frontendUrl = getFrontendUrl();
     var completionUrl = frontendUrl + '/registrazione/completa?token=' + leadToken;
     sendOnboardingStep1Email(emailLower, payload.nome.trim(), completionUrl);
   } catch (emailErr) {
@@ -561,7 +561,7 @@ function inviaEmailSollecito(leadId) {
   checkSezione(8, 'Documenti e Foto',     function(d) { return !!(d.doc_identita_url && d.foto_busto_url && d.cv_url); });
 
   try {
-    var frontendUrl = PropertiesService.getScriptProperties().getProperty('FRONTEND_URL') || 'https://madeevent.it';
+    var frontendUrl = getFrontendUrl();
     var completionUrl = frontendUrl + '/registrazione/completa?token=' + (d.lead_token || '');
     sendSollecitoEmail(d.email, d.nome, completionUrl, completati, mancanti);
     updateEntityData(leadId, { ultimo_sollecito: new Date().toISOString() }, entity.tenant_id, null);

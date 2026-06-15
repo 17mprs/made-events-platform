@@ -68,7 +68,7 @@ function stripHtml_(html) {
  * @param {string} loginUrl    URL della piattaforma (opzionale)
  */
 function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
-  var url = loginUrl || 'https://madeevent.it/login';
+  var url = loginUrl || (getFrontendUrl() + '/login');
 
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',

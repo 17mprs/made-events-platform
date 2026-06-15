@@ -505,7 +505,7 @@ function handleConfirmPasswordReset(payload) {
 }
 
 function sendPasswordResetEmail_(email, token) {
-  var resetUrl = 'https://made-events-platform.vercel.app/reset-password/confirm?token=' + token;
+  var resetUrl = getFrontendUrl() + '/reset-password/confirm?token=' + token;
   var html =
     '<div style="font-family:Montserrat,Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;">' +
     '<div style="background:#7A1E2C;padding:28px 40px;">' +
