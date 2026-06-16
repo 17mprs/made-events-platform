@@ -15,6 +15,10 @@ function initScriptProperties() {
     SPREADSHEET_ID:       '12ITb5K_ZcskSFgLmpdWXvqqP2oh5cJ51KKhPq2PhlHQ',
     CONTRACT_TEMPLATE_ID: '1WyVn17-7Iaq3H5uF0DZPDN_DVC-KQPmFnU4bWbFNYgM',
     FRONTEND_URL:         'https://made-events-platform.vercel.app',
+    NEWSLETTER_TIER1_FREQUENCY_DAYS: '7',
+    NEWSLETTER_TIER1_LAST_SENT:      '',
+    NEWSLETTER_TIER2_FREQUENCY_DAYS: '14',
+    NEWSLETTER_TIER2_LAST_SENT:      '',
   };
 
   for (var key in defaults) {

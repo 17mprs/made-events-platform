@@ -109,7 +109,11 @@ var PERMISSION_MATRIX = {
 
   // TRACKING EVENTI
   'application.markEventCompleted': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
-  'talent.updateEventiPreCRM':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
+  'talent.updateEventiPreCRM':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // NEWSLETTER
+  'newsletter.preview':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'newsletter.setFrequency': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
 };
 
 // ---------------------------------------------------------------------------

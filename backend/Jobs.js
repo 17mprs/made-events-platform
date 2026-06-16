@@ -69,6 +69,20 @@ function setupAllTriggers() {
     .everyHours(1)
     .create();
 
+  // newsletterTier1: ogni giorno alle 10:00 (frequenza reale gestita internamente)
+  ScriptApp.newTrigger('jobNewsletterTier1')
+    .timeBased()
+    .everyDays(1)
+    .atHour(10)
+    .create();
+
+  // newsletterTier2: ogni giorno alle 10:00 (frequenza reale gestita internamente)
+  ScriptApp.newTrigger('jobNewsletterTier2')
+    .timeBased()
+    .everyDays(1)
+    .atHour(10)
+    .create();
+
   Logger.log('[JOBS] Tutti i trigger installati correttamente.');
 }
 

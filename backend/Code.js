@@ -197,6 +197,10 @@ function handleRequest(action, payload, token) {
     // DASHBOARD
     case 'dashboard.bootstrap': return handleDashboardBootstrap(payload, auth);
 
+    // NEWSLETTER
+    case 'newsletter.preview':      return getNewsletterPreview(payload.tier);
+    case 'newsletter.setFrequency': return handleNewsletterSetFrequency(payload, auth);
+
     // SYSTEM
     case 'config.get':  return handleConfigGet(payload, auth);
     case 'demo.reset':  return handleDemoReset(payload, auth);

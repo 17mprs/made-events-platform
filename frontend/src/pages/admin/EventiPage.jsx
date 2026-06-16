@@ -3,7 +3,7 @@ import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, Align
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { clientApi, eventApi, talentApi, applicationApi, contractApi, getErrorMessage } from '../../api/client'
+import { clientApi, eventApi, talentApi, applicationApi, contractApi, newsletterApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
@@ -1464,6 +1464,202 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
 })
 
 // ---------------------------------------------------------------------------
+// NEWSLETTER PREVIEW MODAL
+// ---------------------------------------------------------------------------
+
+function NewsletterPreviewModal({ tier, html, stats, onClose }) {
+  const ACCENT = COLORS.accent
+  return createPortal(
+    <div style={{
+      position:'fixed', inset:0, zIndex:400,
+      background:'rgba(0,0,0,0.72)', display:'flex', flexDirection:'column',
+    }}>
+      {/* Topbar */}
+      <div style={{
+        display:'flex', alignItems:'center', gap:12, padding:'12px 20px',
+        background:'#1A1A2E', flexShrink:0,
+      }}>
+        <div style={{ flex:1 }}>
+          <span style={{ fontWeight:700, fontSize:13, color:'#fff', letterSpacing:1 }}>
+            ANTEPRIMA NEWSLETTER — {tier}
+          </span>
+          {stats && (
+            <span style={{ marginLeft:16, fontSize:12, color:'#aaa' }}>
+              {stats.destinatari} destinatari · {stats.eventi} eventi
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background:ACCENT, border:'none', borderRadius:4, padding:'6px 18px',
+            color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer', letterSpacing:1,
+          }}
+        >CHIUDI</button>
+      </div>
+      {/* iframe */}
+      <div style={{ flex:1, overflow:'hidden', background:'#f0f0f0', padding:'24px 0' }}>
+        <iframe
+          title={`preview-${tier}`}
+          srcDoc={html}
+          style={{
+            display:'block', margin:'0 auto', width:'100%', maxWidth:680,
+            height:'100%', border:'none', borderRadius:4,
+            boxShadow:'0 4px 32px rgba(0,0,0,0.25)',
+          }}
+          sandbox="allow-same-origin"
+        />
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NEWSLETTER SETTINGS MODAL
+// ---------------------------------------------------------------------------
+
+function NewsletterSettingsModal({ currentSettings, onSave, onClose }) {
+  const ACCENT = COLORS.accent
+  const [t1, setT1] = useState(String(currentSettings.tier1_days ?? 7))
+  const [t2, setT2] = useState(String(currentSettings.tier2_days ?? 14))
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState(null)
+
+  async function handleSave() {
+    const v1 = parseInt(t1), v2 = parseInt(t2)
+    if (isNaN(v1) || v1 < 1 || isNaN(v2) || v2 < 1) {
+      setErr('Inserisci valori >= 1')
+      return
+    }
+    setSaving(true); setErr(null)
+    const res = await newsletterApi.setFrequency({ tier1_days: v1, tier2_days: v2 })
+    setSaving(false)
+    if (res.success) { onSave(res.data); onClose() }
+    else setErr(res.error?.message || 'Errore salvataggio')
+  }
+
+  return createPortal(
+    <div style={{
+      position:'fixed', inset:0, zIndex:400, background:'rgba(0,0,0,0.55)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+    }}>
+      <div style={{
+        background:'#fff', borderRadius:8, padding:32, width:360,
+        boxShadow:'0 8px 48px rgba(0,0,0,0.22)', fontFamily:'Montserrat,sans-serif',
+      }}>
+        <h3 style={{ margin:'0 0 6px', fontSize:16, fontWeight:700, color:'#1A1A2E' }}>
+          Frequenza newsletter
+        </h3>
+        <p style={{ margin:'0 0 24px', fontSize:12, color:'#888' }}>
+          Il trigger gira ogni giorno alle 10:00 ma invia solo se passati N giorni dall'ultimo invio.
+        </p>
+
+        <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#444', marginBottom:4 }}>
+          TIER 1 — profilo incompleto (ogni N giorni)
+        </label>
+        <input
+          type="number" min={1} value={t1}
+          onChange={e => setT1(e.target.value)}
+          style={{
+            width:'100%', padding:'8px 12px', border:`1px solid #ddd`, borderRadius:4,
+            fontSize:14, marginBottom:16, boxSizing:'border-box',
+          }}
+        />
+
+        <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#444', marginBottom:4 }}>
+          TIER 2 — talent approvati (ogni N giorni)
+        </label>
+        <input
+          type="number" min={1} value={t2}
+          onChange={e => setT2(e.target.value)}
+          style={{
+            width:'100%', padding:'8px 12px', border:`1px solid #ddd`, borderRadius:4,
+            fontSize:14, marginBottom:20, boxSizing:'border-box',
+          }}
+        />
+
+        {err && <p style={{ margin:'0 0 12px', fontSize:12, color:'#C62828' }}>{err}</p>}
+
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding:'8px 18px', border:`1px solid #ddd`, borderRadius:4,
+              background:'none', fontSize:13, cursor:'pointer',
+            }}
+          >Annulla</button>
+          <button
+            onClick={handleSave} disabled={saving}
+            style={{
+              padding:'8px 18px', border:'none', borderRadius:4,
+              background: saving ? '#ccc' : ACCENT, color:'#fff',
+              fontSize:13, fontWeight:600, cursor: saving ? 'default' : 'pointer',
+            }}
+          >{saving ? 'Salvataggio…' : 'Salva'}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NEWSLETTER PANEL
+// ---------------------------------------------------------------------------
+
+function NewsletterPanel({ onPreview, onOpenSettings }) {
+  const ACCENT = COLORS.accent
+  const [loading, setLoading] = useState(null)   // 'TIER1' | 'TIER2' | null
+
+  async function handlePreview(tier) {
+    setLoading(tier)
+    const res = await newsletterApi.preview(tier)
+    setLoading(null)
+    onPreview(tier, res)
+  }
+
+  return (
+    <div style={{
+      display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+      padding:'12px 16px', marginBottom:20, borderRadius:6,
+      background:'#FDF6F7', border:`1px solid ${ACCENT}22`,
+    }}>
+      <span style={{ fontSize:11, fontWeight:700, letterSpacing:2, color:ACCENT, textTransform:'uppercase', marginRight:4 }}>
+        Newsletter
+      </span>
+
+      <button
+        onClick={() => handlePreview('TIER1')} disabled={loading !== null}
+        style={{
+          padding:'6px 14px', border:`1px solid ${ACCENT}`, borderRadius:4,
+          background: loading === 'TIER1' ? ACCENT : '#fff', color: loading === 'TIER1' ? '#fff' : ACCENT,
+          fontSize:12, fontWeight:600, cursor: loading ? 'default' : 'pointer', letterSpacing:0.5,
+        }}
+      >{loading === 'TIER1' ? 'Carico…' : 'Preview TIER1'}</button>
+
+      <button
+        onClick={() => handlePreview('TIER2')} disabled={loading !== null}
+        style={{
+          padding:'6px 14px', border:`1px solid ${ACCENT}`, borderRadius:4,
+          background: loading === 'TIER2' ? ACCENT : '#fff', color: loading === 'TIER2' ? '#fff' : ACCENT,
+          fontSize:12, fontWeight:600, cursor: loading ? 'default' : 'pointer', letterSpacing:0.5,
+        }}
+      >{loading === 'TIER2' ? 'Carico…' : 'Preview TIER2'}</button>
+
+      <button
+        onClick={onOpenSettings}
+        title="Impostazioni frequenza"
+        style={{
+          marginLeft:'auto', padding:'6px 12px', border:`1px solid #ddd`, borderRadius:4,
+          background:'none', fontSize:12, color:'#666', cursor:'pointer',
+        }}
+      >⚙ Frequenza</button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // MAIN
 // ---------------------------------------------------------------------------
 
@@ -1492,6 +1688,11 @@ export default function EventiPage() {
   // Per-card local state (needs backend to persist)
   const [closedSet,    setClosedSet]    = useState(new Set())   // entity_ids with closed selection
   const [richieste,    setRichieste]    = useState({})          // entity_id → number
+
+  // Newsletter
+  const [nlPreview,    setNlPreview]    = useState(null)        // { tier, html, stats }
+  const [nlSettings,   setNlSettings]   = useState(false)
+  const [nlFreq,       setNlFreq]       = useState({ tier1_days: 7, tier2_days: 14 })
 
   // Ref per accesso stabile a closedSet dentro useCallback senza dipendenza
   const closedSetRef = useRef(closedSet)
@@ -1634,6 +1835,14 @@ export default function EventiPage() {
         action={<Button onClick={() => { setFormPrefill(null); setIsEdit(false); setShowForm(true) }}>+ Nuovo Evento</Button>}
       />
 
+      {/* Newsletter panel */}
+      <NewsletterPanel
+        onPreview={(tier, res) => {
+          if (res.success) setNlPreview({ tier, html: res.data.html, stats: res.data.stats })
+        }}
+        onOpenSettings={() => setNlSettings(true)}
+      />
+
       {/* Filters */}
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20, alignItems:'center' }}>
         <input
@@ -1714,6 +1923,23 @@ export default function EventiPage() {
           onClose={() => setMatchEvent(null)}
           handleApiResponse={handleApiResponse}
           initialTab={matchTab}
+        />
+      )}
+
+      {nlPreview && (
+        <NewsletterPreviewModal
+          tier={nlPreview.tier}
+          html={nlPreview.html}
+          stats={nlPreview.stats}
+          onClose={() => setNlPreview(null)}
+        />
+      )}
+
+      {nlSettings && (
+        <NewsletterSettingsModal
+          currentSettings={nlFreq}
+          onSave={(saved) => setNlFreq(saved)}
+          onClose={() => setNlSettings(false)}
         />
       )}
     </Layout>

@@ -241,3 +241,8 @@ export const emailApi = {
   sendConvocazione: (to, nome, titolo_evento, data_evento, luogo_evento, body) =>
     gasPost('email.sendConvocazione', { to, nome, titolo_evento, data_evento, luogo_evento, body }, t()),
 }
+
+export const newsletterApi = {
+  preview:      (tier)    => gasPost('newsletter.preview',      { tier },    t()),
+  setFrequency: (payload) => gasPost('newsletter.setFrequency', payload,     t()),
+}
