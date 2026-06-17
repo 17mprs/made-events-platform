@@ -113,7 +113,10 @@ var PERMISSION_MATRIX = {
 
   // NEWSLETTER
   'newsletter.preview':      { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
-  'newsletter.setFrequency': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
+  'newsletter.setFrequency': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // CANDIDATURE ADMIN
+  'application.listAll': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
 };
 
 // ---------------------------------------------------------------------------

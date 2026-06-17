@@ -151,7 +151,7 @@ function softDelete(sheetName, id, userId) {
   return result !== null;
 }
 
-function queryRows(sheetName, filters) {
+function queryRows(sheetName, filters, includeDeleted) {
   var sheet = getSheet(sheetName);
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
@@ -161,7 +161,7 @@ function queryRows(sheetName, filters) {
   var results = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (deletedIdx !== -1 && String(data[i][deletedIdx]).toLowerCase() === 'true') {
+    if (!includeDeleted && deletedIdx !== -1 && String(data[i][deletedIdx]).toLowerCase() === 'true') {
       continue;
     }
     var match = true;

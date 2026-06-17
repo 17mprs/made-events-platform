@@ -487,6 +487,74 @@ function handleApplicationList(payload, auth) {
   return successResponse(result);
 }
 
+function handleApplicationListAll(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+
+  var tenantId = String(auth.tenant_id);
+  var all = getAllRows('Entities');
+
+  // Build event snapshot map (INCLUDING soft-deleted events)
+  var evMap = {};
+  var tpMap = {};
+  all.forEach(function(row) {
+    if (String(row.tenant_id) !== tenantId) return;
+    var d = parseJSON(row.data);
+    if (row.type === 'EVENT') {
+      evMap[row.entity_id] = {
+        titolo:      d.titolo      || '',
+        data_inizio: d.data_inizio || '',
+        data_fine:   d.data_fine   || '',
+        luogo:       d.luogo       || '',
+        citta:       d.citta       || '',
+        status:      row.status    || '',
+        deleted:     String(row.deleted).toLowerCase() === 'true',
+        deleted_at:  row.deleted_at || '',
+      };
+    }
+    if (row.type === 'TALENT_PROFILE') {
+      tpMap[row.entity_id] = {
+        nome:           d.nome           || '',
+        cognome:        d.cognome        || '',
+        foto_busto_url: d.foto_busto_url || '',
+        score:          d.score != null  ? Number(d.score) : null,
+        ranking:        d.ranking        || '',
+        citta:          d.citta          || '',
+      };
+    }
+  });
+
+  // All non-deleted applications for this tenant
+  var appRows = all.filter(function(row) {
+    if (row.type !== 'APPLICATION') return false;
+    if (String(row.tenant_id) !== tenantId) return false;
+    if (String(row.deleted).toLowerCase() === 'true') return false;
+    return true;
+  });
+
+  var items = appRows.map(function(row) {
+    var pub = entityToPublic(row);
+    var d   = pub.data || {};
+    pub.event_snapshot   = evMap[d.event_id] || {
+      titolo: d.event_titolo || '(evento sconosciuto)',
+      data_inizio: '', data_fine: '', luogo: '', citta: '',
+      status: '', deleted: false, deleted_at: '',
+    };
+    pub.talent_snapshot  = tpMap[d.talent_profile_id] || {
+      nome: d.talent_name || '', cognome: '', foto_busto_url: '',
+      score: null, ranking: '', citta: '',
+    };
+    return pub;
+  });
+
+  items.sort(function(a, b) {
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+
+  return successResponse({ items: items, total: items.length });
+}
+
 function handleApplicationInvite(payload, auth) {
   var valid = requireFields(payload, ['talent_profile_id', 'event_id']);
   if (valid) return valid;

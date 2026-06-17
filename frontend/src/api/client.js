@@ -205,6 +205,7 @@ export const applicationApi = {
                     gasPost('application.reject',       { entity_id, nota_rifiuto }, t()),
   withdraw:       (entity_id)              => gasPost('application.withdraw',     { entity_id }, t()),
   list:           (payload = {})           => gasPost('application.list',         payload, t()),
+  listAll:        ()                       => gasPost('application.listAll',      {},       t()),
   updateStatus:   (entity_id, new_status)  => gasPost('application.updateStatus', { entity_id, new_status }, t()),
   markEventCompleted: (application_id)     => gasPost('application.markEventCompleted', { application_id }, t()),
 }

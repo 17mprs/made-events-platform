@@ -161,6 +161,7 @@ function handleRequest(action, payload, token) {
     case 'application.list':               return handleApplicationList(payload, auth);
     case 'application.updateStatus':       return handleApplicationUpdateStatus(payload, auth);
     case 'application.markEventCompleted': return handleMarkEventCompleted(payload, auth);
+    case 'application.listAll':           return handleApplicationListAll(payload, auth);
 
     // ASSIGNMENT
     case 'assignment.list':          return handleAssignmentList(payload, auth);
