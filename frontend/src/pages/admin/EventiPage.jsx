@@ -274,7 +274,29 @@ function EventStatusToggle({ event, onChangeStatus, onRequestDelete, isChanging 
 // EVENT FORM DRAWER (Nuovo / Duplica / Modifica)
 // ---------------------------------------------------------------------------
 
-function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApiResponse }) {
+function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApiResponse, onClientCreated }) {
+  const BLANK_CLIENT = { ragione_sociale:'', partita_iva:'', referente_nome:'', referente_cognome:'', email:'', telefono:'', citta:'' }
+  const [showNewClient,  setShowNewClient]  = useState(false)
+  const [clientForm,     setClientForm]     = useState(BLANK_CLIENT)
+  const [clientSaving,   setClientSaving]   = useState(false)
+  const [clientError,    setClientError]    = useState(null)
+
+  const setC = key => e => setClientForm(p => ({ ...p, [key]: e.target.value }))
+
+  async function handleClientSave(e) {
+    e.preventDefault()
+    if (!clientForm.ragione_sociale.trim()) { setClientError('Ragione sociale obbligatoria'); return }
+    setClientSaving(true); setClientError(null)
+    const res = await clientApi.create(clientForm)
+    setClientSaving(false)
+    if (!res.success) { setClientError(res.error?.message || 'Errore creazione cliente'); return }
+    const newClient = res.data.client
+    onClientCreated?.(newClient)
+    setForm(p => ({ ...p, client_id: newClient.entity_id }))
+    setShowNewClient(false)
+    setClientForm(BLANK_CLIENT)
+  }
+
   const [form, setForm] = useState({
     titolo:             prefill?.titolo             ?? '',
     descrizione:        prefill?.descrizione        ?? '',
@@ -375,15 +397,74 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               )}
               <button
                 type="button"
-                onClick={() => window.open('/admin/clienti?action=new', '_blank')}
+                onClick={() => { setClientError(null); setShowNewClient(true) }}
                 style={{
                   background: 'none', border: 'none', color: COLORS.accent,
                   fontSize: 12, cursor: 'pointer', padding: '4px 0',
-                  marginTop: 4, textDecoration: 'underline',
+                  marginTop: 4, textDecoration: 'underline', fontFamily: 'Montserrat,sans-serif',
                 }}
               >
                 ⊕ Crea nuovo cliente
               </button>
+
+              {showNewClient && createPortal(
+                <>
+                  <div
+                    onClick={() => setShowNewClient(false)}
+                    style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:302 }}
+                  />
+                  <div style={{
+                    position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+                    zIndex:303, background:'#fff', borderRadius:8, padding:28, width:420, maxWidth:'92vw',
+                    fontFamily:'Montserrat,sans-serif', boxShadow:'0 8px 48px rgba(0,0,0,0.28)',
+                  }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+                      <h3 style={{ margin:0, fontSize:16, fontWeight:700, color:'#1A1A2E' }}>Nuovo cliente</h3>
+                      <button onClick={() => setShowNewClient(false)} style={{ background:'none', border:'none', fontSize:18, cursor:'pointer', color:'#666', lineHeight:1 }}>✕</button>
+                    </div>
+                    <form onSubmit={handleClientSave}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                        {[
+                          { label:'Ragione sociale *', key:'ragione_sociale', required:true },
+                          { label:'Partita IVA',       key:'partita_iva' },
+                          { label:'Referente nome',    key:'referente_nome' },
+                          { label:'Referente cognome', key:'referente_cognome' },
+                          { label:'Email',             key:'email',    type:'email' },
+                          { label:'Telefono',          key:'telefono' },
+                          { label:'Città',             key:'citta' },
+                        ].map(({ label, key, required, type }) => (
+                          <div key={key}>
+                            <label style={{ display:'block', fontSize:11, fontWeight:600, color:'#444', marginBottom:3, textTransform:'uppercase', letterSpacing:0.5 }}>{label}</label>
+                            <input
+                              type={type || 'text'}
+                              value={clientForm[key]}
+                              onChange={setC(key)}
+                              required={!!required}
+                              style={{
+                                width:'100%', padding:'8px 10px', border:'1px solid #ddd', borderRadius:4,
+                                fontSize:13, fontFamily:'Montserrat,sans-serif', boxSizing:'border-box',
+                                outline:'none',
+                              }}
+                            />
+                          </div>
+                        ))}
+                        {clientError && <p style={{ margin:0, fontSize:12, color:'#C62828' }}>{clientError}</p>}
+                        <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:4 }}>
+                          <button
+                            type="button" onClick={() => setShowNewClient(false)}
+                            style={{ padding:'8px 18px', border:'1px solid #ddd', borderRadius:4, background:'none', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}
+                          >Annulla</button>
+                          <button
+                            type="submit" disabled={clientSaving}
+                            style={{ padding:'8px 18px', border:'none', borderRadius:4, background: clientSaving ? '#ccc' : COLORS.accent, color:'#fff', fontSize:13, fontWeight:600, cursor: clientSaving ? 'default' : 'pointer', fontFamily:'Montserrat,sans-serif' }}
+                          >{clientSaving ? 'Salvataggio…' : 'Crea cliente'}</button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                </>,
+                document.body
+              )}
             </div>
 
             <CittaProvinciaSelect
@@ -1913,6 +1994,7 @@ export default function EventiPage() {
           prefill={formPrefill}
           isEdit={isEdit}
           handleApiResponse={handleApiResponse}
+          onClientCreated={c => setClients(prev => [...prev, c])}
         />
       )}
 
