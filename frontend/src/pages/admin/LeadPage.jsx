@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { leadApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, PAGE_SIZE, Pagination } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, Pagination } from './shared'
 
 // ---------------------------------------------------------------------------
 // SOLLECITI COUNTER BADGE
@@ -29,12 +29,13 @@ function SollecitiCounter({ data }) {
 // LEADS SECTION — exported for reuse in AdminDashboard overview
 // ---------------------------------------------------------------------------
 
-export function LeadsSection({ handleApiResponse }) {
+export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSelect = false }) {
   const [leads,      setLeads]      = useState([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
   const [search,     setSearch]     = useState('')
   const [page,       setPage]       = useState(1)
+  const [perPage,    setPerPage]    = useState(pageSize)
   const [rowLoading, setRowLoading] = useState({}) // { [entity_id]: 'solicit'|'reset'|null }
 
   const load = useCallback(async () => {
@@ -57,6 +58,7 @@ export function LeadsSection({ handleApiResponse }) {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setPage(1) }, [search])
+  useEffect(() => { setPage(1) }, [perPage])
 
   const filtered = useMemo(() => {
     if (!search.trim()) return leads
@@ -67,8 +69,8 @@ export function LeadsSection({ handleApiResponse }) {
     )
   }, [leads, search])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const paginated  = filtered.slice((page - 1) * perPage, page * perPage)
 
   function hasSolleciti(l) {
     return !!(l.data?.sollecito_1_inviato || l.data?.sollecito_2_inviato || l.data?.sollecito_finale_inviato)
@@ -115,6 +117,17 @@ export function LeadsSection({ handleApiResponse }) {
           onChange={e => setSearch(e.target.value)}
           style={{ ...FILTER_INPUT, minWidth: 180 }}
         />
+        {showPageSizeSelect && (
+          <select
+            value={perPage}
+            onChange={e => setPerPage(Number(e.target.value))}
+            style={{ ...FILTER_INPUT, width: 'auto' }}
+          >
+            {[5, 10, 20, 50].map(n => (
+              <option key={n} value={n}>{n} per pagina</option>
+            ))}
+          </select>
+        )}
         <span style={{ fontSize: 12, color: '#8888A0', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
           {filtered.length} bozze
         </span>
@@ -219,7 +232,7 @@ export default function LeadPage() {
         title="Lead Talent"
         subtitle="Candidature in bozza — step 1 non completato"
       />
-      <LeadsSection handleApiResponse={handleApiResponse} />
+      <LeadsSection handleApiResponse={handleApiResponse} showPageSizeSelect={true} />
     </Layout>
   )
 }

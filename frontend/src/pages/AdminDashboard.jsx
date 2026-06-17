@@ -124,7 +124,7 @@ export default function AdminDashboard() {
 
       {/* Lead Talent section */}
       <SectionTitle>Lead Talent</SectionTitle>
-      <LeadsSection handleApiResponse={handleApiResponse} />
+      <LeadsSection handleApiResponse={handleApiResponse} pageSize={5} />
 
       {/* Talent da approvare */}
       <SectionTitle>
