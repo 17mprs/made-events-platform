@@ -1,4 +1,4 @@
-// === CLIENT PORTAL — MADE EVENT Platform ===
+// === CLIENT PORTAL — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { eventApi, shiftApi, assignmentApi, getErrorMessage } from '../api/client'

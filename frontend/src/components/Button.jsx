@@ -1,4 +1,4 @@
-// === BUTTON — MADE EVENT Platform ===
+// === BUTTON — MADE EVENTS Platform ===
 import React, { useState } from 'react'
 import { COLORS, COMPONENT_STYLES, FONTS, LETTER_SPACING, RADIUS } from '../styles/theme'
 

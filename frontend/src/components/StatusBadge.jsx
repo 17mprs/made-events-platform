@@ -1,4 +1,4 @@
-// === STATUS BADGE — MADE EVENT Platform ===
+// === STATUS BADGE — MADE EVENTS Platform ===
 import React from 'react'
 import { COLORS } from '../styles/theme'
 

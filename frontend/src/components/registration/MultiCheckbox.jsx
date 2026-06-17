@@ -1,4 +1,4 @@
-// === MULTI CHECKBOX — MADE EVENT ===
+// === MULTI CHECKBOX — MADE EVENTS ===
 // Gruppo di checkbox per selezione multipla.
 // Props:
 //   options: [{value, label}] | string[]

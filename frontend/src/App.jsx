@@ -1,4 +1,4 @@
-// === APP.JSX — MADE EVENT Platform ===
+// === APP.JSX — MADE EVENTS Platform ===
 import React from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'

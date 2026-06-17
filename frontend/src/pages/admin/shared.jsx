@@ -1,4 +1,4 @@
-// === ADMIN SHARED — MADE EVENT Platform ===
+// === ADMIN SHARED — MADE EVENTS Platform ===
 import React, { useState } from 'react'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Button from '../../components/Button'
@@ -99,7 +99,7 @@ export function TalentAvatar({ nome, fotoUrl, size = 40 }) {
   return (
     <div style={{
       width:size, height:size, borderRadius:'50%',
-      background:'#7A1E2C', color:'#fff', flexShrink:0,
+      background:'#630E33', color:'#fff', flexShrink:0,
       display:'flex', alignItems:'center', justifyContent:'center',
       fontSize:Math.round(size * 0.38), fontWeight:700,
     }}>

@@ -1,4 +1,4 @@
-// === PROVINCE ITALIANE — MADE EVENT Platform ===
+// === PROVINCE ITALIANE — MADE EVENTS Platform ===
 // 107 province con sigla, nome completo e regione.
 // Usato nei cascading select di Sezione 1 (luogo nascita/residenza) e Sezione 3 (province lavoro).
 

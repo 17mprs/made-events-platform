@@ -1,4 +1,4 @@
-// === CARD — MADE EVENT Platform ===
+// === CARD — MADE EVENTS Platform ===
 import React, { useState } from 'react'
 import { COLORS, COMPONENT_STYLES } from '../styles/theme'
 

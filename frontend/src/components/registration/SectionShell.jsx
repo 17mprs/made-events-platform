@@ -1,4 +1,4 @@
-// === SECTION SHELL — MADE EVENT ===
+// === SECTION SHELL — MADE EVENTS ===
 // Wrapper condiviso per ogni sezione: titolo numerato + pulsanti Indietro/Salva.
 import React from 'react'
 import { COLORS, LETTER_SPACING } from '../../styles/theme'

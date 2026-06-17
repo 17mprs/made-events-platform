@@ -1,4 +1,4 @@
-// === API/CLIENT.JS — MADE EVENT Platform ===
+// === API/CLIENT.JS — MADE EVENTS Platform ===
 // Wrapper fetch verso il Google Apps Script endpoint.
 //
 // ISTRUZIONE: dopo aver pubblicato la Web App dal GAS Editor,

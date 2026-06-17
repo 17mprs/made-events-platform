@@ -1,4 +1,4 @@
-// === REGISTER USER (Talent) — MADE EVENT Platform ===
+// === REGISTER USER (Talent) — MADE EVENTS Platform ===
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { talentApi, leadApi, getErrorMessage } from '../api/client'

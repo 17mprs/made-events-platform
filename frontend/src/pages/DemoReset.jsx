@@ -1,4 +1,4 @@
-// === DEMO RESET — MADE EVENT Platform ===
+// === DEMO RESET — MADE EVENTS Platform ===
 // Pagina di reset dati demo. Solo in development.
 // Accessibile a /demo-reset (nessun auth richiesto in dev).
 
@@ -9,7 +9,7 @@ const COLORS = {
   bg:      '#0B0B0F',
   surface: '#1A1A24',
   border:  '#2A2A3A',
-  accent:  '#7A1E2C',
+  accent:  '#630E33',
   accentH: '#9B2535',
   text:    '#E8E8F0',
   muted:   '#8888A0',

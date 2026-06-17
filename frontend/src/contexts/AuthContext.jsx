@@ -1,4 +1,4 @@
-// === AUTH CONTEXT — MADE EVENT Platform ===
+// === AUTH CONTEXT — MADE EVENTS Platform ===
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authApi, getToken, setToken, removeToken, decodeToken, isAuthError } from '../api/client'
 

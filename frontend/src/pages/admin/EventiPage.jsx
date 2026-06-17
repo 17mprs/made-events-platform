@@ -670,10 +670,10 @@ export function ContractPreviewModal({ talent, event, onClose }) {
 
   const S = {
     page:     { fontFamily:'Montserrat,sans-serif', fontSize:'10pt', lineHeight:1.7, color:'#111', background:'#fff', padding:'40px 48px', maxWidth:794, width:'100%', boxSizing:'border-box' },
-    h1:       { fontSize:'14pt', fontWeight:700, color:'#7A1E2C', textAlign:'center', margin:'0 0 2px', letterSpacing:'0.5px' },
+    h1:       { fontSize:'14pt', fontWeight:700, color:'#630E33', textAlign:'center', margin:'0 0 2px', letterSpacing:'0.5px' },
     sub:      { fontSize:'8.5pt', color:'#888', textAlign:'center', margin:'0 0 20px' },
     divider:  { borderTop:'1px solid #ddd', margin:'18px 0' },
-    artTitle: { fontSize:'10pt', fontWeight:700, color:'#7A1E2C', margin:'18px 0 5px' },
+    artTitle: { fontSize:'10pt', fontWeight:700, color:'#630E33', margin:'18px 0 5px' },
     p:        { margin:'4px 0', fontSize:'10pt' },
     dataRow:  { display:'flex', gap:16, marginBottom:3 },
     dataLbl:  { fontSize:'9.5pt', color:'#555', minWidth:190, flexShrink:0 },
@@ -846,7 +846,7 @@ export function ContractPreviewModal({ talent, event, onClose }) {
     URL.revokeObjectURL(url)
   }
 
-  const btnPrimary   = { background:'#7A1E2C', color:'#fff', border:'none', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
+  const btnPrimary   = { background:'#630E33', color:'#fff', border:'none', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
   const btnSecondary = { background:'none', border:'1px solid rgba(255,255,255,0.3)', color:'#ccc', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
 
   return (
@@ -1269,7 +1269,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
               <button key={t.key} onClick={() => setTab(t.key)} style={{
                 padding:'10px 14px', fontSize:12, fontWeight:600,
                 background:'none', border:'none', cursor:'pointer',
-                borderBottom: tab === t.key ? '2px solid #7A1E2C' : '2px solid transparent',
+                borderBottom: tab === t.key ? '2px solid #630E33' : '2px solid transparent',
                 color: tab === t.key ? '#E8B4BC' : MUTED,
                 fontFamily:'Montserrat,sans-serif', marginBottom:-1,
               }}>
@@ -1295,7 +1295,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                     <button
                       onClick={() => actionLoading !== t.entity_id && handleInvite(t.entity_id)}
                       disabled={actionLoading === t.entity_id}
-                      style={{ ...BTN('#7A1E2C'), color:'#E8B4BC', opacity: actionLoading === t.entity_id ? 0.5 : 1 }}
+                      style={{ ...BTN('#630E33'), color:'#E8B4BC', opacity: actionLoading === t.entity_id ? 0.5 : 1 }}
                     >
                       {actionLoading === t.entity_id ? '…' : 'Invita'}
                     </button>
@@ -1416,7 +1416,7 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
       {/* MAGAZINE HEADER — photo + bordeaux gradient overlay + white text */}
       <div style={{
         height:220, position:'relative', flexShrink:0, overflow:'hidden',
-        background:`linear-gradient(135deg, #4A1020 0%, #7A1E2C 100%)`,
+        background:`linear-gradient(135deg, #4A1020 0%, #630E33 100%)`,
       }}>
         {coverUrl && (
           <img

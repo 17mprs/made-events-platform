@@ -1,4 +1,4 @@
-// === LAYOUT — MADE EVENT Platform ===
+// === LAYOUT — MADE EVENTS Platform ===
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { COLORS, COMPONENT_STYLES, LAYOUT, LETTER_SPACING, FONTS } from '../styles/theme'

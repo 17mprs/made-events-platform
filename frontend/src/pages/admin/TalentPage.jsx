@@ -1412,14 +1412,14 @@ export function TalentsSection({ handleApiResponse }) {
   if (error)   return <div className="error-banner">{error}</div>
 
   const BTN = {
-    background:'none', border:'1px solid #7A1E2C', color:'#7A1E2C',
+    background:'none', border:'1px solid #630E33', color:'#630E33',
     borderRadius:6, padding:'4px 10px', fontSize:11, cursor:'pointer',
     fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap',
     transition:'background 0.15s, color 0.15s',
   }
   const hover = (e, on) => {
-    e.currentTarget.style.background = on ? '#7A1E2C' : 'none'
-    e.currentTarget.style.color      = on ? '#fff'    : '#7A1E2C'
+    e.currentTarget.style.background = on ? '#630E33' : 'none'
+    e.currentTarget.style.color      = on ? '#fff'    : '#630E33'
   }
 
   const renderRow = (l) => {
@@ -1652,7 +1652,7 @@ export function PendingApprovalSection({ handleApiResponse }) {
                 <td>
                   <button
                     onClick={() => setSelectedReview(l)}
-                    style={{ background: 'none', border: '1px solid #7A1E2C', color: '#7A1E2C', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
+                    style={{ background: 'none', border: '1px solid #630E33', color: '#630E33', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', whiteSpace: 'nowrap' }}
                   >
                     Revisiona →
                   </button>

@@ -1,4 +1,4 @@
-// === USER PORTAL — MADE EVENT Platform ===
+// === USER PORTAL — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -158,7 +158,7 @@ function AvailableEvents({ handleApiResponse }) {
                   style={{ width:'100%', height:'160px', objectFit:'cover', display:'block' }}
                 />
               ) : (
-                <div style={{ width:'100%', height:'120px', background:'#7A1E2C', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <div style={{ width:'100%', height:'120px', background:'#630E33', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <span style={{ color:'#fff', fontSize:'13px', fontWeight:500, letterSpacing:'0.05em' }}>MADE EVENTS</span>
                 </div>
               )}
@@ -201,7 +201,7 @@ function AvailableEvents({ handleApiResponse }) {
                       disabled={applying === ev.entity_id}
                       style={{
                         flex:1, padding:'7px 12px', fontSize:'12px', fontWeight:500,
-                        background:'#7A1E2C', color:'#fff', border:'none', borderRadius:'4px',
+                        background:'#630E33', color:'#fff', border:'none', borderRadius:'4px',
                         cursor: applying === ev.entity_id ? 'wait' : 'pointer',
                         fontFamily:'Montserrat,sans-serif',
                       }}
@@ -523,7 +523,7 @@ function PhotoExpiryBadge({ fotoDate }) {
 }
 
 const DASHED_INPUT = {
-  border: '1.5px dashed #7A1E2C44',
+  border: '1.5px dashed #630E3344',
   borderRadius: '4px',
   padding: '7px 10px',
   fontSize: '13px',
@@ -766,7 +766,7 @@ function MyProfile({ handleApiResponse }) {
           {d.foto_busto_url ? (
             <img src={d.foto_busto_url} alt={d.nome} style={{ width:64, height:64, borderRadius:'50%', objectFit:'cover', border:`2px solid ${COLORS.border}` }} />
           ) : (
-            <div style={{ width:64, height:64, borderRadius:'50%', background:'#7A1E2C', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, color:'#fff', fontWeight:700 }}>
+            <div style={{ width:64, height:64, borderRadius:'50%', background:'#630E33', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, color:'#fff', fontWeight:700 }}>
               {(d.nome?.[0] ?? '?').toUpperCase()}
             </div>
           )}

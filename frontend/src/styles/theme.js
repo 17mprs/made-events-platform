@@ -1,11 +1,11 @@
-// === THEME.JS — MADE EVENT Platform Design System ===
+// === THEME.JS — MADE EVENTS Platform Design System ===
 // Fonte unica di verità per tutti i token di design.
 // Usato come riferimento da tutti i componenti (inline styles).
 
 export const COLORS = {
   text:           '#2E2E2E',
   textSecondary:  '#6B6B6B',
-  accent:         '#7A1E2C',
+  accent:         '#630E33',
   accentHover:    '#8F2536',
   accentLight:    '#F5E8EA',   // bordeaux al 10% — usato per sfondi highlight
   bg:             '#FFFFFF',

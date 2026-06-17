@@ -1,4 +1,4 @@
-// === FILE UPLOAD — MADE EVENT ===
+// === FILE UPLOAD — MADE EVENTS ===
 // Componente upload file singolo con:
 //   - validazione tipo MIME e dimensione
 //   - lettura come base64 per invio a GAS

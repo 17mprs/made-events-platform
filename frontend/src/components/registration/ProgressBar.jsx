@@ -1,4 +1,4 @@
-// === REGISTRATION PROGRESS BAR — MADE EVENT ===
+// === REGISTRATION PROGRESS BAR — MADE EVENTS ===
 import React from 'react'
 import { COLORS } from '../../styles/theme'
 

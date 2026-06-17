@@ -1,4 +1,4 @@
-// === REGISTER COMPLETE — MADE EVENT Platform ===
+// === REGISTER COMPLETE — MADE EVENTS Platform ===
 // Landing raggiunta via link email con ?token=UUID.
 // Orchestratore dell'onboarding completo in 8 sezioni.
 // Ogni sezione salva automaticamente i dati su GAS al click "Salva e continua".

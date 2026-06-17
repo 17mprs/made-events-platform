@@ -176,10 +176,10 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
                           <button
                             disabled={!!busy}
                             onClick={() => handleSolicit(l.entity_id)}
-                            onMouseEnter={e => { if (!busy) { e.currentTarget.style.background = '#7A1E2C'; e.currentTarget.style.color = '#fff' } }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#7A1E2C' }}
+                            onMouseEnter={e => { if (!busy) { e.currentTarget.style.background = '#630E33'; e.currentTarget.style.color = '#fff' } }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#630E33' }}
                             style={{
-                              background: 'none', border: '1px solid #7A1E2C', color: '#7A1E2C',
+                              background: 'none', border: '1px solid #630E33', color: '#630E33',
                               borderRadius: 6, padding: '4px 12px', fontSize: 11,
                               cursor: busy ? 'wait' : 'pointer', fontFamily: 'Montserrat,sans-serif',
                               whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s',

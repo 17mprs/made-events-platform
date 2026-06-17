@@ -1,4 +1,4 @@
-// === REGISTER AZIENDA — MADE EVENT Platform ===
+// === REGISTER AZIENDA — MADE EVENTS Platform ===
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { clientApi, getErrorMessage } from '../api/client'
