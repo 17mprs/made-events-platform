@@ -192,28 +192,35 @@ export function Sidebar({ items, open }) {
             )
           }
 
-          const active = item.exact
+          const isHash  = item.to && item.to.includes('#')
+          const active  = item.exact
             ? location.pathname === item.to
-            : location.pathname.startsWith(item.to)
+            : !isHash && location.pathname.startsWith(item.to)
+
+          const linkStyle = {
+            display:       'block',
+            padding:       '10px 24px',
+            fontSize:      '13px',
+            fontWeight:    500,
+            letterSpacing: '0.8px',
+            textTransform: 'uppercase',
+            color:         active ? COLORS.accent : COLORS.text,
+            background:    active ? COLORS.accentLight : 'transparent',
+            borderLeft:    active ? `3px solid ${COLORS.accent}` : '3px solid transparent',
+            textDecoration:'none',
+            transition:    'background 0.2s',
+          }
+
+          if (isHash) {
+            return (
+              <a key={i} href={item.to} style={linkStyle}>
+                {item.label}
+              </a>
+            )
+          }
 
           return (
-            <Link
-              key={i}
-              to={item.to}
-              style={{
-                display:       'block',
-                padding:       '10px 24px',
-                fontSize:      '13px',
-                fontWeight:    500,
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                color:         active ? COLORS.accent : COLORS.text,
-                background:    active ? COLORS.accentLight : 'transparent',
-                borderLeft:    active ? `3px solid ${COLORS.accent}` : '3px solid transparent',
-                textDecoration:'none',
-                transition:    'background 0.2s',
-              }}
-            >
+            <Link key={i} to={item.to} style={linkStyle}>
               {item.label}
             </Link>
           )

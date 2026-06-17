@@ -308,6 +308,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     client_id:          prefill?.client_id          ?? '',
     foto_url:           prefill?.foto_url           ?? '',
     hostess_richieste:  prefill?.hostess_richieste  ?? '',
+    compenso:           prefill?.compenso           ?? '',
     steward_richiesti:  prefill?.steward_richiesti  ?? 0,
     anni_esperienza_minimi: prefill?.anni_esperienza_minimi ?? '',
     richiede_trasferte: prefill?.richiede_trasferte ?? false,
@@ -481,6 +482,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               <Input label="Hostess richieste" type="number" min="1" value={form.hostess_richieste} onChange={set('hostess_richieste')} placeholder="es. 10" />
               <Input label="Min. anni esperienza" type="number" min="0" value={form.anni_esperienza_minimi} onChange={set('anni_esperienza_minimi')} placeholder="es. 2" />
             </div>
+            <Input label="Compenso (€)" value={form.compenso} onChange={set('compenso')} placeholder="es. €42,00 netti" />
 
             <label style={{
               display: 'flex', alignItems: 'center', gap: 8, marginTop: 4,
@@ -1459,6 +1461,13 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
 
       {/* Body */}
       <div style={{ padding:'12px 16px 10px', flex:1, display:'flex', flexDirection:'column', gap:4, background:'#fff' }}>
+
+        {/* Compenso */}
+        {d.compenso && (
+          <div style={{ fontSize:11, color:COLORS.textSecondary, marginTop:4 }}>
+            💶 <span style={{ fontWeight:600, color:COLORS.text }}>{d.compenso}</span>
+          </div>
+        )}
 
         {/* Hostess richieste inline input */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>

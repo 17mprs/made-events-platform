@@ -15,6 +15,57 @@ const EMPTY_FORM = {
   indirizzo:'', citta:'',
 }
 
+function DeleteClientModal({ client, onConfirm, onClose, loading }) {
+  const [code, setCode] = useState('')
+  const isValid = code === '12345'
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300 }} />
+      <div style={{
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        background:'#fff', borderRadius:8, padding:32, width:420, maxWidth:'92vw',
+        zIndex:301, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', fontFamily:'Montserrat,sans-serif',
+      }}>
+        <h3 style={{ margin:'0 0 8px', fontSize:16, fontWeight:700, color:'#C62828' }}>Elimina cliente</h3>
+        <p style={{ margin:'0 0 16px', fontSize:13, color:COLORS.textSecondary }}>
+          Stai per eliminare <strong>"{client.data?.ragione_sociale}"</strong>. Il cliente sparirà dalla lista. Questa azione non è reversibile dall'interfaccia.
+        </p>
+        <div style={{ marginBottom:20 }}>
+          <label style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:COLORS.textSecondary, display:'block', marginBottom:4 }}>
+            Per confermare digita il codice
+          </label>
+          <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:8 }}>
+            Codice: <strong style={{ fontFamily:'monospace', fontSize:14 }}>12345</strong>
+          </div>
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            placeholder="12345"
+            autoFocus
+            style={{
+              border:`1.5px solid ${isValid ? '#4CAF50' : COLORS.border}`,
+              borderRadius:4, padding:'9px 12px', fontSize:15,
+              fontFamily:'Montserrat,sans-serif', width:'100%',
+              boxSizing:'border-box', outline:'none', transition:'border-color 0.2s',
+            }}
+          />
+        </div>
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{ background:'none', border:'1px solid #e0e0e0', borderRadius:6, padding:'9px 20px', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif', color:'#333' }}
+          >
+            Annulla operazione
+          </button>
+          <Button variant="danger" disabled={!isValid} loading={loading} onClick={() => onConfirm(client.entity_id)}>
+            Elimina cliente
+          </Button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function ClientFormDrawer({ onClose, onSaved, prefill, handleApiResponse }) {
   const isEdit = !!prefill?.entity_id
   const [form, setForm] = useState(isEdit ? { ...EMPTY_FORM, ...prefill.data } : { ...EMPTY_FORM })
@@ -100,8 +151,10 @@ export default function ClientiPage() {
   const [events,   setEvents]   = useState([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [editing,  setEditing]  = useState(null)
+  const [showForm,     setShowForm]     = useState(false)
+  const [editing,      setEditing]      = useState(null)
+  const [deleteModal,  setDeleteModal]  = useState(null)
+  const [deleting,     setDeleting]     = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -130,6 +183,15 @@ export default function ClientiPage() {
 
   const handleClose = () => { setShowForm(false); setEditing(null) }
   const handleSaved = () => { handleClose(); load() }
+
+  const handleConfirmDelete = async (entity_id) => {
+    setDeleting(true)
+    const res = handleApiResponse(await clientApi.softDelete(entity_id))
+    setDeleting(false)
+    if (!res.success) { alert(getErrorMessage(res.error)); return }
+    setDeleteModal(null)
+    load()
+  }
 
   return (
     <Layout sidebarItems={ADMIN_SIDEBAR}>
@@ -166,6 +228,7 @@ export default function ClientiPage() {
                   client={c}
                   events={events}
                   onEdit={() => { setEditing(c); setShowForm(true) }}
+                  onDelete={() => setDeleteModal(c)}
                 />
               ))}
             </tbody>
@@ -181,6 +244,15 @@ export default function ClientiPage() {
           handleApiResponse={handleApiResponse}
         />
       )}
+
+      {deleteModal && (
+        <DeleteClientModal
+          client={deleteModal}
+          onConfirm={handleConfirmDelete}
+          onClose={() => setDeleteModal(null)}
+          loading={deleting}
+        />
+      )}
     </Layout>
   )
 }
@@ -189,7 +261,7 @@ export default function ClientiPage() {
 // CLIENT ROW WITH ACCORDION
 // ---------------------------------------------------------------------------
 
-function ClientRowAccordion({ client, events, onEdit }) {
+function ClientRowAccordion({ client, events, onEdit, onDelete }) {
   const [open, setOpen] = useState(false)
   const clientEvents = events.filter(e => String(e.data?.client_id) === String(client.entity_id))
 
@@ -226,6 +298,19 @@ function ClientRowAccordion({ client, events, onEdit }) {
             }}
           >
             Modifica
+          </button>
+          <button
+            onClick={onDelete}
+            onMouseEnter={e => { e.currentTarget.style.background='#C62828'; e.currentTarget.style.color='#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='#C62828' }}
+            style={{
+              background:'none', border:'1px solid #C62828', color:'#C62828',
+              borderRadius:6, padding:'4px 12px', fontSize:11, marginLeft:6,
+              cursor:'pointer', fontFamily:'Montserrat,sans-serif',
+              transition:'background 0.15s, color 0.15s',
+            }}
+          >
+            Elimina
           </button>
         </td>
       </tr>

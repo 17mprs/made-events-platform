@@ -35,6 +35,7 @@ var PERMISSION_MATRIX = {
   'client.list':          { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'client.get':           { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'O' },
   'client.update':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'client.softDelete':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // EVENT
   'event.create':         { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },

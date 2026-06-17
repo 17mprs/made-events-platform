@@ -206,6 +206,25 @@ function handleClientUpdate(payload, auth) {
   return successResponse({ client: entityToPublic(updated) });
 }
 
+function handleClientSoftDelete(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato: solo gli admin possono eliminare entity');
+  }
+
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity || entity.type !== 'CLIENT') {
+    return errorResponse('SYS_002', 'Cliente non trovato');
+  }
+
+  var ok = softDeleteEntity(payload.entity_id, auth.tenant_id, auth.user_id);
+  if (!ok) return errorResponse('SYS_001', 'Impossibile eliminare il cliente');
+
+  return successResponse({ entity_id: payload.entity_id });
+}
+
 // ---------------------------------------------------------------------------
 // EVENT handlers
 // ---------------------------------------------------------------------------
@@ -243,6 +262,7 @@ function handleEventCreate(payload, auth) {
     ruoli_richiesti:           payload.ruoli_richiesti           || [],
     automunita:                payload.automunita                || '',
     priorita_lavorato_con_noi: !!payload.priorita_lavorato_con_noi,
+    compenso:                  payload.compenso                  || '',
     note_admin:                payload.note_admin                || ''
   }, auth.tenant_id, auth.user_id);
 
@@ -356,7 +376,8 @@ function handleEventUpdate(payload, auth) {
     'data_inizio', 'data_fine', 'hostess_richieste', 'steward_richiesti', 'selezioni_chiuse', 'note_admin',
     'anni_esperienza_minimi', 'richiede_trasferte', 'richiede_weekend',
     'sesso_richiesto', 'altezza_minima', 'taglia_richiesta',
-    'lingue_richieste', 'ruoli_richiesti', 'automunita', 'priorita_lavorato_con_noi'
+    'lingue_richieste', 'ruoli_richiesti', 'automunita', 'priorita_lavorato_con_noi',
+    'compenso'
   ];
   var updates = {};
   for (var i = 0; i < allowedFields.length; i++) {

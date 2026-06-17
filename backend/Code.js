@@ -131,10 +131,11 @@ function handleRequest(action, payload, token) {
     case 'talent.updateEventiPreCRM': return handleUpdateEventiPreCRM(payload, auth);
 
     // CLIENT
-    case 'client.create': return handleClientCreate(payload, auth);
-    case 'client.list':   return handleClientList(payload, auth);
-    case 'client.get':    return handleClientGet(payload, auth);
-    case 'client.update': return handleClientUpdate(payload, auth);
+    case 'client.create':     return handleClientCreate(payload, auth);
+    case 'client.list':       return handleClientList(payload, auth);
+    case 'client.get':        return handleClientGet(payload, auth);
+    case 'client.update':     return handleClientUpdate(payload, auth);
+    case 'client.softDelete': return handleClientSoftDelete(payload, auth);
 
     // EVENT
     case 'event.create':       return handleEventCreate(payload, auth);

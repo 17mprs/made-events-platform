@@ -167,10 +167,11 @@ export const leadApi = {
 }
 
 export const clientApi = {
-  create: (payload)   => gasPost('client.create', payload, t()),
-  list:   (payload={})=> gasPost('client.list',   payload, t()),
-  get:    (entity_id) => gasPost('client.get',    { entity_id }, t()),
-  update: (payload)   => gasPost('client.update', payload, t()),
+  create:     (payload)   => gasPost('client.create',     payload,       t()),
+  list:       (payload={})=> gasPost('client.list',       payload,       t()),
+  get:        (entity_id) => gasPost('client.get',        { entity_id }, t()),
+  update:     (payload)   => gasPost('client.update',     payload,       t()),
+  softDelete: (entity_id) => gasPost('client.softDelete', { entity_id }, t()),
 }
 
 export const eventApi = {
