@@ -230,7 +230,7 @@ function handleEventCreate(payload, auth) {
     citta:                     payload.citta                     || '',
     provincia:                 payload.provincia                 || '',
     foto_url:                  payload.foto_url                  || '',
-    foto_copertina_url:        payload.foto_url                  || '',
+    foto_copertina_url:        payload.foto_copertina_url        || payload.foto_url || '',
     hostess_richieste:         payload.hostess_richieste         || 0,
     steward_richiesti:         payload.steward_richiesti         || 0,
     anni_esperienza_minimi:    payload.anni_esperienza_minimi    || 0,
