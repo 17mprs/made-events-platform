@@ -258,7 +258,7 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
       )}
 
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500 }} />
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500 }} />
 
       {/* Drawer */}
       <div style={{
@@ -504,7 +504,7 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
 
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:500 }} />
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:500 }} />
       <div style={{
         position:'fixed', right:0, top:0, bottom:0, width:520, maxWidth:'96vw',
         background:'#fff', borderLeft:`1px solid ${COLORS.border}`,
@@ -951,7 +951,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
       )}
 
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:400 }} />
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:400 }} />
 
       {/* Drawer */}
       <div style={{ position:'fixed', right:0, top:0, bottom:0, width:680, maxWidth:'96vw', background:'#fff', borderLeft:`1px solid ${COLORS.border}`, zIndex:401, display:'flex', flexDirection:'column', fontFamily:'Montserrat,sans-serif' }}>

@@ -358,7 +358,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
 
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:300 }} />
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:300 }} />
       <div style={{
         position:'fixed', right:0, top:0, bottom:0, width:500, maxWidth:'96vw',
         background:'#fff', borderLeft:`1px solid ${COLORS.border}`,
@@ -410,7 +410,6 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               {showNewClient && createPortal(
                 <>
                   <div
-                    onClick={() => setShowNewClient(false)}
                     style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:302 }}
                   />
                   <div style={{

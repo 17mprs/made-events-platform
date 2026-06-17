@@ -161,7 +161,7 @@ export function LeadDrawer({ lead, nota, onNotaChange, onClose, onAction, action
 
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:200 }} />
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:200 }} />
       <div style={{
         position:'fixed', right:0, top:0, bottom:0, width:440, maxWidth:'95vw',
         background:'#0E0E16', borderLeft:'1px solid #2A2A3A',

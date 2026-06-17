@@ -34,7 +34,7 @@ function ClientFormDrawer({ onClose, onSaved, prefill, handleApiResponse }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:300 }} />
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', zIndex:300 }} />
       <div style={{
         position:'fixed', right:0, top:0, bottom:0, width:480, maxWidth:'95vw',
         background:'#fff', borderLeft:'1px solid #eaeaea',
