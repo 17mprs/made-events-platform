@@ -3,7 +3,7 @@ import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, Align
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { clientApi, eventApi, talentApi, applicationApi, contractApi, newsletterApi, getErrorMessage } from '../../api/client'
+import { clientApi, eventApi, talentApi, applicationApi, contractApi, shiftApi, newsletterApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
@@ -1061,6 +1061,198 @@ function computeMatchPct(ed, td) {
 }
 
 // ---------------------------------------------------------------------------
+// SHIFT SECTION — turni multipli per evento
+// ---------------------------------------------------------------------------
+
+function ShiftSection({ eventId, handleApiResponse }) {
+  const BG = '#0E0E16'; const BD = '#2A2A3A'; const TEXT = '#E8E8F0'; const MUTED = '#8888A0'
+
+  const [open,          setOpen]          = useState(false)
+  const [shifts,        setShifts]        = useState([])
+  const [loadingShifts, setLoadingShifts] = useState(false)
+  const [showAddForm,   setShowAddForm]   = useState(false)
+  const [addForm,       setAddForm]       = useState({
+    data:'', orario_inizio:'', orario_fine:'',
+    posti_disponibili:'1', ruolo:'Hostess', dress_code:'', note_operational:'',
+  })
+  const [saving,     setSaving]     = useState(false)
+  const [cancelling, setCancelling] = useState(null)
+
+  const loadShifts = useCallback(async () => {
+    setLoadingShifts(true)
+    const res = handleApiResponse(await shiftApi.list({ event_id: eventId }))
+    setLoadingShifts(false)
+    if (res.success) setShifts(res.data?.items ?? [])
+  }, [eventId, handleApiResponse])
+
+  useEffect(() => { loadShifts() }, [loadShifts])
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    const res = handleApiResponse(await shiftApi.create({
+      event_id:          eventId,
+      data:              addForm.data,
+      orario_inizio:     addForm.orario_inizio,
+      orario_fine:       addForm.orario_fine,
+      posti_disponibili: Number(addForm.posti_disponibili) || 1,
+      ruolo:             addForm.ruolo,
+      dress_code:        addForm.dress_code,
+      note_operational:  addForm.note_operational,
+    }))
+    setSaving(false)
+    if (res.success) {
+      setShowAddForm(false)
+      setAddForm({ data:'', orario_inizio:'', orario_fine:'', posti_disponibili:'1', ruolo:'Hostess', dress_code:'', note_operational:'' })
+      loadShifts()
+    } else {
+      alert(getErrorMessage(res.error))
+    }
+  }
+
+  const handleCancelShift = async (shiftId) => {
+    if (!window.confirm('Annullare questo turno?')) return
+    setCancelling(shiftId)
+    handleApiResponse(await shiftApi.updateStatus(shiftId, 'CANCELLED'))
+    setCancelling(null)
+    loadShifts()
+  }
+
+  const statusBadge = (status) => {
+    const MAP = {
+      OPEN:      { label:'Aperto',    bg:'#166534', color:'#86EFAC' },
+      FULL:      { label:'Completo',  bg:'#92400E', color:'#FCD34D' },
+      CLOSED:    { label:'Chiuso',    bg:'#374151', color:'#9CA3AF' },
+      CANCELLED: { label:'Annullato', bg:'#7F1D1D', color:'#FCA5A5' },
+    }
+    const s = MAP[status] || { label: status, bg:'#1A1A24', color:MUTED }
+    return (
+      <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:8, background:s.bg, color:s.color, letterSpacing:'0.5px', textTransform:'uppercase' }}>
+        {s.label}
+      </span>
+    )
+  }
+
+  const fmtShiftDate = (iso) => {
+    if (!iso) return '—'
+    try { return new Date(iso).toLocaleDateString('it-IT', { day:'2-digit', month:'short', year:'numeric' }) }
+    catch { return iso }
+  }
+
+  const inp = { background:'#111118', border:`1px solid ${BD}`, color:TEXT, borderRadius:5, padding:'7px 10px', fontSize:12, fontFamily:'Montserrat,sans-serif', outline:'none', width:'100%', boxSizing:'border-box' }
+  const setF = key => e => setAddForm(p => ({ ...p, [key]: e.target.value }))
+
+  return (
+    <div style={{ borderTop:`1px solid ${BD}`, borderBottom:`1px solid ${BD}`, marginTop:10, marginBottom:4 }}>
+      {/* Toggle header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ width:'100%', background:'none', border:'none', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', fontFamily:'Montserrat,sans-serif' }}
+      >
+        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', textTransform:'uppercase', color:MUTED }}>
+          📅 Turni {loadingShifts ? '…' : `(${shifts.length})`}
+        </span>
+        <span style={{ fontSize:10, color:MUTED }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div style={{ paddingBottom:12 }}>
+          {/* Lista turni */}
+          {shifts.length === 0 && !loadingShifts ? (
+            <div style={{ fontSize:12, color:MUTED, fontStyle:'italic', marginBottom:10 }}>Nessun turno. Aggiungine uno.</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
+              {shifts.map(s => {
+                const sd = s.data ?? {}
+                return (
+                  <div key={s.entity_id} style={{ background:'#1A1A24', borderRadius:7, padding:'9px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:TEXT }}>
+                        {fmtShiftDate(sd.data)}&nbsp;·&nbsp;{sd.orario_inizio || '—'} → {sd.orario_fine || '—'}
+                      </div>
+                      <div style={{ fontSize:11, color:MUTED, marginTop:2 }}>
+                        {sd.ruolo || '—'}&nbsp;·&nbsp;{sd.posti_confermati ?? 0}/{sd.posti_disponibili ?? 0} posti
+                        {sd.dress_code && <span>&nbsp;·&nbsp;{sd.dress_code}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+                      {statusBadge(s.status)}
+                      {s.status === 'OPEN' && (
+                        <button
+                          onClick={() => handleCancelShift(s.entity_id)}
+                          disabled={cancelling === s.entity_id}
+                          style={{ background:'none', border:'1px solid #7F1D1D', color:'#FCA5A5', borderRadius:5, padding:'3px 8px', fontSize:10, cursor:'pointer', fontFamily:'Montserrat,sans-serif', opacity: cancelling === s.entity_id ? 0.5 : 1 }}
+                        >
+                          {cancelling === s.entity_id ? '…' : '✕ Annulla'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Add form toggle */}
+          {!showAddForm ? (
+            <button
+              onClick={() => setShowAddForm(true)}
+              style={{ fontSize:11, fontWeight:600, color:'#630E33', background:'none', border:'1px dashed #630E33', borderRadius:6, padding:'6px 14px', cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}
+            >
+              + Aggiungi turno
+            </button>
+          ) : (
+            <form onSubmit={handleCreate} style={{ background:'#1A1A24', borderRadius:8, padding:'12px 14px', display:'flex', flexDirection:'column', gap:8, marginTop:6 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                <div>
+                  <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Data *</div>
+                  <input type="date" required value={addForm.data} onChange={setF('data')} style={inp} />
+                </div>
+                <div>
+                  <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Ora inizio *</div>
+                  <input type="time" required value={addForm.orario_inizio} onChange={setF('orario_inizio')} style={inp} />
+                </div>
+                <div>
+                  <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Ora fine *</div>
+                  <input type="time" required value={addForm.orario_fine} onChange={setF('orario_fine')} style={inp} />
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div>
+                  <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Posti *</div>
+                  <input type="number" min="1" required value={addForm.posti_disponibili} onChange={setF('posti_disponibili')} style={inp} />
+                </div>
+                <div>
+                  <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Ruolo *</div>
+                  <select value={addForm.ruolo} onChange={setF('ruolo')} style={inp}>
+                    {['Hostess','Steward','Modella','Promoter'].map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Dress code</div>
+                <input value={addForm.dress_code} onChange={setF('dress_code')} placeholder="es. Abito nero elegante" style={inp} />
+              </div>
+              <div>
+                <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Note operative</div>
+                <input value={addForm.note_operational} onChange={setF('note_operational')} placeholder="Istruzioni per il turno" style={inp} />
+              </div>
+              <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:4 }}>
+                <button type="button" onClick={() => setShowAddForm(false)} style={{ background:'none', border:`1px solid ${BD}`, color:MUTED, borderRadius:6, padding:'7px 14px', fontSize:11, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                  Annulla
+                </button>
+                <button type="submit" disabled={saving} style={{ background: saving ? '#333' : '#630E33', color:'#fff', border:'none', borderRadius:6, padding:'7px 16px', fontSize:11, fontWeight:700, cursor: saving ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                  {saving ? 'Salvataggio…' : 'Crea turno'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // TALENT EVENT DRAWER — 3 tab: Potenziali / In Attesa / Approvati
 // ---------------------------------------------------------------------------
 
@@ -1264,6 +1456,8 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
             {d.altezza_minima  && <span style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>Altezza ≥ {d.altezza_minima}cm</span>}
             {(d.lingue_richieste ?? []).map(l => <span key={l} style={{ fontSize:10, background:'#1A1A24', color:MUTED, padding:'2px 8px', borderRadius:10 }}>{l}</span>)}
           </div>
+
+          <ShiftSection eventId={event.entity_id} handleApiResponse={handleApiResponse} />
 
           {/* Tab switcher */}
           <div style={{ display:'flex', borderBottom:`1px solid ${BD}` }}>
