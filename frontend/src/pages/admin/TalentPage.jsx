@@ -628,6 +628,9 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
   const [contractLoading,   setContractLoading]   = useState(false)
   const [contractResult,    setContractResult]    = useState(null)
 
+  const [cardLoading, setCardLoading] = useState(false)
+  const [cardError,   setCardError]   = useState(null)
+
   // Score admin override
   const [localScore,          setLocalScore]          = useState(d.score ?? null)
   const [editableScoreAdmin,  setEditableScoreAdmin]  = useState(d.score_admin ?? 5)
@@ -809,6 +812,18 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
     setContractLoading(false)
     if (res.success) setContractResult('ok')
     else setContractResult('error')
+  }
+
+  const handleGeneraScheda = async () => {
+    setCardLoading(true)
+    setCardError(null)
+    const res = await talentApi.generateCard(talent.entity_id)
+    setCardLoading(false)
+    if (res.success && res.data?.pdf_url) {
+      window.open(res.data.pdf_url, '_blank')
+    } else {
+      setCardError(getErrorMessage(res.error))
+    }
   }
 
   const BTN_OUTLINE = { background:'none', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'7px 14px', cursor:'pointer', fontSize:12, fontFamily:'Montserrat,sans-serif', color:COLORS.text }
@@ -1277,7 +1292,19 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
               style={{ flex:'1 1 90px', padding:'9px 12px', background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif', fontWeight:700 }}>
               Genera contratto
             </button>
+            <button
+              onClick={handleGeneraScheda}
+              disabled={cardLoading}
+              style={{ flex:'1 1 90px', padding:'9px 12px', background: cardLoading ? '#e0e0e0' : '#1565C0', color: cardLoading ? '#999' : '#fff', border:'none', borderRadius:6, fontSize:12, cursor: cardLoading ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif', fontWeight:700, transition:'background 0.15s' }}
+            >
+              {cardLoading ? 'Generazione…' : '📄 Scheda PDF'}
+            </button>
           </div>
+          {cardError && (
+            <div style={{ marginTop:8, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>
+              {cardError}
+            </div>
+          )}
         </div>
       </div>
     </>

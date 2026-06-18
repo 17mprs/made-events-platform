@@ -129,6 +129,7 @@ function handleRequest(action, payload, token) {
     case 'talent.updateProfile':     return handleTalentUpdateProfile(payload, auth);
     case 'talent.updateScoreAdmin':  return handleUpdateScoreAdmin(payload, auth);
     case 'talent.updateEventiPreCRM': return handleUpdateEventiPreCRM(payload, auth);
+    case 'talent.generateCard':      return handleGenerateTalentCard(payload, auth);
 
     // CLIENT
     case 'client.create':     return handleClientCreate(payload, auth);

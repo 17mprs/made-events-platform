@@ -157,6 +157,7 @@ export const talentApi = {
   updateProfile:    (payload)               => gasPost('talent.updateProfile',    payload, t()),
   updateScoreAdmin:    (entity_id, score_admin)   => gasPost('talent.updateScoreAdmin',    { entity_id, score_admin }, t()),
   updateEventiPreCRM: (entity_id, eventi_precrm) => gasPost('talent.updateEventiPreCRM', { entity_id, eventi_precrm }, t()),
+  generateCard:       (talent_id)                => gasPost('talent.generateCard',        { talent_id },               t(), GAS_UPLOAD_TIMEOUT_MS),
 }
 
 export const leadApi = {
