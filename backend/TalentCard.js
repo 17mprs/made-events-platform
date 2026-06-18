@@ -127,7 +127,8 @@ function generateTalentCard_(talent, auth) {
   if (fotoPara) {
     var photoBlob = null;
     if (d.foto_busto_url) {
-      photoBlob = fetchImageBlob_(d.foto_busto_url);
+      // Pass tenant_id so the Drive-path check can verify file ownership
+      photoBlob = fetchTenantImageBlob_(d.foto_busto_url, auth.tenant_id);
     }
     if (photoBlob) {
       try {
@@ -148,7 +149,11 @@ function generateTalentCard_(talent, auth) {
   var pdfBlob = DriveApp.getFileById(docId).getAs('application/pdf');
   pdfBlob.setName(filename + '.pdf');
   var pdfFile = targetFolder.createFile(pdfBlob);
-  pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  // Share only with the requesting admin, not publicly.
+  if (auth.email) {
+    try { pdfFile.addViewer(auth.email); } catch (e) { /* non bloccare se email non valida */ }
+  }
 
   // --- Elimina copia doc temporanea ---
   DriveApp.getFileById(docId).setTrashed(true);
@@ -160,28 +165,62 @@ function generateTalentCard_(talent, auth) {
 }
 
 // ---------------------------------------------------------------------------
-// HELPER — scarica immagine da URL o Drive
+// HELPER — scarica immagine con validazione sicurezza
+//
+// Drive URL: verifica che il file appartenga alla cartella tenant (max 4 livelli)
+//            per evitare che un talent-supplied URL legga file arbitrari Drive.
+// URL esterna: solo https, solo Content-Type image/*.
 // ---------------------------------------------------------------------------
 
-function fetchImageBlob_(url) {
+function fetchTenantImageBlob_(url, tenantId) {
   if (!url) return null;
 
-  // Drive URL → usa DriveApp direttamente
   var driveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (driveMatch) {
+    var fileId = driveMatch[1];
+    if (!isDriveFileInTenantFolder_(fileId, tenantId)) return null;
     try {
-      return DriveApp.getFileById(driveMatch[1]).getBlob();
+      return DriveApp.getFileById(fileId).getBlob();
     } catch (e) {
       return null;
     }
   }
 
-  // URL esterno → UrlFetchApp
+  // Solo https — rifiuta http, file://, data: e URL interne
+  if (!/^https:\/\//i.test(url)) return null;
+
   try {
     var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (response.getResponseCode() === 200) return response.getBlob();
-    return null;
+    if (response.getResponseCode() !== 200) return null;
+    var ct = (response.getHeaders()['Content-Type'] || '').toLowerCase();
+    if (ct.indexOf('image/') !== 0) return null; // rifiuta tutto ciò che non è image/*
+    return response.getBlob();
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Verifica che un Drive file ID si trovi nella cartella tenant (fino a 4 livelli).
+ * La struttura è: ROOT/[tenantId]/talent/[profileId]/foto/[file]  (4 livelli sopra il file).
+ */
+function isDriveFileInTenantFolder_(fileId, tenantId) {
+  try {
+    var tenantFolderId = ensureTenantFolders(tenantId).tenantFolder.getId();
+    var file = DriveApp.getFileById(fileId);
+    // Cammina i parent fino a 4 livelli cercando la cartella tenant
+    return searchParents_(file.getParents(), tenantFolderId, 4);
+  } catch (e) {
+    return false;
+  }
+}
+
+function searchParents_(iter, targetId, depth) {
+  if (depth <= 0) return false;
+  while (iter.hasNext()) {
+    var folder = iter.next();
+    if (folder.getId() === targetId) return true;
+    if (searchParents_(folder.getParents(), targetId, depth - 1)) return true;
+  }
+  return false;
 }
