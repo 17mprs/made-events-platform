@@ -61,7 +61,7 @@ function getEventiPerNewsletter_() {
 // ---------------------------------------------------------------------------
 
 function buildNewsletterHtml(tier, eventi, destinatario) {
-  var ACCENT   = '#7A1E2C';
+  var ACCENT   = '#630E33';
   var isTier1  = (tier === 'TIER1');
   var baseUrl  = getFrontendUrl();
   var nome     = escapeHtml_(destinatario.nome  || '');

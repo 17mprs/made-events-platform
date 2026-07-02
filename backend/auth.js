@@ -508,14 +508,14 @@ function sendPasswordResetEmail_(email, token) {
   var resetUrl = getFrontendUrl() + '/reset-password/confirm?token=' + token;
   var html =
     '<div style="font-family:Montserrat,Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;">' +
-    '<div style="background:#7A1E2C;padding:28px 40px;">' +
+    '<div style="background:#630E33;padding:28px 40px;">' +
     '<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;letter-spacing:2px;">MADE EVENTS</h1>' +
     '</div>' +
     '<div style="padding:40px;">' +
     '<h2 style="color:#1A1A24;font-size:18px;margin:0 0 16px;font-weight:700;">Recupera la tua password</h2>' +
     '<p style="color:#555;font-size:14px;line-height:1.7;margin:0 0 28px;">Hai richiesto il recupero della password per il tuo account.<br>' +
     'Clicca il pulsante qui sotto per impostarne una nuova. Il link è valido per <strong>1 ora</strong>.</p>' +
-    '<a href="' + resetUrl + '" style="display:inline-block;background:#7A1E2C;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.5px;">Reimposta password</a>' +
+    '<a href="' + resetUrl + '" style="display:inline-block;background:#630E33;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.5px;">Reimposta password</a>' +
     '<p style="color:#999;font-size:12px;margin:32px 0 0;line-height:1.6;">Non hai richiesto il recupero password? Ignora questa email — il tuo account è al sicuro.</p>' +
     '<p style="color:#ccc;font-size:11px;margin:6px 0 0;word-break:break-all;">Link: ' + resetUrl + '</p>' +
     '</div>' +

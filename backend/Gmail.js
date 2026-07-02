@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 var EMAIL_CONFIG = {
-  FROM_NAME:    'Made Event Platform',
+  FROM_NAME:    'MADE EVENTS',
   REPLY_TO:     'noreply@madeevent.it',   // Override con config tenant se disponibile
   SUBJECT_PREFIX: '[Made Event] '
 };
@@ -73,7 +73,7 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
     '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">Made Event Platform</h1>',
+    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
     '<h2 style="color:#1a1a2e;">Benvenuto/a, ' + escapeHtml_(nome) + '!</h2>',
@@ -89,7 +89,7 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
     'padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">',
     'Accedi alla piattaforma</a>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — gestione staffing eventi.<br>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — gestione staffing eventi.<br>',
     'Non rispondere a questa email.</p>',
     '</div>',
     '</div>'
@@ -109,7 +109,7 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
     '',
     'Accedi qui: ' + url,
     '',
-    '— Made Event Platform'
+    '— MADE EVENTS'
   ].join('\n');
 
   return sendEmail_(to, 'Benvenuto! Le tue credenziali di accesso', html, text);
@@ -123,7 +123,7 @@ function sendProfileApprovedEmail(to, nome) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
     '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">Made Event Platform</h1>',
+    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
     '<h2 style="color:#1a1a2e;">Profilo approvato ✓</h2>',
@@ -136,7 +136,7 @@ function sendProfileApprovedEmail(to, nome) {
     '<li>Gestire il tuo profilo e i tuoi documenti</li>',
     '</ul>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — Non rispondere a questa email.</p>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
     '</div>',
     '</div>'
   ].join('');
@@ -163,7 +163,7 @@ function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
     '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">Made Event Platform</h1>',
+    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
     '<h2 style="color:#1a1a2e;">Turno confermato ✓</h2>',
@@ -183,7 +183,7 @@ function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId) {
     '</div>',
     '<p style="font-size:13px;color:#888;">Rif. Assignment: <code>' + assignmentId + '</code></p>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — Non rispondere a questa email.</p>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
     '</div>',
     '</div>'
   ].join('');
@@ -202,7 +202,7 @@ function sendReminder24hEmail(to, nome, shiftData) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
     '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">Made Event Platform</h1>',
+    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
     '<h2 style="color:#1a1a2e;">⏰ Reminder — Il tuo turno è domani</h2>',
@@ -215,7 +215,7 @@ function sendReminder24hEmail(to, nome, shiftData) {
     '</div>',
     '<p>Non dimenticare di fare il <strong>check-in</strong> dalla piattaforma al tuo arrivo.</p>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — Non rispondere a questa email.</p>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
     '</div>',
     '</div>'
   ].join('');
@@ -233,7 +233,7 @@ function sendReminder2hEmail(to, nome, shiftData) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
     '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">Made Event Platform</h1>',
+    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
     '<h2 style="color:#d32f2f;">🔔 Il tuo turno inizia tra 2 ore!</h2>',
@@ -242,7 +242,7 @@ function sendReminder2hEmail(to, nome, shiftData) {
     shiftData.meeting_point ? '<p><strong>Punto di ritrovo:</strong> ' + escapeHtml_(shiftData.meeting_point) + '</p>' : '',
     '<p>Ricorda: puoi fare il <strong>check-in</strong> dalla piattaforma a partire da <strong>30 minuti prima</strong> dell\'inizio.</p>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — Non rispondere a questa email.</p>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
     '</div>',
     '</div>'
   ].join('');
@@ -272,7 +272,7 @@ function sendNoShowAlertEmail(adminEmail, talentNome, talentEmail, shiftData, as
     '</div>',
     '<p>L\'assignment è stato marcato come <strong>NO_SHOW</strong>. Intervieni per coprire il turno se necessario.</p>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — Sistema automatico.</p>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — Sistema automatico.</p>',
     '</div>',
     '</div>'
   ].join('');
@@ -291,7 +291,7 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
     '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">Made Event Platform</h1>',
+    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
     '<h2 style="color:' + color + ';">📄 ' + urgency + 'Documento in scadenza</h2>',
@@ -300,7 +300,7 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
     'scadrà tra <strong>' + giorniMancanti + ' giorni</strong>.</p>',
     '<p>Aggiorna il documento accedendo alla piattaforma per evitare interruzioni nelle future assegnazioni.</p>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">Made Event Platform — Non rispondere a questa email.</p>',
+    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
     '</div>',
     '</div>'
   ].join('');
@@ -320,7 +320,7 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
  * @param {string} completionUrl  URL completo con lead_token es. https://…/registrazione/completa?token=UUID
  */
 function sendOnboardingStep1Email(to, nome, completionUrl) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
 
   var html = [
     '<!DOCTYPE html>',
@@ -335,7 +335,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
 
     // Header bordeaux
     '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 20px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">Made Event Platform</p>',
+    '<p style="margin:0 0 20px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
     '<h1 style="margin:0;font-size:26px;font-weight:300;letter-spacing:1.5px;color:#FFFFFF;line-height:1.3;">',
     'Hai fatto<br>il primo passo.',
     '</h1>',
@@ -383,7 +383,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
     // Footer
     '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:24px 48px;">',
     '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;line-height:1.6;">',
-    'Made Event Platform &mdash; Gestione staffing eventi<br>',
+    'MADE EVENTS &mdash; Gestione staffing eventi<br>',
     'Non rispondere a questa email &middot; noreply@madeevent.it',
     '</p>',
     '</td></tr>',
@@ -409,7 +409,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
     'date e location selezionati in base alle tue caratteristiche.',
     '',
     '---',
-    'Made Event Platform — Non rispondere a questa email.'
+    'MADE EVENTS — Non rispondere a questa email.'
   ].join('\n');
 
   return sendEmail_(to, 'Completa la tua iscrizione — Made Event', html, text);
@@ -420,7 +420,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
 // ---------------------------------------------------------------------------
 
 function sendProfiloRicevutoEmail(to, nome) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
 
   var html = [
     '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
@@ -429,7 +429,7 @@ function sendProfiloRicevutoEmail(to, nome) {
     '<tr><td align="center">',
     '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
     '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">Made Event Platform</p>',
+    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
     '<h1 style="margin:0;font-size:24px;font-weight:300;letter-spacing:1.5px;color:#FFFFFF;line-height:1.3;">Profilo ricevuto ✓</h1>',
     '</td></tr>',
     '<tr><td style="padding:48px;">',
@@ -445,12 +445,12 @@ function sendProfiloRicevutoEmail(to, nome) {
     '<p style="margin:0;font-size:12px;color:#AAAAAA;">Non rispondere a questa email &middot; noreply@madeevent.it</p>',
     '</td></tr>',
     '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">Made Event Platform &mdash; Gestione staffing eventi</p>',
+    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
     '</td></tr>',
     '</table></td></tr></table></body></html>'
   ].join('\n');
 
-  var text = 'Ciao ' + nome + ',\n\nIl tuo profilo è stato ricevuto ed è in attesa di revisione.\nTi contatteremo via email con l\'esito entro pochi giorni.\n\n— Made Event Platform';
+  var text = 'Ciao ' + nome + ',\n\nIl tuo profilo è stato ricevuto ed è in attesa di revisione.\nTi contatteremo via email con l\'esito entro pochi giorni.\n\n— MADE EVENTS';
   return sendEmail_(to, 'Profilo ricevuto — in attesa di approvazione', html, text);
 }
 
@@ -459,7 +459,7 @@ function sendProfiloRicevutoEmail(to, nome) {
 // ---------------------------------------------------------------------------
 
 function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
   var rankingLabel = score >= 80 ? 'A — Eccellente' : score >= 60 ? 'B — Buono' : score >= 40 ? 'C — Medio' : 'D — Base';
 
   var html = [
@@ -482,12 +482,12 @@ function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
     '<p style="font-size:14px;font-weight:300;color:#2E2E2E;line-height:1.7;">Accedi alla piattaforma per esaminare il profilo completo e procedere con approvazione o rifiuto.</p>',
     '</td></tr>',
     '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;">Made Event Platform — Sistema automatico</p>',
+    '<p style="margin:0;font-size:11px;color:#AAAAAA;">MADE EVENTS — Sistema automatico</p>',
     '</td></tr>',
     '</table></td></tr></table></body></html>'
   ].join('\n');
 
-  var text = 'NUOVO PROFILO DA APPROVARE\n\nNome: ' + nome + ' ' + cognome + '\nScore: ' + score + '/100\nLead ID: ' + leadId + '\n\nAccedi alla piattaforma per approvare o rifiutare.\n\n— Made Event Platform';
+  var text = 'NUOVO PROFILO DA APPROVARE\n\nNome: ' + nome + ' ' + cognome + '\nScore: ' + score + '/100\nLead ID: ' + leadId + '\n\nAccedi alla piattaforma per approvare o rifiutare.\n\n— MADE EVENTS';
   return sendEmail_(to, 'Nuovo profilo da approvare — ' + nome + ' ' + cognome + ' [' + score + '/100]', html, text);
 }
 
@@ -496,7 +496,7 @@ function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
 // ---------------------------------------------------------------------------
 
 function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
 
   var completatiHtml = completati.map(function(s) {
     return '<li style="margin:4px 0;font-size:13px;color:#2E7D32;">✓ ' + escapeHtml_(s) + '</li>';
@@ -513,7 +513,7 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
     '<tr><td align="center">',
     '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
     '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">Made Event Platform</p>',
+    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
     '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Hai lasciato la registrazione a metà</h1>',
     '</td></tr>',
     '<tr><td style="padding:48px;">',
@@ -530,12 +530,12 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
     '<p style="margin:0;font-size:12px;color:#AAAAAA;">Il link è personale e valido per la tua registrazione.</p>',
     '</td></tr>',
     '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;">Made Event Platform &mdash; Non rispondere a questa email</p>',
+    '<p style="margin:0;font-size:11px;color:#AAAAAA;">MADE EVENTS &mdash; Non rispondere a questa email</p>',
     '</td></tr>',
     '</table></td></tr></table></body></html>'
   ].join('\n');
 
-  var text = 'Ciao ' + nome + ',\n\nHai lasciato la registrazione incompleta.\nRiprendi qui: ' + completionUrl + '\n\nManca ancora: ' + mancanti.join(', ') + '\n\n— Made Event Platform';
+  var text = 'Ciao ' + nome + ',\n\nHai lasciato la registrazione incompleta.\nRiprendi qui: ' + completionUrl + '\n\nManca ancora: ' + mancanti.join(', ') + '\n\n— MADE EVENTS';
   return sendEmail_(to, 'Completa la tua iscrizione — ' + (mancanti.length ? mancanti.length + ' sezioni mancanti' : 'quasi pronta!'), html, text);
 }
 
@@ -544,7 +544,7 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
 // ---------------------------------------------------------------------------
 
 function sendCustomAdminEmail(to, nome, contenutoTesto, emailAdmin) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
 
   var html = [
     '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
@@ -584,7 +584,7 @@ function sendCustomAdminEmail(to, nome, contenutoTesto, emailAdmin) {
 // ---------------------------------------------------------------------------
 
 function sendSocialInviteEmail(to, nome, contenutoTesto) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
 
   var html = [
     '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
@@ -622,7 +622,7 @@ function sendSocialInviteEmail(to, nome, contenutoTesto) {
 // ---------------------------------------------------------------------------
 
 function sendConvocazioneEmail(to, nome, titoloEvento, dataEvento, luogoEvento, contenutoTesto) {
-  var ACCENT = '#7A1E2C';
+  var ACCENT = '#630E33';
 
   var eventoBlock = titoloEvento
     ? '<div style="background:#FAFAFA;border-left:4px solid ' + ACCENT + ';padding:16px 20px;margin-bottom:28px;border-radius:0 4px 4px 0;">' +
