@@ -434,10 +434,18 @@ const PROFILE_SECTIONS = [
 ]
 
 function profileToForm(d) {
+  const FALLBACKS = {
+    email_contatto: 'email',
+    citta_nascita:  'nascita_citta',
+    citta:          'residenza_citta',
+  }
   const f = {}
   PROFILE_SECTIONS.forEach(sec => {
     sec.fields.forEach(key => {
-      const v = d[key]
+      let v = d[key]
+      if ((v === undefined || v === null || v === '') && FALLBACKS[key]) {
+        v = d[FALLBACKS[key]]
+      }
       if (sec.array?.includes(key)) {
         f[key] = Array.isArray(v) ? v.join(', ') : (v ?? '')
       } else if (sec.bool?.includes(key)) {
