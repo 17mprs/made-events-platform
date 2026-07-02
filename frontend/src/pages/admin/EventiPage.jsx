@@ -479,7 +479,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
             <Input label="Data fine" type="datetime-local" value={form.data_fine} onChange={set('data_fine')} />
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Input label="Hostess richieste" type="number" min="1" value={form.hostess_richieste} onChange={set('hostess_richieste')} placeholder="es. 10" />
+              <Input label="Hostess richieste" type="number" min="0" value={form.hostess_richieste} onChange={set('hostess_richieste')} placeholder="es. 10" />
               <Input label="Min. anni esperienza" type="number" min="0" value={form.anni_esperienza_minimi} onChange={set('anni_esperienza_minimi')} placeholder="es. 2" />
             </div>
             <Input label="Compenso (€)" value={form.compenso} onChange={set('compenso')} placeholder="es. €42,00 netti" />
@@ -2049,6 +2049,8 @@ export default function EventiPage() {
     if (!res.success) {
       setEvents(prevEvents)
       alert(getErrorMessage(res.error))
+    } else {
+      load()
     }
   }
 

@@ -687,7 +687,7 @@ function SectionCard({ sec, form, setForm, data }) {
                   value={form[key] ?? ''}
                   onChange={v => setForm(f => ({ ...f, [key]: v }))}
                   multiline={key === 'esperienze_precedenti' || key === 'attrezzatura'}
-                  placeholder={sec.array?.includes(key) ? 'es. Italiano, Inglese B2' : undefined}
+                  placeholder={sec.array?.includes(key) ? (key === 'lingue' ? 'es. Italiano, Inglese B2' : key === 'province_operativita' ? 'es. Roma, Milano' : key === 'skills' ? 'es. Accoglienza, Promoter' : '') : undefined}
                 />
               )}
             </div>
