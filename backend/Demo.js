@@ -410,6 +410,7 @@ function setupDemoData() {
 
   // 1. Cancella tutto il demo precedente
   _deleteDemoLeads_();
+  _deleteDemoEntities_('TALENT_PROFILE');
   _deleteDemoEntities_('CLIENT');
   _deleteDemoEntities_('EVENT');
   _deleteDemoEntities_('SHIFT');
