@@ -156,20 +156,33 @@ function sendProfileApprovedEmail(to, nome) {
  * @param {object} shiftData        dati dello shift (data, orario, location, ruolo...)
  * @param {string} assignmentId     UUID dell'assignment
  */
-function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId) {
+function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId, eventData) {
+  eventData = eventData || {};
   var dataFormatted    = formatDate_(shiftData.data);
   var orarioFormatted  = (shiftData.orario_inizio || '') + (shiftData.orario_fine ? ' – ' + shiftData.orario_fine : '');
+  var luogoFormatted   = [eventData.luogo, eventData.citta].filter(Boolean).join(' — ');
 
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
+    '<div style="background:#630E33;padding:24px;text-align:center;">',
     '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
-    '<h2 style="color:#1a1a2e;">Turno confermato ✓</h2>',
+    '<h2 style="color:#630E33;">Turno confermato ✓</h2>',
     '<p>Ciao ' + escapeHtml_(nome) + ',</p>',
     '<p>La tua candidatura è stata <strong>approvata</strong>. Sei ufficialmente assegnato/a al seguente turno:</p>',
-    '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:24px 0;">',
+    // Sezione evento
+    eventData.titolo ? (
+      '<div style="background:#fdf2f5;border-left:4px solid #630E33;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">' +
+      '<p style="margin:0 0 6px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#630E33;font-weight:700;">Evento</p>' +
+      '<p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;">' + escapeHtml_(eventData.titolo) + '</p>' +
+      (luogoFormatted ? '<p style="margin:4px 0;font-size:13px;color:#555;">📍 ' + escapeHtml_(luogoFormatted) + '</p>' : '') +
+      (eventData.compenso ? '<p style="margin:4px 0;font-size:13px;color:#555;">💶 Compenso: <strong>' + escapeHtml_(String(eventData.compenso)) + '</strong></p>' : '') +
+      '</div>'
+    ) : '',
+    // Sezione turno
+    '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:16px 0;">',
+    '<p style="margin:0 0 10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#888;font-weight:700;">Dettagli turno</p>',
     shiftData.ruolo    ? '<p style="margin:4px 0;"><strong>Ruolo:</strong> '         + escapeHtml_(shiftData.ruolo)         + '</p>' : '',
     '<p style="margin:4px 0;"><strong>Data:</strong> '                               + escapeHtml_(dataFormatted)           + '</p>',
     orarioFormatted    ? '<p style="margin:4px 0;"><strong>Orario:</strong> '        + escapeHtml_(orarioFormatted)         + '</p>' : '',
@@ -188,7 +201,7 @@ function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId) {
     '</div>'
   ].join('');
 
-  return sendEmail_(to, 'Turno confermato — ' + dataFormatted, html);
+  return sendEmail_(to, 'Turno confermato — ' + (eventData.titolo ? escapeHtml_(eventData.titolo) + ' · ' : '') + dataFormatted, html);
 }
 
 // ---------------------------------------------------------------------------

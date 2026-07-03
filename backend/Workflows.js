@@ -186,12 +186,14 @@ function sideEffect_ApplicationApproved_(application, auth) {
     var talentProfile = getEntityById(appData.talent_profile_id, auth.tenant_id);
     if (talentProfile && talentProfile.data.email_contatto) {
       var shift = getEntityById(appData.shift_id, auth.tenant_id);
+      var event = getEntityById(appData.event_id, auth.tenant_id);
       if (shift) {
         sendAssignmentConfirmedEmail(
           talentProfile.data.email_contatto,
           (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
           shift.data,
-          assignment.entity_id
+          assignment.entity_id,
+          event ? event.data : {}
         );
       }
     }
