@@ -52,7 +52,7 @@ export default function CittaProvinciaSelect({
           {label}{required && ' *'}
         </label>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div className="grid-2-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ position: 'relative' }}>
             <input

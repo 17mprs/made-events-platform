@@ -50,7 +50,7 @@ function DeleteClientModal({ client, onConfirm, onClose, loading }) {
             }}
           />
         </div>
-        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end', flexWrap:'wrap' }}>
           <button
             onClick={onClose}
             style={{ background:'none', border:'1px solid #e0e0e0', borderRadius:6, padding:'9px 20px', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif', color:'#333' }}
@@ -105,7 +105,7 @@ function ClientFormDrawer({ onClose, onSaved, prefill, handleApiResponse }) {
             <Input label="Partita IVA" value={form.partita_iva} onChange={set('partita_iva')} />
             <Input label="Email" type="email" value={form.email} onChange={set('email')} />
             <Input label="Telefono" value={form.telefono} onChange={set('telefono')} />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <Input label="Nome referente" value={form.referente_nome} onChange={set('referente_nome')} />
               <Input label="Cognome referente" value={form.referente_cognome} onChange={set('referente_cognome')} />
             </div>

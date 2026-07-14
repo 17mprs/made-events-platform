@@ -115,7 +115,12 @@ function handleDocumentUpload(payload, auth) {
   var valid = requireFields(payload, ['talent_profile_id', 'tipo_documento', 'file_base64', 'filename']);
   if (valid) return valid;
 
-  var validTipi = ['cv', 'foto', 'carta_identita'];
+  var validTipi = [
+    'cv', 'foto', 'carta_identita',
+    // Stessi tipo_documento del questionario (Section7) — area riservata talent
+    'foto_busto', 'foto_intera', 'foto_extra',
+    'doc_identita', 'doc_cf', 'attestato_haccp', 'attestato_sicurezza'
+  ];
   if (validTipi.indexOf(payload.tipo_documento) === -1) {
     return errorResponse('VAL_002', 'tipo_documento deve essere uno di: ' + validTipi.join(', '), 'tipo_documento');
   }
@@ -190,10 +195,11 @@ function handleDocumentUpload(payload, auth) {
       auth.user_id
     );
 
-    // Aggiorna anche il campo shortcut nel TALENT_PROFILE
-    var shortcutField = payload.tipo_documento === 'cv'   ? 'cv_url'
-                       : payload.tipo_documento === 'foto' ? 'foto_url'
-                       : null;
+    // Aggiorna anche il campo shortcut nel TALENT_PROFILE (stesso nome campo del questionario)
+    var shortcutField = payload.tipo_documento === 'cv'             ? 'cv_url'
+                       : payload.tipo_documento === 'foto'          ? 'foto_url'
+                       : payload.tipo_documento === 'carta_identita' ? null
+                       : payload.tipo_documento + '_url';
     if (shortcutField) {
       updateEntityData(payload.talent_profile_id, { [shortcutField]: fileUrl }, auth.tenant_id, auth.user_id);
     }
@@ -329,7 +335,10 @@ function handleDriveSetup(payload, auth) {
 function getTipoFolder_(talentFolders, tipo) {
   switch (tipo) {
     case 'cv':             return talentFolders.cvFolder;
-    case 'foto':           return talentFolders.fotoFolder;
+    case 'foto':
+    case 'foto_busto':
+    case 'foto_intera':
+    case 'foto_extra':     return talentFolders.fotoFolder;
     case 'carta_identita': return talentFolders.documentiFolder;
     default:               return talentFolders.documentiFolder;
   }

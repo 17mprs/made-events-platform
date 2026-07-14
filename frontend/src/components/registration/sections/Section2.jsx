@@ -3,16 +3,7 @@ import React, { useState } from 'react'
 import { COLORS, COMPONENT_STYLES } from '../../../styles/theme'
 import Input from '../../Input'
 import SectionShell from '../SectionShell'
-
-const range = (from, to, step = 1) => {
-  const arr = []
-  for (let i = from; i <= to; i += step) arr.push(i)
-  return arr
-}
-
-const TAGLIE_SHIRT  = ['XXS', 'XS', 'S', 'M', 'L', 'XL']
-const TAGLIE_NUM    = range(36, 48, 2)   // 36 38 40 42 44 46 48
-const SCARPE        = range(35, 45)
+import { ALTEZZE, TAGLIE_SHIRT, TAGLIE_NUM, SCARPE } from '../questionnaireOptions'
 
 function FieldError({ msg }) {
   if (!msg) return null
@@ -43,64 +34,31 @@ function RadioGroup({ label, name, value, onChange, required, error }) {
   )
 }
 
-export default function Section2({ data, onChange, onNext, onBack, loading }) {
-  const [errors, setErrors] = useState({})
-  const isMale = data.genere === 'M'
+const SEL_LABELS = { altezza: 'Altezza (cm)', taglia_tshirt: 'Taglia t-shirt / giacca', taglia_pantalone: 'Taglia pantalone IT', taglia_gonna: 'Taglia gonna / abito IT', numero_scarpe: 'Numero scarpe' }
+const SEL_OPTIONS = { altezza: ALTEZZE, taglia_tshirt: TAGLIE_SHIRT, taglia_pantalone: TAGLIE_NUM, taglia_gonna: TAGLIE_NUM, numero_scarpe: SCARPE }
 
-  function validate() {
-    const e = {}
-    if (!data.altezza)           e.altezza = 'Obbligatorio'
-    if (!data.taglia_tshirt)     e.taglia_tshirt = 'Obbligatorio'
-    if (!data.taglia_pantalone)  e.taglia_pantalone = 'Obbligatorio'
-    if (!isMale && !data.taglia_gonna) e.taglia_gonna = 'Obbligatorio'
-    if (!data.numero_scarpe)     e.numero_scarpe = 'Obbligatorio'
-    if (!data.piercing_visibili) e.piercing_visibili = 'Seleziona un\'opzione'
-    if (!data.tatuaggi_visibili) e.tatuaggi_visibili = 'Seleziona un\'opzione'
-    if (data.tatuaggi_visibili === 'Sì' && !data.tatuaggi_dove) e.tatuaggi_dove = 'Specifica dove sono visibili'
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
+export function Section2Fields({ data, onChange, errors = {} }) {
+  const isMale = data.genere === 'M'
 
   function sel(key) {
     return (
       <div>
-        <label style={COMPONENT_STYLES.label}>{selLabel(key)} *</label>
+        <label style={COMPONENT_STYLES.label}>{SEL_LABELS[key]} *</label>
         <select
           value={data[key] || ''}
           onChange={e => onChange(key, e.target.value)}
           style={{ ...COMPONENT_STYLES.input, borderColor: errors[key] ? COLORS.error : COLORS.border }}
         >
           <option value="">— Seleziona —</option>
-          {selOptions(key).map(v => <option key={v} value={String(v)}>{v}</option>)}
+          {SEL_OPTIONS[key].map(v => <option key={v} value={String(v)}>{v}</option>)}
         </select>
         <FieldError msg={errors[key]} />
       </div>
     )
   }
 
-  function selLabel(key) {
-    return { altezza: 'Altezza (cm)', taglia_tshirt: 'Taglia t-shirt / giacca', taglia_pantalone: 'Taglia pantalone IT', taglia_gonna: 'Taglia gonna / abito IT', numero_scarpe: 'Numero scarpe' }[key]
-  }
-
-  function selOptions(key) {
-    return {
-      altezza: range(150, 195),
-      taglia_tshirt: TAGLIE_SHIRT,
-      taglia_pantalone: TAGLIE_NUM,
-      taglia_gonna: TAGLIE_NUM,
-      numero_scarpe: SCARPE,
-    }[key]
-  }
-
   return (
-    <SectionShell
-      number={2}
-      title="Profilo Fisico"
-      description="Tutti i campi di questa sezione sono obbligatori."
-      onBack={onBack}
-      onNext={() => { if (validate()) onNext() }}
-      loading={loading}
-    >
+    <>
       <div className="form-grid">
         {sel('altezza')}
         {sel('taglia_tshirt')}
@@ -110,7 +68,7 @@ export default function Section2({ data, onChange, onNext, onBack, loading }) {
         {!isMale && <div />}
       </div>
 
-      <div style={{ marginTop: '28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+      <div className="form-grid" style={{ marginTop: '28px', gap: '24px' }}>
         <RadioGroup
           label="Piercing visibili in viso"
           name="piercing_visibili"
@@ -145,6 +103,38 @@ export default function Section2({ data, onChange, onNext, onBack, loading }) {
           )}
         </div>
       </div>
+    </>
+  )
+}
+
+export default function Section2({ data, onChange, onNext, onBack, loading }) {
+  const [errors, setErrors] = useState({})
+  const isMale = data.genere === 'M'
+
+  function validate() {
+    const e = {}
+    if (!data.altezza)           e.altezza = 'Obbligatorio'
+    if (!data.taglia_tshirt)     e.taglia_tshirt = 'Obbligatorio'
+    if (!data.taglia_pantalone)  e.taglia_pantalone = 'Obbligatorio'
+    if (!isMale && !data.taglia_gonna) e.taglia_gonna = 'Obbligatorio'
+    if (!data.numero_scarpe)     e.numero_scarpe = 'Obbligatorio'
+    if (!data.piercing_visibili) e.piercing_visibili = 'Seleziona un\'opzione'
+    if (!data.tatuaggi_visibili) e.tatuaggi_visibili = 'Seleziona un\'opzione'
+    if (data.tatuaggi_visibili === 'Sì' && !data.tatuaggi_dove) e.tatuaggi_dove = 'Specifica dove sono visibili'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  return (
+    <SectionShell
+      number={2}
+      title="Profilo Fisico"
+      description="Tutti i campi di questa sezione sono obbligatori."
+      onBack={onBack}
+      onNext={() => { if (validate()) onNext() }}
+      loading={loading}
+    >
+      <Section2Fields data={data} onChange={onChange} errors={errors} />
     </SectionShell>
   )
 }

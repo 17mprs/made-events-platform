@@ -74,7 +74,7 @@ function PageShell({ children }) {
         </div>
 
         {/* Card */}
-        <div style={{ background: '#fff', border: `1px solid ${COLORS.border}`, borderRadius: '6px', padding: '48px' }}>
+        <div className="auth-card" style={{ background: '#fff', border: `1px solid ${COLORS.border}`, borderRadius: '6px', padding: '48px' }}>
           {children}
         </div>
 
@@ -215,10 +215,10 @@ export default function RegisterComplete() {
     talentApi.getLead(token).then(res => {
       if (!res.success) { setStatus('invalid'); return }
 
-      const { lead_id, nome, email, step_completed, saved_data } = res.data
+      const { lead_id, nome, email, sezione_completata, saved_data } = res.data
       setLeadData({ lead_id, nome, email })
 
-      if (step_completed >= 7) {
+      if (sezione_completata >= 7) {
         setStatus('already_done')
         return
       }
@@ -229,7 +229,7 @@ export default function RegisterComplete() {
       }
 
       // Riprendi dalla sezione successiva a quella già completata
-      const resumeAt = Math.min(Math.max((step_completed || 0) + 1, 1), 7)
+      const resumeAt = Math.min(Math.max((sezione_completata || 0) + 1, 1), 7)
       setSection(resumeAt)
       setStatus('form')
     })

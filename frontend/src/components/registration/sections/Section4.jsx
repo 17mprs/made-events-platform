@@ -3,9 +3,7 @@ import React, { useState } from 'react'
 import { COLORS, COMPONENT_STYLES } from '../../../styles/theme'
 import Input from '../../Input'
 import SectionShell from '../SectionShell'
-
-const LIVELLI_INGLESE  = ['Base', 'Intermedio', 'Fluente', 'Madrelingua']
-const LIVELLI_ALTRA    = ['Non conosco', 'Base', 'Intermedio', 'Fluente', 'Madrelingua']
+import { LIVELLI_INGLESE, LIVELLI_ALTRA } from '../questionnaireOptions'
 
 function LinguaSelect({ label, fieldKey, value, onChange, options, required, error }) {
   return (
@@ -24,21 +22,7 @@ function LinguaSelect({ label, fieldKey, value, onChange, options, required, err
   )
 }
 
-export default function Section4({ data, onChange, onNext, onBack, loading }) {
-  const [errors, setErrors] = useState({})
-
-  function validate() {
-    const e = {}
-    if (!data.lingua_inglese) e.lingua_inglese = 'Il livello di inglese è obbligatorio'
-    // Altre lingue: se nome inserito, deve avere livello
-    const altre = data.altre_lingue || []
-    altre.forEach((l, i) => {
-      if (l.nome && !l.livello) e[`altra_lingue_${i}`] = 'Seleziona il livello'
-    })
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
-
+export function Section4Fields({ data, onChange, errors = {} }) {
   const altreLingue = data.altre_lingue || []
 
   function updateAltra(index, field, value) {
@@ -55,14 +39,7 @@ export default function Section4({ data, onChange, onNext, onBack, loading }) {
   }
 
   return (
-    <SectionShell
-      number={4}
-      title="Lingue"
-      description="Indica il tuo livello per ogni lingua. L'inglese è obbligatorio."
-      onBack={onBack}
-      onNext={() => { if (validate()) onNext() }}
-      loading={loading}
-    >
+    <>
       {/* Lingue principali */}
       <div className="form-grid" style={{ marginBottom: data.lingua_inglese ? '8px' : '28px' }}>
         <LinguaSelect
@@ -167,6 +144,34 @@ export default function Section4({ data, onChange, onNext, onBack, loading }) {
           </button>
         )}
       </div>
+    </>
+  )
+}
+
+export default function Section4({ data, onChange, onNext, onBack, loading }) {
+  const [errors, setErrors] = useState({})
+
+  function validate() {
+    const e = {}
+    if (!data.lingua_inglese) e.lingua_inglese = 'Il livello di inglese è obbligatorio'
+    const altre = data.altre_lingue || []
+    altre.forEach((l, i) => {
+      if (l.nome && !l.livello) e[`altra_lingue_${i}`] = 'Seleziona il livello'
+    })
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  return (
+    <SectionShell
+      number={4}
+      title="Lingue"
+      description="Indica il tuo livello per ogni lingua. L'inglese è obbligatorio."
+      onBack={onBack}
+      onNext={() => { if (validate()) onNext() }}
+      loading={loading}
+    >
+      <Section4Fields data={data} onChange={onChange} errors={errors} />
     </SectionShell>
   )
 }

@@ -345,28 +345,21 @@ function handleTalentApprove(payload, auth) {
   if (existingProfile) {
     profileId = existingProfile.entity_id;
   } else {
-    // Crea TALENT_PROFILE
-    var profile = createEntity('TALENT_PROFILE', ENTITY_STATUS.TALENT_PROFILE.APPROVED, {
+    // Crea TALENT_PROFILE — il questionario (leadData) è la fonte madre di tutti i
+    // dati del profilo: copiamo l'intero oggetto (tutte le 7 sezioni) e sovrascriviamo
+    // solo i campi derivati/specifici del TALENT_PROFILE.
+    var profile = createEntity('TALENT_PROFILE', ENTITY_STATUS.TALENT_PROFILE.APPROVED, Object.assign({}, leadData, {
       lead_id:              lead.entity_id,
       user_id:              userId,
-      nome:                 leadData.nome             || '',
-      cognome:              leadData.cognome           || '',
-      telefono:             leadData.telefono          || '',
       email_contatto:       leadData.email             || '',
       citta:                leadData.citta             || leadData.residenza_citta || '',
       citta_nascita:        leadData.nascita_citta     || '',
-      province_operativita: leadData.province_operativita || leadData.province_lavoro || [],
-      lingue:               leadData.lingue           || [],
-      altezza:              leadData.altezza          || '',
-      taglia:               leadData.taglia           || '',
-      skills:               leadData.skills           || [],
-      esperienza_anni:      leadData.esperienza_anni  || 0,
-      disponibilita:        leadData.disponibilita    || '',
+      province_operativita: leadData.province_lavoro   || leadData.province_operativita || [],
       rating:               0,
       stato_verifica:       'verified',
       documenti: {
-        cv:   leadData.cv_url   ? { file_id: '', url: leadData.cv_url,   status: 'valid', uploaded_at: new Date().toISOString() } : {},
-        foto: leadData.foto_url ? { file_id: '', url: leadData.foto_url, status: 'valid', uploaded_at: new Date().toISOString() } : {},
+        cv:   leadData.cv_url         ? { file_id: '', url: leadData.cv_url,         status: 'valid', uploaded_at: new Date().toISOString() } : {},
+        foto: leadData.foto_busto_url ? { file_id: '', url: leadData.foto_busto_url, status: 'valid', uploaded_at: new Date().toISOString() } : {},
         carta_identita: {}
       },
       score:                 leadData.score                 || 0,
@@ -375,7 +368,7 @@ function handleTalentApprove(payload, auth) {
       ranking:              leadData.ranking               || 'D',
       eventi_crm_completati: 0,
       eventi_precrm:        leadData.eventi_precrm         || 0
-    }, auth.tenant_id, auth.user_id);
+    }), auth.tenant_id, auth.user_id);
     profileId = profile.entity_id;
   }
 
@@ -659,4 +652,78 @@ function findAssignment_(shiftId, talentProfileId, tenantId) {
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// BACKFILL — recupera i dati del questionario persi dai TALENT_PROFILE
+// approvati prima del fix del mapping LEAD → TALENT_PROFILE (BUG7).
+// Azione admin 'talent.backfillFromLead'. Di default gira in dry-run: passa
+// { dryRun: false } esplicitamente per scrivere davvero. Non sovrascrive mai
+// un campo già valorizzato nel TALENT_PROFILE — riempie solo i vuoti.
+// ---------------------------------------------------------------------------
+
+var BACKFILL_LEAD_BOOKKEEPING_FIELDS_ = [
+  'lead_token', 'gdpr_consent', 'gdpr_timestamp', 'stato_profilo',
+  'step_completed', 'sezione_completata', 'registration_started_at', 'registration_completed_at',
+  'ultimo_accesso', 'ultimo_sollecito', 'sollecito_1_inviato', 'sollecito_2_inviato', 'sollecito_finale_inviato',
+  'score', 'score_questionario', 'score_admin', 'ranking'
+];
+
+function backfillIsEmpty_(v) {
+  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+function handleTalentBackfillFromLead(payload, auth) {
+  var dryRun = payload.dryRun !== false; // default true — serve dryRun:false esplicito per scrivere
+
+  var allEntities = getAllRows('Entities');
+  var leadsById = {};
+  for (var i = 0; i < allEntities.length; i++) {
+    if (allEntities[i].type === 'LEAD_TALENT') leadsById[allEntities[i].entity_id] = allEntities[i];
+  }
+
+  var report = [];
+  for (var j = 0; j < allEntities.length; j++) {
+    var e = allEntities[j];
+    if (e.type !== 'TALENT_PROFILE') continue;
+    if (auth.tenant_id && String(e.tenant_id) !== String(auth.tenant_id)) continue;
+
+    var profileData = parseJSON(e.data);
+    var lead = leadsById[profileData.lead_id];
+    if (!lead) continue;
+    var leadData = parseJSON(lead.data);
+
+    var patch = {};
+
+    // Campi con nome diverso tra LEAD_TALENT e TALENT_PROFILE
+    var mapped = {
+      email_contatto:       leadData.email,
+      citta_nascita:        leadData.nascita_citta,
+      province_operativita: leadData.province_lavoro
+    };
+    for (var mk in mapped) {
+      if (backfillIsEmpty_(profileData[mk]) && !backfillIsEmpty_(mapped[mk])) patch[mk] = mapped[mk];
+    }
+
+    // Tutti gli altri campi del questionario, stesso nome in entrambi
+    for (var key in leadData) {
+      if (BACKFILL_LEAD_BOOKKEEPING_FIELDS_.indexOf(key) !== -1) continue;
+      if (mapped.hasOwnProperty(key)) continue;
+      if (backfillIsEmpty_(profileData[key]) && !backfillIsEmpty_(leadData[key])) patch[key] = leadData[key];
+    }
+
+    if (Object.keys(patch).length === 0) continue;
+
+    report.push({ entity_id: e.entity_id, lead_id: lead.entity_id, fields_backfilled: Object.keys(patch) });
+
+    if (!dryRun) {
+      updateEntityData(e.entity_id, patch, e.tenant_id, auth.user_id);
+    }
+  }
+
+  return successResponse({
+    dry_run: dryRun,
+    profiles_updated: report.length,
+    details: report
+  });
 }

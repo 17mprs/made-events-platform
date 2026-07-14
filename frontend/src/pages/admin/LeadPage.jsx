@@ -7,6 +7,39 @@ import Layout from '../../components/Layout'
 import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, Pagination } from './shared'
 
 // ---------------------------------------------------------------------------
+// COMPLETION BADGE — % sezioni questionario completate (solo tab Lead)
+// ---------------------------------------------------------------------------
+
+// Stessi controlli per-sezione usati da inviaEmailSollecito (backend/RegistrationFlow.js)
+function completionPct(d) {
+  if (!d) return 0
+  const checks = [
+    !!(d.nascita_citta && d.residenza_citta),
+    !!(d.altezza && d.taglia_tshirt && d.numero_scarpe),
+    !!(d.patente_tipologie?.length && d.province_lavoro?.length),
+    !!d.lingua_inglese,
+    !!(d.titolo_studio && d.anni_esperienza_settore),
+    true, // Dotazione Personale — opzionale, sempre OK
+    !!(d.foto_busto_url && d.foto_intera_url),
+  ]
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+}
+
+function CompletionBadge({ data }) {
+  const pct = completionPct(data)
+  const color = pct >= 80 ? '#22c55e' : pct >= 40 ? '#f97316' : '#ef4444'
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 7px', borderRadius: 10,
+      background: color + '22', color, fontSize: 11, fontWeight: 700,
+      border: `1px solid ${color}44`,
+    }}>
+      {pct}%
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // SOLLECITI COUNTER BADGE
 // ---------------------------------------------------------------------------
 
@@ -29,7 +62,7 @@ function SollecitiCounter({ data }) {
 // LEADS SECTION — exported for reuse in AdminDashboard overview
 // ---------------------------------------------------------------------------
 
-export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSelect = false }) {
+export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSelect = false, showCompletion = false }) {
   const [leads,      setLeads]      = useState([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
@@ -147,6 +180,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
                   <th>Città</th>
                   <th>Iscritto il</th>
                   <th>Stato</th>
+                  {showCompletion && <th>Completamento</th>}
                   <th>Solleciti</th>
                   <th></th>
                 </tr>
@@ -168,6 +202,11 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
                       <td>
                         <LeadBadge status={l.status} />
                       </td>
+                      {showCompletion && (
+                        <td>
+                          <CompletionBadge data={l.data} />
+                        </td>
+                      )}
                       <td>
                         <SollecitiCounter data={l.data} />
                       </td>
@@ -232,7 +271,7 @@ export default function LeadPage() {
         title="Lead Talent"
         subtitle="Candidature in bozza — step 1 non completato"
       />
-      <LeadsSection handleApiResponse={handleApiResponse} showPageSizeSelect={true} />
+      <LeadsSection handleApiResponse={handleApiResponse} showPageSizeSelect={true} showCompletion={true} />
     </Layout>
   )
 }

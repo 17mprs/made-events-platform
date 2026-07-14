@@ -9,6 +9,7 @@ import {
   ADMIN_SIDEBAR, PageHeader,
   TalentAvatar, LeadBadge, ScoreBar,
   FILTER_INPUT, PAGE_SIZE, Pagination,
+  driveThumbUrl,
 } from './shared'
 
 // ---------------------------------------------------------------------------
@@ -106,7 +107,7 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
   ) : null
 
   const grid = (items) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+    <div className="grid-2-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
       {items}
     </div>
   )
@@ -293,21 +294,25 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
                 {photos.map(p => (
                   <div key={p.key} style={{ textAlign: 'center' }}>
                     {isDriveUrl(p.url) ? (
-                      <a
-                        href={p.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          width: 140, height: 180, display: 'flex', flexDirection: 'column',
-                          alignItems: 'center', justifyContent: 'center', gap: 8,
-                          border: `1px solid ${COLORS.border}`, borderRadius: 6,
-                          background: COLORS.surface, textDecoration: 'none',
-                          color: COLORS.accent, fontSize: 12, fontFamily: 'Montserrat, sans-serif',
-                        }}
-                      >
-                        <span style={{ fontSize: 28, lineHeight: 1 }}>📷</span>
-                        <span style={{ fontWeight: 600 }}>Apri foto →</span>
-                      </a>
+                      <div style={{ position: 'relative', width: 140, height: 180 }}>
+                        <img
+                          src={driveThumbUrl(p.url, 300)}
+                          alt={p.label}
+                          style={{ width: 140, height: 180, objectFit: 'cover', borderRadius: 6, border: `1px solid ${COLORS.border}`, display: 'block' }}
+                        />
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            position: 'absolute', bottom: 4, left: 4, right: 4, textAlign: 'center',
+                            fontSize: 10, fontWeight: 600, color: '#fff', background: 'rgba(0,0,0,0.55)',
+                            borderRadius: 4, padding: '2px 0', textDecoration: 'none',
+                          }}
+                        >
+                          Apri foto →
+                        </a>
+                      </div>
                     ) : (
                       <img
                         src={p.url}
@@ -527,24 +532,26 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
             <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:COLORS.textSecondary, marginBottom:10 }}>
               {changedKeys.length} campo{changedKeys.length !== 1 ? 'i' : ''} modificato{changedKeys.length !== 1 ? 'i' : ''}
             </div>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-              <thead>
-                <tr style={{ background:'#f5f5f5' }}>
-                  <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:600, color:COLORS.textSecondary, width:'28%' }}>Campo</th>
-                  <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:600, color:'#C62828' }}>Valore attuale</th>
-                  <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:600, color:'#2E7D32' }}>Nuovo valore</th>
-                </tr>
-              </thead>
-              <tbody>
-                {changedKeys.map(k => (
-                  <tr key={k} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
-                    <td style={{ padding:'8px 10px', fontWeight:600, color:COLORS.text }}>{LABELS[k] || k}</td>
-                    <td style={{ padding:'8px 10px', color:'#C62828', background:'#FFF3F3' }}>{fmt(d[k])}</td>
-                    <td style={{ padding:'8px 10px', color:'#2E7D32', background:'#F3FFF3' }}>{fmt(pending[k])}</td>
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                <thead>
+                  <tr style={{ background:'#f5f5f5' }}>
+                    <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:600, color:COLORS.textSecondary, width:'28%' }}>Campo</th>
+                    <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:600, color:'#C62828' }}>Valore attuale</th>
+                    <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:600, color:'#2E7D32' }}>Nuovo valore</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {changedKeys.map(k => (
+                    <tr key={k} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
+                      <td style={{ padding:'8px 10px', fontWeight:600, color:COLORS.text }}>{LABELS[k] || k}</td>
+                      <td style={{ padding:'8px 10px', color:'#C62828', background:'#FFF3F3' }}>{fmt(d[k])}</td>
+                      <td style={{ padding:'8px 10px', color:'#2E7D32', background:'#F3FFF3' }}>{fmt(pending[k])}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -709,7 +716,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
     </div>
   ) : null
 
-  const grid2 = items => <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px 16px' }}>{items}</div>
+  const grid2 = items => <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px 16px' }}>{items}</div>
 
   const photos = [
     { key:'busto',  label:'Mezzo busto',  url: d.foto_busto_url  },
@@ -718,11 +725,14 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
   ].filter(p => p.url)
 
   const renderPhoto = p => isDriveUrl(p.url) ? (
-    <a href={p.url} target="_blank" rel="noreferrer"
-      style={{ width:120, height:150, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6, border:`1px solid ${COLORS.border}`, borderRadius:6, background:COLORS.surface, textDecoration:'none', color:COLORS.accent, fontSize:11, fontFamily:'Montserrat,sans-serif' }}>
-      <span style={{ fontSize:24 }}>📷</span>
-      <span style={{ fontWeight:600 }}>Apri foto →</span>
-    </a>
+    <div style={{ position:'relative', width:120, height:150 }}>
+      <img src={driveThumbUrl(p.url, 260)} alt={p.label}
+        style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, display:'block' }} />
+      <a href={p.url} target="_blank" rel="noreferrer"
+        style={{ position:'absolute', bottom:4, left:4, right:4, textAlign:'center', fontSize:10, fontWeight:600, color:'#fff', background:'rgba(0,0,0,0.55)', borderRadius:4, padding:'2px 0', textDecoration:'none' }}>
+        Apri foto →
+      </a>
+    </div>
   ) : (
     <img src={p.url} alt={p.label} onClick={() => setLightboxUrl(p.url)}
       style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, cursor:'zoom-in', display:'block' }} />
@@ -1243,29 +1253,31 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
                 <div style={{ fontSize:12, color:COLORS.textSecondary }}>Nessuna candidatura nel database.</div>
               )}
               {!historyLoading && (history ?? []).length > 0 && (
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                  <thead>
-                    <tr style={{ background:'#f5f5f5' }}>
-                      <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Evento</th>
-                      <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Data</th>
-                      <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Stato</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map(app => {
-                      const evt = eventMap[app.data?.event_id ?? app.data?.shift_id]
-                      const evtTitle = evt?.data?.titolo ?? app.data?.event_id ?? '—'
-                      const appDate = app.created_at ? new Date(app.created_at).toLocaleDateString('it-IT') : '—'
-                      return (
-                        <tr key={app.entity_id} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
-                          <td style={{ padding:'8px 10px', color:COLORS.text }}>{evtTitle}</td>
-                          <td style={{ padding:'8px 10px', color:COLORS.textSecondary }}>{appDate}</td>
-                          <td style={{ padding:'8px 10px' }}>{statusBadge(app.status)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                    <thead>
+                      <tr style={{ background:'#f5f5f5' }}>
+                        <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Evento</th>
+                        <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Data</th>
+                        <th style={{ padding:'7px 10px', textAlign:'left', color:COLORS.textSecondary, fontWeight:600, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>Stato</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map(app => {
+                        const evt = eventMap[app.data?.event_id ?? app.data?.shift_id]
+                        const evtTitle = evt?.data?.titolo ?? app.data?.event_id ?? '—'
+                        const appDate = app.created_at ? new Date(app.created_at).toLocaleDateString('it-IT') : '—'
+                        return (
+                          <tr key={app.entity_id} style={{ borderBottom:`1px solid ${COLORS.border}` }}>
+                            <td style={{ padding:'8px 10px', color:COLORS.text }}>{evtTitle}</td>
+                            <td style={{ padding:'8px 10px', color:COLORS.textSecondary }}>{appDate}</td>
+                            <td style={{ padding:'8px 10px' }}>{statusBadge(app.status)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           ))}

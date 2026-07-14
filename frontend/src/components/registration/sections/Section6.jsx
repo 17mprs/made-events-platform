@@ -3,16 +3,24 @@ import React from 'react'
 import SectionShell from '../SectionShell'
 import MultiCheckbox from '../MultiCheckbox'
 import { COLORS, COMPONENT_STYLES } from '../../../styles/theme'
+import { DOTAZIONE_OPTIONS } from '../questionnaireOptions'
 
-const DOTAZIONE_OPTIONS = [
-  'Tailleur pantalone e giacca nero',
-  'Camicia bianca classica',
-  'Camicia nera classica',
-  'Décolleté nere con tacco',
-  'Scarpe eleganti nere basse (mocassino / ballerina / stringata)',
-  'Tubino nero',
-  'Sneaker bianche',
-]
+export function Section6Fields({ data, onChange }) {
+  return (
+    <div>
+      <label style={COMPONENT_STYLES.label}>Abbigliamento disponibile (opzionale)</label>
+      <p style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '16px', lineHeight: 1.6 }}>
+        Avere questi capi può aumentare le possibilità di selezione per eventi che richiedono un determinato dress code.
+      </p>
+      <MultiCheckbox
+        options={DOTAZIONE_OPTIONS}
+        value={data.dotazione_personale || []}
+        onChange={v => onChange('dotazione_personale', v)}
+        columns={2}
+      />
+    </div>
+  )
+}
 
 export default function Section6({ data, onChange, onNext, onBack, loading, nextLabel }) {
   return (
@@ -25,18 +33,7 @@ export default function Section6({ data, onChange, onNext, onBack, loading, next
       loading={loading}
       nextLabel={nextLabel}
     >
-      <div>
-        <label style={COMPONENT_STYLES.label}>Abbigliamento disponibile (opzionale)</label>
-        <p style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '16px', lineHeight: 1.6 }}>
-          Avere questi capi può aumentare le possibilità di selezione per eventi che richiedono un determinato dress code.
-        </p>
-        <MultiCheckbox
-          options={DOTAZIONE_OPTIONS}
-          value={data.dotazione_personale || []}
-          onChange={v => onChange('dotazione_personale', v)}
-          columns={2}
-        />
-      </div>
+      <Section6Fields data={data} onChange={onChange} />
     </SectionShell>
   )
 }

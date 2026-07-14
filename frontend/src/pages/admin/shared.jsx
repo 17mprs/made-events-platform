@@ -25,8 +25,8 @@ export const ADMIN_SIDEBAR = [
 
 export function PageHeader({ title, subtitle, action }) {
   return (
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:32 }}>
-      <div>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:32, flexWrap:'wrap', gap:12 }}>
+      <div style={{ minWidth:0 }}>
         <h1 style={{ margin:0, fontSize:22, fontWeight:600, letterSpacing:'1.5px', textTransform:'uppercase', color:COLORS.text }}>
           {title}
         </h1>
@@ -84,12 +84,21 @@ export function ScoreBar({ score }) {
 // TALENT AVATAR
 // ---------------------------------------------------------------------------
 
+// Le foto talent sono su Drive con link "view" (drive.google.com/file/d/ID/view),
+// non utilizzabile come <img src> — va convertito in link thumbnail incorporabile.
+export function driveThumbUrl(url, size = 200) {
+  if (typeof url !== 'string') return url
+  const m = url.match(/\/file\/d\/([^/]+)/)
+  if (!m) return url
+  return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w${size}`
+}
+
 export function TalentAvatar({ nome, fotoUrl, size = 40 }) {
   const [err, setErr] = useState(false)
   if (fotoUrl && !err) {
     return (
       <img
-        src={fotoUrl}
+        src={driveThumbUrl(fotoUrl, Math.max(size * 2, 80))}
         alt={nome}
         onError={() => setErr(true)}
         style={{ width:size, height:size, borderRadius:'50%', objectFit:'cover', flexShrink:0 }}
@@ -153,9 +162,9 @@ export function LeadDrawer({ lead, nota, onNotaChange, onClose, onAction, action
   const d = lead.data ?? {}
 
   const row = (label, value) => value ? (
-    <div key={label} style={{ display:'flex', gap:8, marginBottom:6 }}>
+    <div key={label} style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap' }}>
       <span style={{ fontSize:12, color:'#8888A0', minWidth:150, flexShrink:0 }}>{label}</span>
-      <span style={{ fontSize:12, color:'#E8E8F0' }}>{value}</span>
+      <span style={{ fontSize:12, color:'#E8E8F0', minWidth:0, wordBreak:'break-word' }}>{value}</span>
     </div>
   ) : null
 

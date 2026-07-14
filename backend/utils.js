@@ -121,7 +121,10 @@ var PERMISSION_MATRIX = {
   'application.listAll': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // DEMO
-  'demo.reset': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
+  'demo.reset': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+
+  // BACKFILL (BUG7 — recupero dati questionario nei TALENT_PROFILE già approvati)
+  'talent.backfillFromLead': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' }
 };
 
 // ---------------------------------------------------------------------------

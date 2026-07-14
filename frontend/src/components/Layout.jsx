@@ -67,7 +67,7 @@ function Header({ onMenuToggle, showMenu }) {
           <rect x="2" y="2" width="20" height="20" rx="2" fill={COLORS.accent} />
           <path d="M7 12h10M12 7v10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
-        <span style={{ letterSpacing: LETTER_SPACING.logo, fontSize:'22px', fontWeight:600 }}>MADE EVENTS</span>
+        <span className="logo-text" style={{ letterSpacing: LETTER_SPACING.logo, fontSize:'22px', fontWeight:600 }}>MADE EVENTS</span>
       </div>
 
       {/* Nav */}

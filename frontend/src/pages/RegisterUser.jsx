@@ -142,7 +142,7 @@ export default function RegisterUser() {
           </p>
         </div>
 
-        <div style={{ background:'#fff', border:`1px solid ${COLORS.border}`, borderRadius:'6px', padding:'40px' }}>
+        <div className="auth-card" style={{ background:'#fff', border:`1px solid ${COLORS.border}`, borderRadius:'6px', padding:'40px' }}>
           {error && <div className="error-banner">{error}</div>}
 
           <form onSubmit={submit} noValidate>

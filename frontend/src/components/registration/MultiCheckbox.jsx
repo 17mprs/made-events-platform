@@ -28,11 +28,7 @@ export default function MultiCheckbox({ options = [], value = [], onChange, excl
 
   return (
     <div>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gap: '10px',
-      }}>
+      <div className={`mc-grid mc-grid-${columns}`}>
         {normalized.map(opt => {
           const checked = value.includes(opt.value)
           return (

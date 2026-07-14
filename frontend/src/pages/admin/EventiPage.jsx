@@ -124,7 +124,7 @@ function DeleteConfirmModal({ event, onConfirm, onClose, loading }) {
             }}
           />
         </div>
-        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end', flexWrap:'wrap' }}>
           <button
             onClick={onClose}
             style={{ background:'none', border:'1px solid #e0e0e0', borderRadius:6, padding:'9px 20px', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif', color:'#333' }}
@@ -478,7 +478,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
             <Input label="Data inizio *" type="datetime-local" value={form.data_inizio} onChange={set('data_inizio')} required={!isEdit} />
             <Input label="Data fine" type="datetime-local" value={form.data_fine} onChange={set('data_fine')} />
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <Input label="Hostess richieste" type="number" min="0" value={form.hostess_richieste} onChange={set('hostess_richieste')} placeholder="es. 10" />
               <Input label="Min. anni esperienza" type="number" min="0" value={form.anni_esperienza_minimi} onChange={set('anni_esperienza_minimi')} placeholder="es. 2" />
             </div>
@@ -536,7 +536,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
                 Requisiti Talent
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
                   <label style={LBL}>Sesso richiesto</label>
                   <select value={form.sesso_richiesto} onChange={set('sesso_richiesto')} style={{ ...COMPONENT_STYLES.input }}>
@@ -616,7 +616,7 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
             </div>
           </div>
 
-          <div style={{ marginTop:24, display:'flex', gap:10 }}>
+          <div style={{ marginTop:24, display:'flex', gap:10, flexWrap:'wrap' }}>
             <Button type="submit" loading={saving}>{isEdit ? 'Salva modifiche' : 'Salva evento'}</Button>
             <button type="button" onClick={onClose} style={{ background:'none', border:'1px solid #e0e0e0', borderRadius:6, padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'Montserrat,sans-serif', color:'#333' }}>
               Annulla
@@ -860,12 +860,12 @@ export function ContractPreviewModal({ talent, event, onClose }) {
         {/* Chrome bar */}
         <div className="contract-chrome" style={{
           position:'sticky', top:0, zIndex:10,
-          display:'flex', alignItems:'center', gap:10,
+          display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
           background:'rgba(10,10,16,0.9)', backdropFilter:'blur(10px)',
           padding:'10px 20px', borderRadius:8, marginBottom:16,
           width:'100%', maxWidth:794, boxSizing:'border-box',
         }}>
-          <span style={{ fontSize:13, fontWeight:600, color:'#fff', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+          <span style={{ fontSize:13, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
             Contratto — {nomeCognome || 'Talent'}
           </span>
           <button onClick={() => window.print()} style={btnPrimary}>Stampa / PDF</button>
@@ -1203,7 +1203,7 @@ function ShiftSection({ eventId, handleApiResponse }) {
             </button>
           ) : (
             <form onSubmit={handleCreate} style={{ background:'#1A1A24', borderRadius:8, padding:'12px 14px', display:'flex', flexDirection:'column', gap:8, marginTop:6 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+              <div className="grid-3-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
                 <div>
                   <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Data *</div>
                   <input type="date" required value={addForm.data} onChange={setF('data')} style={inp} />
@@ -1217,7 +1217,7 @@ function ShiftSection({ eventId, handleApiResponse }) {
                   <input type="time" required value={addForm.orario_fine} onChange={setF('orario_fine')} style={inp} />
                 </div>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div>
                   <div style={{ fontSize:10, color:MUTED, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Posti *</div>
                   <input type="number" min="1" required value={addForm.posti_disponibili} onChange={setF('posti_disponibili')} style={inp} />
@@ -1828,7 +1828,7 @@ function NewsletterSettingsModal({ currentSettings, onSave, onClose }) {
       display:'flex', alignItems:'center', justifyContent:'center',
     }}>
       <div style={{
-        background:'#fff', borderRadius:8, padding:32, width:360,
+        background:'#fff', borderRadius:8, padding:32, width:360, maxWidth:'92vw', boxSizing:'border-box',
         boxShadow:'0 8px 48px rgba(0,0,0,0.22)', fontFamily:'Montserrat,sans-serif',
       }}>
         <h3 style={{ margin:'0 0 6px', fontSize:16, fontWeight:700, color:'#1A1A2E' }}>

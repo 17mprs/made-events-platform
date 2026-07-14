@@ -34,7 +34,7 @@ export default function SectionShell({ number, title, description, onBack, onNex
       {children}
 
       {/* Azioni */}
-      <div style={{ display: 'flex', gap: '12px', marginTop: '36px', paddingTop: '24px', borderTop: `1px solid ${COLORS.border}` }}>
+      <div className="section-actions">
         {onBack && (
           <Button variant="secondary" type="button" onClick={onBack} disabled={loading}>
             ← Indietro

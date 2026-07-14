@@ -780,25 +780,33 @@ function handleTalentUpdateProfile(payload, auth) {
     }
   }
 
+  // Stessi field names del questionario (RegistrationFlow.js CAMPI_PUBBLICI) —
+  // l'area riservata deve poter modificare esattamente gli stessi campi delle 7 sezioni.
   var allowedFields = [
+    'telefono',
     // S1 — Dati Personali
-    'telefono', 'data_nascita', 'citta_nascita', 'nazionalita',
-    'indirizzo_residenza', 'numero_documento', 'stato_emissione_documento',
+    'genere',
+    'nascita_nazione', 'nascita_regione', 'nascita_provincia', 'nascita_citta', 'nascita_paese',
+    'residenza_nazione', 'residenza_regione', 'residenza_provincia', 'residenza_citta', 'residenza_paese',
+    'domicilio_coincide', 'domicilio_provincia', 'instagram', 'facebook',
     // S2 — Profilo Fisico
-    'altezza', 'taglia', 'capelli', 'occhi', 'corporatura',
-    // S3 — Logistica
-    'citta', 'province_operativita', 'automunita',
-    'disponibile_trasferte', 'disponibile_weekend',
+    'altezza', 'taglia_tshirt', 'taglia_pantalone', 'taglia_gonna', 'numero_scarpe',
+    'piercing_visibili', 'tatuaggi_visibili', 'tatuaggi_dove',
+    // S3 — Disponibilità Logistica
+    'patente_tipologie', 'automunita', 'province_lavoro',
+    'disponibilita_trasferte', 'disponibilita_weekend', 'disponibilita_serali',
     // S4 — Lingue
-    'lingue',
-    // S5 — Esperienza
-    'esperienza_anni', 'skills', 'esperienze_precedenti',
-    // S6 — Attrezzatura
-    'attrezzatura',
-    // S7 — Fiscale
-    'codice_fiscale', 'iban', 'intestatario_conto', 'partita_iva',
+    'lingua_inglese', 'inglese_certificato', 'lingua_francese', 'lingua_spagnolo', 'lingua_tedesco', 'altre_lingue',
+    // S5 — Profilo Professionale
+    'titolo_studio', 'titolo_studio_indirizzo', 'professione_attuale', 'tipologie_esperienza', 'anni_esperienza_settore',
+    // S6 — Dotazione Personale
+    'dotazione_personale',
+    // S7 — Fiscale + Foto
+    'codice_fiscale', 'partita_iva', 'iban', 'disponibile_chiamata', 'disponibile_ritenuta',
+    'doc_identita_url', 'doc_cf_url', 'foto_busto_url', 'foto_intera_url', 'foto_extra_url',
+    'cv_url', 'attestato_haccp_url', 'attestato_sicurezza_url',
     // Altro
-    'disponibilita', 'note'
+    'citta', 'province_operativita', 'note'
   ];
   var updates = {};
   for (var i = 0; i < allowedFields.length; i++) {

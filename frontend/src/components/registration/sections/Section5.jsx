@@ -4,60 +4,15 @@ import { COLORS, COMPONENT_STYLES } from '../../../styles/theme'
 import Input from '../../Input'
 import SectionShell from '../SectionShell'
 import MultiCheckbox from '../MultiCheckbox'
+import { TITOLI_STUDIO, PROFESSIONI, TIPOLOGIE_ESPERIENZA, ANNI_ESPERIENZA } from '../questionnaireOptions'
 
-const TITOLI_STUDIO = [
-  'Scuola elementare',
-  'Media inferiore',
-  'Media superiore',
-  'Laurea triennale',
-  'Laurea magistrale',
-]
-
-const PROFESSIONI = [
-  'Studentessa',
-  'Lavoratrice part-time',
-  'Lavoratrice full-time',
-  'Libera professionista',
-  'Lavoro occasionale',
-  'Altro',
-]
-
-const TIPOLOGIE_ESPERIENZA = [
-  'Accoglienza',
-  'Accrediti / Registrazione partecipanti',
-  'Accoglienza ECM',
-  'Guardaroba',
-  'Hospitality sportiva',
-  'Concerti',
-  'Promozioni',
-  'Promoter vendita',
-  'Sampling',
-  'Teatri',
-  'Fiere',
-  'Congressi',
-  'Eventi corporate',
-  'Eventi luxury',
-  'Wedding',
-  'Coordinamento eventi',
-  'Segreteria organizzativa',
-]
-
-const ANNI_ESPERIENZA = ['0–1', '1–3', '3–5', 'Oltre 5']
-
-export default function Section5({ data, onChange, onNext, onBack, loading }) {
-  const [errors, setErrors] = useState({})
+export function Section5Fields({ data, onChange, errors = {} }) {
   const [altroProfessione, setAltroProfessione] = useState(
     (data.professione_attuale || []).find(v => !PROFESSIONI.slice(0, -1).includes(v) && v !== 'Altro') || ''
   )
 
-  function validate() {
-    const e = {}
-    if (!data.titolo_studio)               e.titolo_studio = 'Seleziona il titolo di studio'
-    if (!data.professione_attuale?.length) e.professione_attuale = 'Seleziona almeno un\'opzione'
-    if (!data.anni_esperienza_settore)     e.anni_esperienza_settore = 'Seleziona gli anni di esperienza'
-    // Tipologie non obbligatorie
-    setErrors(e)
-    return Object.keys(e).length === 0
+  function isCustom(v) {
+    return !PROFESSIONI.includes(v)
   }
 
   function handleProfessioneChange(values) {
@@ -74,19 +29,8 @@ export default function Section5({ data, onChange, onNext, onBack, loading }) {
     }
   }
 
-  function isCustom(v) {
-    return !PROFESSIONI.includes(v)
-  }
-
   return (
-    <SectionShell
-      number={5}
-      title="Profilo Professionale"
-      description="Formazione, occupazione attuale e tipologie di esperienza nel settore eventi."
-      onBack={onBack}
-      onNext={() => { if (validate()) onNext() }}
-      loading={loading}
-    >
+    <>
       {/* Titolo di studio */}
       <div style={{ marginBottom: '28px' }}>
         <div className="form-grid">
@@ -171,6 +115,33 @@ export default function Section5({ data, onChange, onNext, onBack, loading }) {
           <p style={{ fontSize: '12px', color: COLORS.error, marginTop: '4px' }}>{errors.anni_esperienza_settore}</p>
         )}
       </div>
+    </>
+  )
+}
+
+export default function Section5({ data, onChange, onNext, onBack, loading }) {
+  const [errors, setErrors] = useState({})
+
+  function validate() {
+    const e = {}
+    if (!data.titolo_studio)               e.titolo_studio = 'Seleziona il titolo di studio'
+    if (!data.professione_attuale?.length) e.professione_attuale = 'Seleziona almeno un\'opzione'
+    if (!data.anni_esperienza_settore)     e.anni_esperienza_settore = 'Seleziona gli anni di esperienza'
+    // Tipologie non obbligatorie
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  return (
+    <SectionShell
+      number={5}
+      title="Profilo Professionale"
+      description="Formazione, occupazione attuale e tipologie di esperienza nel settore eventi."
+      onBack={onBack}
+      onNext={() => { if (validate()) onNext() }}
+      loading={loading}
+    >
+      <Section5Fields data={data} onChange={onChange} errors={errors} />
     </SectionShell>
   )
 }

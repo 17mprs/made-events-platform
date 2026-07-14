@@ -28,3 +28,4 @@ npm-debug.log*
 # clasp credentials (never commit)
 backend/.clasprc.json
 .clasprc.json
+.gstack/

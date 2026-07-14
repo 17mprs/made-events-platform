@@ -1,5 +1,5 @@
 // === REGISTRATION_FLOW.JS — MADE EVENT Platform v1.1 ===
-// Onboarding talent step-by-step: Step 1 (dati base), Step 2 (profilazione 8 sezioni),
+// Onboarding talent step-by-step: Step 1 (dati base), Step 2 (profilazione 7 sezioni),
 // Step 3 (finalizzazione: Drive folder + scoring + stato COMPLETED_PENDING_APPROVAL).
 //
 // Step 1/2/3 e uploadRegistrationDoc sono PUBLIC (no token).
@@ -551,14 +551,13 @@ function inviaEmailSollecito(leadId) {
     else          mancanti.push(label);
   };
 
-  checkSezione(1, 'Dati Personali',       function(d) { return !!(d.nascita_citta && d.residenza_citta); });
-  checkSezione(2, 'Profilo Fisico',       function(d) { return !!(d.altezza && d.taglia_tshirt && d.numero_scarpe); });
-  checkSezione(3, 'Disponibilità',        function(d) { return !!(d.patente_tipologie && d.patente_tipologie.length && d.province_lavoro && d.province_lavoro.length); });
-  checkSezione(4, 'Lingue',               function(d) { return !!d.lingua_inglese; });
-  checkSezione(5, 'Profilo Professionale',function(d) { return !!(d.titolo_studio && d.anni_esperienza_settore); });
-  checkSezione(6, 'Dotazione',            function(d) { return true; }); // opzionale — sempre OK
-  checkSezione(7, 'Dati Fiscali',         function(d) { return !!(d.codice_fiscale && d.iban); });
-  checkSezione(8, 'Documenti e Foto',     function(d) { return !!(d.doc_identita_url && d.foto_busto_url && d.cv_url); });
+  checkSezione(1, 'Dati Personali',          function(d) { return !!(d.nascita_citta && d.residenza_citta); });
+  checkSezione(2, 'Profilo Fisico',          function(d) { return !!(d.altezza && d.taglia_tshirt && d.numero_scarpe); });
+  checkSezione(3, 'Disponibilità Logistica', function(d) { return !!(d.patente_tipologie && d.patente_tipologie.length && d.province_lavoro && d.province_lavoro.length); });
+  checkSezione(4, 'Lingue',                  function(d) { return !!d.lingua_inglese; });
+  checkSezione(5, 'Profilo Professionale',   function(d) { return !!(d.titolo_studio && d.anni_esperienza_settore); });
+  checkSezione(6, 'Dotazione Personale',     function(d) { return true; }); // opzionale — sempre OK
+  checkSezione(7, 'Foto Profilo',            function(d) { return !!(d.foto_busto_url && d.foto_intera_url); });
 
   try {
     var frontendUrl = getFrontendUrl();

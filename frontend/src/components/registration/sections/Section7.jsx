@@ -6,23 +6,7 @@ import { COLORS } from '../../../styles/theme'
 import FileUpload from '../FileUpload'
 import SectionShell from '../SectionShell'
 import { talentApi, getErrorMessage } from '../../../api/client'
-
-const CRITERI_NON_ACCETTAZIONE = [
-  'Con altre persone',
-  'Con filtri / ritocchi',
-  'Con loghi / scritte',
-  'Con occhiali da sole',
-  'Sfocate o scattate da lontano',
-  'Bassa risoluzione',
-  'Con cornici decorative',
-  'Formato stories / screenshot',
-]
-
-const FOTO_FIELDS = {
-  foto_busto:  { label: 'Foto mezzo busto / primo piano', accept: 'image/jpeg,image/png', maxMB: 5, required: true,  hint: 'Sfondo neutro, viso frontale, espressione naturale.' },
-  foto_intera: { label: 'Foto figura intera',             accept: 'image/jpeg,image/png', maxMB: 5, required: true,  hint: 'Sfondo neutro, outfit professionale.' },
-  foto_extra:  { label: 'Foto aggiuntiva',                accept: 'image/jpeg,image/png', maxMB: 5, required: false, hint: 'Opzionale.' },
-}
+import { CRITERI_NON_ACCETTAZIONE, FOTO_FIELDS } from '../questionnaireOptions'
 
 export default function Section7({ data, onChange, leadId, email, onNext, onBack, loading: parentLoading }) {
   const [uploadState, setUploadState]   = useState({})

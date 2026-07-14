@@ -249,7 +249,7 @@ function Vista2({ apps, talentMap, eventMap, actionLoading, onApprove, onReject,
         return (
           <div key={eid} style={{ border:`1px solid ${COLORS.border}`, borderRadius:8, overflow:'hidden', background:'#fff' }}>
             <div onClick={() => setExpandedId(isOpen ? null : eid)}
-              style={{ padding:'14px 18px', display:'flex', alignItems:'center', gap:14, cursor:'pointer', background: isOpen ? '#fafafa' : '#fff' }}
+              style={{ padding:'14px 18px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', cursor:'pointer', background: isOpen ? '#fafafa' : '#fff' }}
             >
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontWeight:600, fontSize:14, color:COLORS.text, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -275,7 +275,7 @@ function Vista2({ apps, talentMap, eventMap, actionLoading, onApprove, onReject,
                   const td   = t?.data ?? {}
                   const nome = td.nome ? `${td.nome} ${td.cognome ?? ''}`.trim() : (a.data?.talent_name ?? '—')
                   return (
-                    <div key={a.entity_id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:6, background:'#fafafa' }}>
+                    <div key={a.entity_id} style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', padding:'8px 10px', borderRadius:6, background:'#fafafa' }}>
                       <TalentAvatar nome={nome} fotoUrl={td.foto_busto_url} size={32} />
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:13, fontWeight:500, color:COLORS.text }}>{nome}</div>

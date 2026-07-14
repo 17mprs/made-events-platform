@@ -254,6 +254,19 @@ input, textarea, select { font-family: var(--font-family); }
   }
 }
 
+@media (max-width: 480px) {
+  .split-left {
+    padding: 32px 20px;
+  }
+  .split-left .logo-text {
+    font-size: 16px !important;
+    letter-spacing: 3px !important;
+  }
+  .split-right {
+    padding: 32px 20px;
+  }
+}
+
 /* ---- MISC ---- */
 
 .empty-state {
@@ -311,4 +324,80 @@ input, textarea, select { font-family: var(--font-family); }
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* ---- MULTI CHECKBOX GRID ---- */
+
+.mc-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.mc-grid-1 { grid-template-columns: 1fr; }
+.mc-grid-2 { grid-template-columns: 1fr 1fr; }
+.mc-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 480px) {
+  .mc-grid-3 { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---- SECTION ACTIONS (registration wizard buttons) ---- */
+
+.section-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+  .section-actions {
+    flex-direction: column-reverse;
+  }
+  .section-actions button {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+}
+
+/* ---- GENERIC 3-COL LAYOUT (radio groups etc.) ---- */
+
+.grid-3-collapse {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 480px) {
+  .grid-3-collapse { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---- AUTH / REGISTRATION CARD SHELL ---- */
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 20px !important;
+  }
+}
+
+/* ---- HEADER MOBILE ---- */
+
+@media (max-width: 480px) {
+  .app-shell header {
+    padding: 0 16px !important;
+  }
+  .app-shell header nav {
+    gap: 12px !important;
+  }
+  .app-shell header .logo-text {
+    font-size: 15px !important;
+    letter-spacing: 2px !important;
+  }
+}
+
+/* ---- GENERIC 2-COL LAYOUT (drawers, form rows) ---- */
+
+@media (max-width: 480px) {
+  .grid-2-collapse { grid-template-columns: 1fr !important; }
 }

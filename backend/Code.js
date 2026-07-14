@@ -208,6 +208,9 @@ function handleRequest(action, payload, token) {
     case 'config.get':  return handleConfigGet(payload, auth);
     case 'demo.reset':  return handleDemoReset(payload, auth);
 
+    // BACKFILL (BUG7)
+    case 'talent.backfillFromLead': return handleTalentBackfillFromLead(payload, auth);
+
     default:
       return errorResponse('VAL_002', 'Action "' + action + '" non riconosciuta');
   }
