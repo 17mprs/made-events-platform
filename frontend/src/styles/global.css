@@ -38,6 +38,18 @@ a { color: inherit; text-decoration: none; }
 button { font-family: var(--font-family); }
 input, textarea, select { font-family: var(--font-family); }
 
+/* Blocca zoom automatico iOS sui campi form — Safari mobile zooma se font-size < 16px */
+input, select, textarea, [role="combobox"] {
+  font-size: 16px !important;
+}
+
+@media (max-width: 768px) {
+  input, select, textarea, [role="combobox"] {
+    font-size: 16px !important;
+    touch-action: pan-y;
+  }
+}
+
 /* Scrollbar sottile */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: var(--color-surface); }
