@@ -143,12 +143,28 @@ function DeleteConfirmModal({ event, onConfirm, onClose, loading }) {
 // EVENT STATUS TOGGLE
 // ---------------------------------------------------------------------------
 
-function EventStatusToggle({ event, onChangeStatus, onRequestDelete, isChanging }) {
+function EventStatusToggle({ event, onChangeStatus, isChanging }) {
   const [open, setOpen] = useState(false)
   const [pos,  setPos]  = useState(null)
   const buttonRef = useRef(null)
   const meta    = statusMeta(event.status)
   const options = STATUS_TRANSITIONS[event.status] ?? []
+
+  // Nessuna transizione di stato disponibile (es. CANCELLED, non mappato in
+  // STATUS_TRANSITIONS) → badge statico, non serve più un dropdown interattivo
+  // ora che "Elimina evento" è un pulsante separato nella card, non più qui dentro.
+  if (!options.length) {
+    return (
+      <span style={{
+        display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px',
+        borderRadius:20, background:meta.bg, color:meta.color,
+        fontSize:10, fontWeight:700, letterSpacing:'0.3px',
+      }}>
+        <span style={{ width:6, height:6, borderRadius:'50%', background:meta.dot, flexShrink:0 }} />
+        {meta.label}
+      </span>
+    )
+  }
 
   const handleToggle = () => {
     if (isChanging) return
@@ -237,21 +253,6 @@ function EventStatusToggle({ event, onChangeStatus, onRequestDelete, isChanging 
                 </button>
               )
             })}
-            <button
-              onClick={() => { setOpen(false); onRequestDelete(event) }}
-              style={{
-                width:'100%', textAlign:'left', background:'none',
-                border:'none', borderTop:`1px solid ${COLORS.border}`,
-                padding:'10px 14px', cursor:'pointer',
-                fontSize:12, fontWeight:600, color:'#C62828',
-                display:'flex', alignItems:'center', gap:8, transition:'background 0.12s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#FFEBEE' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-            >
-              <span style={{ fontSize:14 }}>🗑</span>
-              Elimina evento
-            </button>
           </div>
         </>,
         document.body
@@ -1792,7 +1793,6 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
         <EventStatusToggle
           event={event}
           onChangeStatus={onChangeStatus}
-          onRequestDelete={onRequestDelete}
           isChanging={isChanging}
         />
 
@@ -1837,6 +1837,15 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
             onMouseLeave={e => { e.currentTarget.style.borderColor=COLORS.border; e.currentTarget.style.color=COLORS.textSecondary }}
           >
             Modifica
+          </button>
+          <button
+            onClick={() => onRequestDelete(event)}
+            title="Elimina evento"
+            style={{ background:'none', border:'1px solid #C62828', borderRadius:6, padding:'4px 10px', fontSize:10, fontWeight:600, cursor:'pointer', color:'#C62828', fontFamily:'Montserrat,sans-serif' }}
+            onMouseEnter={e => { e.currentTarget.style.background='#C62828'; e.currentTarget.style.color='#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.color='#C62828' }}
+          >
+            Elimina
           </button>
         </div>
       </div>
