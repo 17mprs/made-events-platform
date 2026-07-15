@@ -185,10 +185,14 @@ export default function ClientiPage() {
   const handleConfirmDelete = async (entity_id) => {
     setDeleting(true)
     const res = handleApiResponse(await clientApi.softDelete(entity_id))
+    if (!res.success) {
+      setDeleting(false)
+      alert(getErrorMessage(res.error))
+      return
+    }
+    await load()
     setDeleting(false)
-    if (!res.success) { alert(getErrorMessage(res.error)); return }
     setDeleteModal(null)
-    load()
     showToast('Eliminato')
   }
 
