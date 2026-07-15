@@ -10,7 +10,7 @@ function doGet(e) {
   return jsonResponse_(successResponse({
     status:    'ok',
     version:   SYSTEM_CONFIG.VERSION,
-    product:   'MADE EVENT Platform',
+    product:   'MADE EVENTS Platform',
     timestamp: new Date().toISOString()
   }));
 }

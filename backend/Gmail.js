@@ -16,7 +16,7 @@
 var EMAIL_CONFIG = {
   FROM_NAME:    'MADE EVENTS',
   REPLY_TO:     'noreply@madeevent.it',   // Override con config tenant se disponibile
-  SUBJECT_PREFIX: '[Made Event] '
+  SUBJECT_PREFIX: '[MADE EVENTS] '
 };
 
 // ---------------------------------------------------------------------------
@@ -72,11 +72,11 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
 
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
+    '<div style="background:#630E33;padding:24px;text-align:center;">',
     '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
-    '<h2 style="color:#1a1a2e;">Benvenuto/a, ' + escapeHtml_(nome) + '!</h2>',
+    '<h2 style="color:#630E33;">Benvenuto/a, ' + escapeHtml_(nome) + '!</h2>',
     '<p>Il tuo profilo è stato <strong>approvato</strong>. ',
     'Puoi ora accedere alla piattaforma e candidarti agli eventi.</p>',
     '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:24px 0;">',
@@ -85,7 +85,7 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
     '<p style="margin:4px 0;">Password temporanea: <code style="background:#e0e0e0;padding:2px 6px;border-radius:4px;">' + escapeHtml_(tempPassword) + '</code></p>',
     '</div>',
     '<p style="color:#d32f2f;font-size:13px;">⚠ Cambia la password al primo accesso.</p>',
-    '<a href="' + url + '" style="display:inline-block;background:#1a1a2e;color:#fff;',
+    '<a href="' + url + '" style="display:inline-block;background:#630E33;color:#fff;',
     'padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">',
     'Accedi alla piattaforma</a>',
     '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
@@ -98,7 +98,7 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
   var text = [
     'Benvenuto/a, ' + nome + '!',
     '',
-    'Il tuo profilo Made Event è stato approvato.',
+    'Il tuo profilo MADE EVENTS è stato approvato.',
     'Puoi ora accedere alla piattaforma.',
     '',
     'Le tue credenziali:',
@@ -122,13 +122,13 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
 function sendProfileApprovedEmail(to, nome) {
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
+    '<div style="background:#630E33;padding:24px;text-align:center;">',
     '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
-    '<h2 style="color:#1a1a2e;">Profilo approvato ✓</h2>',
+    '<h2 style="color:#630E33;">Profilo approvato ✓</h2>',
     '<p>Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p>Il tuo profilo talent è stato <strong>approvato</strong> dal team Made Event.</p>',
+    '<p>Il tuo profilo talent è stato <strong>approvato</strong> dal team MADE EVENTS.</p>',
     '<p>Ora puoi:</p>',
     '<ul>',
     '<li>Visualizzare gli shift disponibili</li>',
@@ -214,11 +214,11 @@ function sendReminder24hEmail(to, nome, shiftData) {
 
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
+    '<div style="background:#630E33;padding:24px;text-align:center;">',
     '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
-    '<h2 style="color:#1a1a2e;">⏰ Reminder — Il tuo turno è domani</h2>',
+    '<h2 style="color:#630E33;">⏰ Reminder — Il tuo turno è domani</h2>',
     '<p>Ciao ' + escapeHtml_(nome) + ', ti ricordiamo che domani hai un turno confermato:</p>',
     '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:24px 0;">',
     '<p style="margin:4px 0;"><strong>Data:</strong> '   + escapeHtml_(dataFormatted) + '</p>',
@@ -245,7 +245,7 @@ function sendReminder2hEmail(to, nome, shiftData) {
 
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
+    '<div style="background:#630E33;padding:24px;text-align:center;">',
     '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
@@ -303,7 +303,7 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
 
   var html = [
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#1a1a2e;padding:24px;text-align:center;">',
+    '<div style="background:#630E33;padding:24px;text-align:center;">',
     '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
     '</div>',
     '<div style="padding:32px;">',
@@ -339,7 +339,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
     '<!DOCTYPE html>',
     '<html lang="it"><head><meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',
-    '<title>Completa la tua iscrizione — Made Event</title></head>',
+    '<title>Completa la tua iscrizione — MADE EVENTS</title></head>',
     '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
 
     '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
@@ -425,7 +425,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
     'MADE EVENTS — Non rispondere a questa email.'
   ].join('\n');
 
-  return sendEmail_(to, 'Completa la tua iscrizione — Made Event', html, text);
+  return sendEmail_(to, 'Completa la tua iscrizione — MADE EVENTS', html, text);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +448,7 @@ function sendProfiloRicevutoEmail(to, nome) {
     '<tr><td style="padding:48px;">',
     '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
     '<p style="margin:0 0 24px;font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;">',
-    'Il tuo profilo è stato ricevuto ed è ora in attesa di revisione da parte del team Made Event.',
+    'Il tuo profilo è stato ricevuto ed è ora in attesa di revisione da parte del team MADE EVENTS.',
     '</p>',
     '<div style="height:2px;background:' + ACCENT + ';margin:0 0 28px;width:48px;"></div>',
     '<p style="margin:0 0 8px;font-size:13px;font-weight:500;letter-spacing:0.8px;text-transform:uppercase;color:#2E2E2E;">Cosa succede ora</p>',
@@ -482,7 +482,7 @@ function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
     '<tr><td align="center">',
     '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
     '<tr><td style="background:#2E2E2E;padding:28px 48px;">',
-    '<p style="margin:0;font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.5);">Made Event — Admin</p>',
+    '<p style="margin:0;font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.5);">MADE EVENTS — Admin</p>',
     '<h1 style="margin:8px 0 0;font-size:20px;font-weight:400;color:#FFFFFF;">Nuovo profilo da approvare</h1>',
     '</td></tr>',
     '<tr><td style="padding:40px 48px;">',
@@ -532,7 +532,7 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
     '<tr><td style="padding:48px;">',
     '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
     '<p style="margin:0 0 28px;font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;">',
-    'Stai completando la tua iscrizione a Made Event. Riprendi da dove ti eri fermata!',
+    'Stai completando la tua iscrizione a MADE EVENTS. Riprendi da dove ti eri fermata!',
     '</p>',
     completati.length ? '<p style="margin:0 0 8px;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;">Hai già compilato:</p><ul style="margin:0 0 24px;padding-left:20px;">' + completatiHtml + '</ul>' : '',
     mancanti.length   ? '<p style="margin:0 0 8px;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;">Manca ancora:</p><ul style="margin:0 0 32px;padding-left:20px;">' + mancantiHtml + '</ul>' : '',

@@ -109,7 +109,7 @@ function setupDatabase() {
     ss.deleteSheet(defaultSheet);
   }
 
-  // 3. Crea tenant "Made Event"
+  // 3. Crea tenant "MADE EVENTS"
   var tenantId = setupTenant_(ss);
 
   // 4. Crea primo utente SUPER_ADMIN
@@ -121,7 +121,7 @@ function setupDatabase() {
   // 6. Scrivi prima riga DeployLog
   setupDeployLog_(ss);
 
-  Logger.log('=== SETUP MADE EVENT PLATFORM COMPLETATO ===');
+  Logger.log('=== SETUP MADE EVENTS PLATFORM COMPLETATO ===');
   Logger.log('Fogli creati:    ' + (created.length   > 0 ? created.join(', ')   : 'nessuno'));
   Logger.log('Fogli esistenti: ' + (existing.length  > 0 ? existing.join(', ')  : 'nessuno'));
   Logger.log('Tenant ID:       ' + tenantId);
@@ -147,9 +147,9 @@ function setupTenant_(ss) {
   var headers = SHEET_HEADERS.Tenants;
   var row = {
     tenant_id:  tenantId,
-    name:       'Made Event',
-    product:    'MADE_EVENT_PLATFORM',
-    slug:       'made-event',
+    name:       'MADE EVENTS',
+    product:    'MADE_EVENTS_PLATFORM',
+    slug:       'made-events',
     status:     'active',
     created_at: now,
     updated_at: now,
@@ -160,7 +160,7 @@ function setupTenant_(ss) {
   tenantsSheet.appendRow(headers.map(function(h) {
     return row[h] !== undefined ? row[h] : '';
   }));
-  Logger.log('Tenant creato: Made Event — ID: ' + tenantId);
+  Logger.log('Tenant creato: MADE EVENTS — ID: ' + tenantId);
   return tenantId;
 }
 
@@ -252,7 +252,7 @@ function setupDeployLog_(ss) {
     deploy_id:   Utilities.getUuid(),
     timestamp:   new Date(),
     version:     SYSTEM_CONFIG.VERSION,
-    note:        'Setup iniziale database MADE EVENT Platform',
+    note:        'Setup iniziale database MADE EVENTS Platform',
     deployed_by: 'system'
   };
   deploySheet.appendRow(headers.map(function(h) {

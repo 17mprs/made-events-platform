@@ -305,7 +305,7 @@ function handleRegisterStep3(payload) {
     stato_profilo:  'in_attesa',
     score:          scoreResult.score,
     ranking:        scoreResult.ranking,
-    message:        'Profilo inviato! In attesa di approvazione del team Made Event.'
+    message:        'Profilo inviato! In attesa di approvazione del team MADE EVENTS.'
   });
 }
 

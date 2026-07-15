@@ -7,7 +7,7 @@ function createTenant(name, product) {
   appendRow_('Tenants', {
     tenant_id:  tenantId,
     name:       name || 'Nuovo Tenant',
-    product:    product || 'MADE_EVENT_PLATFORM',
+    product:    product || 'MADE_EVENTS_PLATFORM',
     slug:       (name || 'nuovo-tenant').toLowerCase().replace(/\s+/g, '-'),
     status:     'active',
     created_at: now,
