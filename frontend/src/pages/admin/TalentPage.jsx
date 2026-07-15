@@ -11,6 +11,7 @@ import {
   FILTER_INPUT, PAGE_SIZE, Pagination,
   driveThumbUrl, safeArray,
 } from './shared'
+import { TAGLIE_SHIRT, TIPOLOGIE_ESPERIENZA, LINGUE_FISSE, DISPONIBILITA_TIPI } from '../../components/registration/questionnaireOptions'
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -75,7 +76,7 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
   const toggleSection = (k) => setOpenSections(prev => ({ ...prev, [k]: !prev[k] }))
 
   const photos = [
-    { key: 'foto_busto',  label: 'Mezzo busto',   url: d.foto_busto_url  },
+    { key: 'foto_busto',  label: 'Mezzo busto',   url: d.foto_busto_url || d.documenti?.foto?.url || d.foto_url },
     { key: 'foto_intera', label: 'Figura intera',  url: d.foto_intera_url },
     { key: 'foto_extra',  label: 'Aggiuntiva',     url: d.foto_extra_url  },
   ].filter(p => p.url)
@@ -718,8 +719,10 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
 
   const grid2 = items => <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px 16px' }}>{items}</div>
 
+  // Fallback su forme legacy per profili approvati prima del fix BUG7 —
+  // stessa catena di getFotoUrl() usata per l'avatar in lista.
   const photos = [
-    { key:'busto',  label:'Mezzo busto',  url: d.foto_busto_url  },
+    { key:'busto',  label:'Mezzo busto',   url: d.foto_busto_url  || d.documenti?.foto?.url || d.foto_url },
     { key:'intera', label:'Figura intera', url: d.foto_intera_url },
     { key:'extra',  label:'Aggiuntiva',    url: d.foto_extra_url  },
   ].filter(p => p.url)
@@ -1356,6 +1359,14 @@ export function TalentsSection({ handleApiResponse }) {
   const [search,         setSearch]         = useState('')
   const [filterStatus,   setFilterStatus]   = useState('ALL')
   const [sortScore,      setSortScore]      = useState('DESC')
+  const [filterCitta,    setFilterCitta]    = useState('')
+  const [filterLingue,   setFilterLingue]   = useState([])   // array di value da LINGUE_FISSE
+  const [filterDisp,     setFilterDisp]     = useState('')   // value da DISPONIBILITA_TIPI
+  const [filterEsp,      setFilterEsp]      = useState('')   // valore da TIPOLOGIE_ESPERIENZA
+  const [filterAltezzaMin, setFilterAltezzaMin] = useState('')
+  const [filterAltezzaMax, setFilterAltezzaMax] = useState('')
+  const [filterTaglia,   setFilterTaglia]   = useState('')
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [page,           setPage]           = useState(1)
   const [selectedReview, setSelectedReview] = useState(null)
   const [selectedScheda, setSelectedScheda] = useState(null)
@@ -1379,7 +1390,11 @@ export function TalentsSection({ handleApiResponse }) {
   }, [])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { setPage(1) }, [filterStatus, search, sortScore])
+  useEffect(() => { setPage(1) }, [filterStatus, search, sortScore, filterCitta, filterLingue, filterDisp, filterEsp, filterAltezzaMin, filterAltezzaMax, filterTaglia])
+
+  const cittaOptions = useMemo(() =>
+    Array.from(new Set(items.map(l => l.data?.citta).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+  [items])
 
   const profileByEmail = useMemo(() => {
     const m = {}
@@ -1404,12 +1419,24 @@ export function TalentsSection({ handleApiResponse }) {
         (l.data?.email ?? '').toLowerCase().includes(q)
       )
     }
+    if (filterCitta) list = list.filter(l => l.data?.citta === filterCitta)
+    if (filterLingue.length > 0) {
+      list = list.filter(l => filterLingue.some(campo => {
+        const v = l.data?.[campo]
+        return !!v && v !== 'Non conosco'
+      }))
+    }
+    if (filterDisp) list = list.filter(l => l.data?.[filterDisp] === 'Sì')
+    if (filterEsp) list = list.filter(l => safeArray(l.data?.tipologie_esperienza).includes(filterEsp))
+    if (filterAltezzaMin) list = list.filter(l => Number(l.data?.altezza) >= Number(filterAltezzaMin))
+    if (filterAltezzaMax) list = list.filter(l => Number(l.data?.altezza) <= Number(filterAltezzaMax))
+    if (filterTaglia) list = list.filter(l => l.data?.taglia_tshirt === filterTaglia)
     list.sort((a, b) => sortScore === 'DESC'
       ? (Number(b.data?.score) || 0) - (Number(a.data?.score) || 0)
       : (Number(a.data?.score) || 0) - (Number(b.data?.score) || 0)
     )
     return list
-  }, [items, filterStatus, search, sortScore])
+  }, [items, filterStatus, search, sortScore, filterCitta, filterLingue, filterDisp, filterEsp, filterAltezzaMin, filterAltezzaMax, filterTaglia])
 
   const pendingList  = filtered.filter(l => l.status === 'COMPLETED_PENDING_APPROVAL')
   const approvedList = filtered.filter(l => l.status === 'APPROVED')
@@ -1548,7 +1575,7 @@ export function TalentsSection({ handleApiResponse }) {
       )}
 
       {/* Filters */}
-      <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16, alignItems:'center' }}>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8, alignItems:'center' }}>
         <input placeholder="Cerca nome o email…" value={search} onChange={e => setSearch(e.target.value)} style={{ ...FILTER_INPUT, minWidth:180 }} />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={FILTER_INPUT}>
           <option value="ALL">Tutti</option>
@@ -1559,8 +1586,63 @@ export function TalentsSection({ handleApiResponse }) {
           <option value="DESC">Score ↓</option>
           <option value="ASC">Score ↑</option>
         </select>
+        <select value={filterCitta} onChange={e => setFilterCitta(e.target.value)} style={FILTER_INPUT}>
+          <option value="">Città (tutte)</option>
+          {cittaOptions.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+          {LINGUE_FISSE.map(l => {
+            const active = filterLingue.includes(l.value)
+            return (
+              <button
+                key={l.value}
+                type="button"
+                onClick={() => setFilterLingue(prev => active ? prev.filter(v => v !== l.value) : [...prev, l.value])}
+                style={{
+                  ...FILTER_INPUT, padding:'6px 10px', cursor:'pointer',
+                  background: active ? '#630E33' : '#fff',
+                  color: active ? '#fff' : '#333333',
+                  border: `1px solid ${active ? '#630E33' : '#e0e0e0'}`,
+                }}
+              >
+                {l.label}
+              </button>
+            )
+          })}
+        </div>
+        <select value={filterDisp} onChange={e => setFilterDisp(e.target.value)} style={FILTER_INPUT}>
+          <option value="">Disponibilità (tutte)</option>
+          {DISPONIBILITA_TIPI.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+        </select>
+        <button
+          type="button"
+          onClick={() => setShowMoreFilters(v => !v)}
+          style={{ ...FILTER_INPUT, cursor:'pointer', color:'#630E33', border:'1px solid #630E33', background:'none' }}
+        >
+          Altri filtri {showMoreFilters ? '▲' : '▼'}
+        </button>
         <span style={{ fontSize:12, color:'#8888A0', marginLeft:'auto', whiteSpace:'nowrap' }}>{filtered.length} profili</span>
       </div>
+
+      {showMoreFilters && (
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16, alignItems:'center', padding:'10px 12px', background:'#F8F8FB', borderRadius:8, border:`1px solid ${COLORS.border}` }}>
+          <select value={filterEsp} onChange={e => setFilterEsp(e.target.value)} style={FILTER_INPUT}>
+            <option value="">Esperienza professionale (tutte)</option>
+            {TIPOLOGIE_ESPERIENZA.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={filterTaglia} onChange={e => setFilterTaglia(e.target.value)} style={FILTER_INPUT}>
+            <option value="">Taglia (tutte)</option>
+            {TAGLIE_SHIRT.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ fontSize:12, color:'#8888A0' }}>Altezza</span>
+            <input type="number" placeholder="da" value={filterAltezzaMin} onChange={e => setFilterAltezzaMin(e.target.value)} style={{ ...FILTER_INPUT, width:64 }} />
+            <span style={{ fontSize:12, color:'#8888A0' }}>—</span>
+            <input type="number" placeholder="a" value={filterAltezzaMax} onChange={e => setFilterAltezzaMax(e.target.value)} style={{ ...FILTER_INPUT, width:64 }} />
+            <span style={{ fontSize:11, color:'#8888A0' }}>cm</span>
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="empty-state">Nessun profilo talent.</div>

@@ -26,6 +26,21 @@ export const PATENTI = [
 export const LIVELLI_INGLESE = ['Base', 'Intermedio', 'Fluente', 'Madrelingua']
 export const LIVELLI_ALTRA   = ['Non conosco', 'Base', 'Intermedio', 'Fluente', 'Madrelingua']
 
+// Lingue fisse del questionario (ognuna è un campo lingua_X separato, non un array)
+export const LINGUE_FISSE = [
+  { value: 'lingua_inglese',  label: 'Inglese' },
+  { value: 'lingua_francese', label: 'Francese' },
+  { value: 'lingua_spagnolo', label: 'Spagnolo' },
+  { value: 'lingua_tedesco',  label: 'Tedesco' },
+]
+
+// Sezione 3 — tipi di disponibilità (ognuno è un campo disponibilita_X separato)
+export const DISPONIBILITA_TIPI = [
+  { value: 'disponibilita_trasferte', label: 'Trasferte' },
+  { value: 'disponibilita_weekend',   label: 'Weekend' },
+  { value: 'disponibilita_serali',    label: 'Serali' },
+]
+
 // Sezione 5 — Profilo Professionale
 export const TITOLI_STUDIO = [
   'Scuola elementare',
