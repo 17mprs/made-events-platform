@@ -8,10 +8,16 @@ import SectionShell from '../SectionShell'
 import { talentApi, getErrorMessage } from '../../../api/client'
 import { CRITERI_NON_ACCETTAZIONE, FOTO_FIELDS } from '../questionnaireOptions'
 
+const TEMPLATE_IMAGES = {
+  foto_busto:  '/assets/template-mezzo-busto.webp',
+  foto_intera: '/assets/template-figura-intera.webp',
+}
+
 export default function Section7({ data, onChange, leadId, email, onNext, onBack, loading: parentLoading }) {
   const [uploadState, setUploadState]   = useState({})
   const [uploadErrors, setUploadErrors] = useState({})
   const [formErrors,   setFormErrors]   = useState({})
+  const [enlargedTemplate, setEnlargedTemplate] = useState(null)
 
   function setUpState(key, state) {
     setUploadState(prev => ({ ...prev, [key]: state }))
@@ -68,7 +74,7 @@ export default function Section7({ data, onChange, leadId, email, onNext, onBack
     <SectionShell
       number={7}
       title="Foto Profilo"
-      description="Carica le tue foto profilo. Vengono salvate in modo sicuro su Google Drive."
+      description="Carica le tue foto profilo. Archiviate nei nostri sistemi cloud nel rispetto della normativa sulla privacy da te accettata."
       onBack={onBack}
       onNext={() => { if (validate()) onNext() }}
       loading={parentLoading || anyUploading}
@@ -97,28 +103,58 @@ export default function Section7({ data, onChange, leadId, email, onNext, onBack
       {/* Campi upload */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {Object.entries(FOTO_FIELDS).map(([fieldKey, cfg]) => (
-          <div key={fieldKey}>
-            <FileUpload
-              label={cfg.label}
-              accept={cfg.accept}
-              maxMB={cfg.maxMB}
-              required={cfg.required}
-              uploaded={uploadState[fieldKey] === 'done' || !!data[`${fieldKey}_url`]}
-              uploadedUrl={data[`${fieldKey}_url`]}
-              onFile={(fileData) => handleFile(fieldKey, fileData)}
-              onClear={() => handleClear(fieldKey)}
-              error={uploadErrors[fieldKey] || formErrors[fieldKey]}
-              hint={cfg.hint}
-            />
-            {uploadState[fieldKey] === 'uploading' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                <div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '1.5px' }} />
-                <span style={{ fontSize: '12px', color: COLORS.textSecondary }}>Caricamento in corso…</span>
-              </div>
+          <div key={fieldKey} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            {TEMPLATE_IMAGES[fieldKey] && (
+              <img
+                src={TEMPLATE_IMAGES[fieldKey]}
+                alt={`Esempio foto — ${cfg.label}`}
+                onClick={() => setEnlargedTemplate(TEMPLATE_IMAGES[fieldKey])}
+                style={{
+                  width: '120px', maxWidth: '120px', flexShrink: 0, display: 'block',
+                  borderRadius: '6px', border: `1px solid ${COLORS.border}`, cursor: 'zoom-in',
+                }}
+              />
             )}
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <FileUpload
+                label={cfg.label}
+                accept={cfg.accept}
+                maxMB={cfg.maxMB}
+                required={cfg.required}
+                uploaded={uploadState[fieldKey] === 'done' || !!data[`${fieldKey}_url`]}
+                uploadedUrl={data[`${fieldKey}_url`]}
+                onFile={(fileData) => handleFile(fieldKey, fileData)}
+                onClear={() => handleClear(fieldKey)}
+                error={uploadErrors[fieldKey] || formErrors[fieldKey]}
+                hint={cfg.hint}
+              />
+              {uploadState[fieldKey] === 'uploading' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '1.5px' }} />
+                  <span style={{ fontSize: '12px', color: COLORS.textSecondary }}>Caricamento in corso…</span>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
+
+      {enlargedTemplate && (
+        <div
+          onClick={() => setEnlargedTemplate(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'zoom-out', padding: '20px',
+          }}
+        >
+          <img
+            src={enlargedTemplate}
+            alt="Esempio foto ingrandito"
+            style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px', display: 'block' }}
+          />
+        </div>
+      )}
     </SectionShell>
   )
 }
