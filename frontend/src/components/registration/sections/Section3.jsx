@@ -11,6 +11,72 @@ export const PROVINCE_OPTIONS = PROVINCE_ALFA.map(p => ({
   label: `${p.nome} (${p.sigla})`,
 }))
 
+const PROVINCE_DEFAULT_COUNT = 20
+
+function ProvinceSelector({ value = [], onChange, error }) {
+  const [query, setQuery]       = useState('')
+  const [expanded, setExpanded] = useState(false)
+
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? PROVINCE_OPTIONS.filter(p => p.label.toLowerCase().includes(q) || p.value.toLowerCase().includes(q))
+    : PROVINCE_OPTIONS
+
+  const base = q ? matches : (expanded ? PROVINCE_OPTIONS : PROVINCE_OPTIONS.slice(0, PROVINCE_DEFAULT_COUNT))
+  // Le province già selezionate restano sempre visibili, anche se il filtro/paginazione le nasconderebbe
+  const baseValues = new Set(base.map(p => p.value))
+  const selectedHidden = PROVINCE_OPTIONS.filter(p => value.includes(p.value) && !baseValues.has(p.value))
+  const visible = [...base, ...selectedHidden]
+
+  const canShowMore = !q && !expanded && PROVINCE_OPTIONS.length > PROVINCE_DEFAULT_COUNT
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+        <input
+          type="text"
+          placeholder="Cerca provincia per nome o sigla…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          style={{ ...COMPONENT_STYLES.input, maxWidth: '280px' }}
+        />
+        <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.accent, whiteSpace: 'nowrap' }}>
+          {value.length} {value.length === 1 ? 'provincia selezionata' : 'province selezionate'}
+        </span>
+      </div>
+
+      <MultiCheckbox
+        options={visible}
+        value={value}
+        onChange={onChange}
+        columns={3}
+      />
+
+      {q && matches.length === 0 && (
+        <p style={{ fontSize: '12px', color: COLORS.textSecondary, marginTop: '10px' }}>Nessuna provincia trovata per "{query}".</p>
+      )}
+
+      {(canShowMore || (expanded && !q)) && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          style={{
+            marginTop: '12px', background: 'none', border: `1px solid ${COLORS.accent}`,
+            color: COLORS.accent, borderRadius: '4px', padding: '6px 14px',
+            fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif',
+          }}
+        >
+          {expanded ? 'Mostra meno' : `Mostra tutte (${PROVINCE_OPTIONS.length})`}
+        </button>
+      )}
+
+      {error && (
+        <p style={{ fontSize: '12px', color: COLORS.error, marginTop: '6px' }}>{error}</p>
+      )}
+    </div>
+  )
+}
+
 function RadioYesNo({ label, name, value, onChange, required, error }) {
   return (
     <div>
@@ -69,11 +135,9 @@ export function Section3Fields({ data, onChange, errors = {} }) {
         <p style={{ fontSize: '12px', color: COLORS.textSecondary, marginBottom: '10px' }}>
           Seleziona tutte le province dove sei disponibile a lavorare.
         </p>
-        <MultiCheckbox
-          options={PROVINCE_OPTIONS}
+        <ProvinceSelector
           value={data.province_lavoro || []}
           onChange={v => onChange('province_lavoro', v)}
-          columns={3}
           error={errors.province_lavoro}
         />
       </div>
