@@ -56,13 +56,20 @@ function generateContract(talentData, eventData, auth) {
 
   // Placeholder map
   var replacements = {
+    // NOTA: il questionario (Section1-7) non colleziona data di nascita esatta,
+    // numero documento, indirizzo con civico, né un campo per il codice fiscale
+    // in nessuna sezione UI — questi restano '[DA COMPILARE]' finché non si
+    // aggiunge un campo dedicato al questionario o si compilano a mano sul
+    // contratto generato. I placeholder qui sotto usano SOLO i field name reali
+    // di TALENT_PROFILE (allineati dopo il fix BUG7) — niente più fallback su
+    // campi sbagliati (es. mostrare la città al posto della data di nascita).
     '{{NOME_COGNOME}}':        v(nomeCompleto),
-    '{{CODICE_FISCALE}}':      v(td.codice_fiscale),
-    '{{DATA_NASCITA}}':        v(td.data_nascita, td.nascita_citta),
-    '{{CITTA_NASCITA}}':       v(td.nascita_citta, td.citta_nascita),
-    '{{NAZIONALITA}}':         v(td.nazionalita, 'Italiana'),
-    '{{INDIRIZZO}}':           v(td.indirizzo_residenza, td.residenza_citta),
-    '{{NUMERO_DOCUMENTO}}':    v(td.numero_documento, td.doc_identita_url),
+    '{{CODICE_FISCALE}}':      v(td.codice_fiscale),          // mai raccolto da nessuna sezione — sempre DA COMPILARE
+    '{{DATA_NASCITA}}':        v(td.data_nascita),             // mai raccolto — sempre DA COMPILARE
+    '{{CITTA_NASCITA}}':       v(td.nascita_citta),
+    '{{NAZIONALITA}}':         v(td.nascita_paese, 'Italiana'),
+    '{{INDIRIZZO}}':           v(td.residenza_citta && (td.residenza_citta + (td.residenza_provincia ? ' (' + td.residenza_provincia + ')' : ''))),
+    '{{NUMERO_DOCUMENTO}}':    v(td.numero_documento),         // mai raccolto — sempre DA COMPILARE (doc_identita_url è il file caricato, non il numero)
     '{{STATO_EMISSIONE_DOC}}': v(td.stato_emissione_documento, 'Italia'),
     '{{DATA_EVENTO}}':         dataEventoStr,
     '{{LUOGO_EVENTO}}':        v(ed.luogo),

@@ -9,7 +9,8 @@ import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 import Input from '../../components/Input'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray, showToast } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray, showToast, driveThumbUrl } from './shared'
+import { LINGUE_FISSE, DISPONIBILITA_TIPI } from '../../components/registration/questionnaireOptions'
 import CittaProvinciaSelect from '../../components/shared/CittaProvinciaSelect'
 
 // ---------------------------------------------------------------------------
@@ -1253,6 +1254,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const [actionLoading, setActionLoading] = useState(null)
   const [contractData,    setContractData]    = useState(null)
   const [markingCompleted, setMarkingCompleted] = useState(null)
+  const [profileModal,    setProfileModal]    = useState(null) // { t, matchPct } | null
 
   const loadApps = useCallback(async () => {
     setLoading(true)
@@ -1405,7 +1407,18 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
           </div>
           {td.score != null && <div style={{ marginTop:4 }}><ScoreBar score={td.score} /></div>}
         </div>
-        <div style={{ display:'flex', gap:6, flexShrink:0 }}>{children}</div>
+        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+          {t && (
+            <button
+              onClick={() => setProfileModal({ t, matchPct })}
+              style={BTN('#8888A0')}
+              title="Vedi profilo rapido"
+            >
+              Profilo
+            </button>
+          )}
+          {children}
+        </div>
       </div>
     )
   }
@@ -1531,10 +1544,11 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                       <button
                         disabled={ctBusy}
                         onClick={() => handleContractGenerate(a.data?.talent_profile_id, a.entity_id)}
-                        style={{ ...BTN('#C8A96E'), color:'#C8A96E', opacity: ctBusy ? 0.5 : 1, minWidth: 80 }}
+                        style={{ ...BTN('#C8A96E'), color:'#C8A96E', opacity: ctBusy ? 0.6 : 1, minWidth: 80, cursor: ctBusy ? 'wait' : 'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
                         title="Genera contratto Google Doc"
                       >
-                        {ctBusy ? '…' : 'Contratto'}
+                        {ctBusy && <span className="spinner" style={{ width:11, height:11, borderWidth:'1.5px' }} />}
+                        {ctBusy ? 'Generazione…' : 'Contratto'}
                       </button>
                       <button
                         onClick={() => setContractData({ talent: t ?? null })}
@@ -1571,7 +1585,102 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
           onClose={() => setContractData(null)}
         />
       )}
+
+      {profileModal && (
+        <TalentProfileMiniModal
+          talent={profileModal.t}
+          matchPct={profileModal.matchPct}
+          onClose={() => setProfileModal(null)}
+        />
+      )}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// MINI MODAL — profilo rapido talent (dal drawer "Talent per evento")
+// ---------------------------------------------------------------------------
+
+function TalentProfileMiniModal({ talent, matchPct, onClose }) {
+  const td   = talent?.data ?? {}
+  const nome = [td.nome, td.cognome].filter(Boolean).join(' ') || '—'
+  const fotoUrl = td.foto_busto_url ? driveThumbUrl(td.foto_busto_url, 200) : null
+
+  const lingueParlate = LINGUE_FISSE
+    .filter(l => td[l.value] && td[l.value] !== 'Non conosco')
+    .map(l => `${l.label}: ${td[l.value]}`)
+
+  const disponibilita = DISPONIBILITA_TIPI.map(dp => ({ label: dp.label, ok: td[dp.value] === 'Sì' }))
+  const tipologie = safeArray(td.tipologie_esperienza)
+
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:500 }} />
+      <div style={{
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        background:'#fff', borderRadius:10, padding:28, width:400, maxWidth:'92vw',
+        maxHeight:'85vh', overflowY:'auto', zIndex:501,
+        boxShadow:'0 20px 60px rgba(0,0,0,0.3)', fontFamily:'Montserrat,sans-serif',
+      }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+          <div style={{ display:'flex', gap:14, alignItems:'center' }}>
+            {fotoUrl ? (
+              <img src={fotoUrl} alt={nome} style={{ width:80, height:80, borderRadius:'50%', objectFit:'cover', border:`1px solid ${COLORS.border}`, flexShrink:0 }} />
+            ) : (
+              <div style={{ width:80, height:80, borderRadius:'50%', background:'#630E33', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, color:'#fff', fontWeight:700, flexShrink:0 }}>
+                {(nome[0] ?? '?').toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize:16, fontWeight:700, color:COLORS.text }}>{nome}</div>
+              <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:2 }}>{td.citta ?? td.residenza_citta ?? '—'}</div>
+              {matchPct != null && (
+                <span style={{ display:'inline-block', marginTop:6, fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:10, background: matchPct >= 80 ? '#16A34A' : matchPct >= 60 ? '#D97706' : '#6B7280', color:'#fff' }}>
+                  {matchPct}% match
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:18, cursor:'pointer', color:COLORS.textSecondary, padding:'4px 8px', lineHeight:1 }}>✕</button>
+        </div>
+
+        {td.score != null && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:11, color:COLORS.textSecondary, marginBottom:4 }}>Score generale: <strong style={{ color:COLORS.text }}>{td.score}</strong></div>
+            <ScoreBar score={td.score} />
+          </div>
+        )}
+
+        <div style={{ marginBottom:14 }}>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:6 }}>Lingue</div>
+          <div style={{ fontSize:13, color:COLORS.text }}>
+            {lingueParlate.length ? lingueParlate.join(' · ') : '—'}
+          </div>
+        </div>
+
+        <div style={{ marginBottom:14 }}>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:6 }}>Disponibilità</div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {disponibilita.map(dp => (
+              <span key={dp.label} style={{
+                fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:10,
+                background: dp.ok ? '#E8F5E9' : '#F5F5F5', color: dp.ok ? '#2E7D32' : '#999',
+              }}>
+                {dp.ok ? '✓' : '✗'} {dp.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:6 }}>Tipologie esperienza</div>
+          <div style={{ fontSize:13, color:COLORS.text }}>
+            {tipologie.length ? tipologie.join(', ') : '—'}
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
   )
 }
 

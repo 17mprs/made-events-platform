@@ -984,7 +984,8 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button onClick={() => { if (!contractLoading) { setShowContractModal(false); setContractResult(null); setContractEventId('') } }} style={BTN_OUTLINE}>Chiudi</button>
               <button onClick={handleGeneraContratto} disabled={!contractEventId || contractLoading}
-                style={{ padding:'8px 20px', background: !contractEventId ? '#f5f5f5' : COLORS.accent, color: !contractEventId ? '#999' : '#fff', border:'none', borderRadius:6, cursor: !contractEventId ? 'not-allowed' : 'pointer', fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif' }}>
+                style={{ padding:'8px 20px', background: !contractEventId ? '#f5f5f5' : COLORS.accent, color: !contractEventId ? '#999' : '#fff', border:'none', borderRadius:6, cursor: contractLoading ? 'wait' : (!contractEventId ? 'not-allowed' : 'pointer'), fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif', display:'inline-flex', alignItems:'center', gap:8 }}>
+                {contractLoading && <span className="spinner" style={{ width:12, height:12, borderWidth:'1.5px', borderTopColor:'#fff', borderColor:'rgba(255,255,255,0.3)' }} />}
                 {contractLoading ? 'Generazione…' : 'Genera contratto'}
               </button>
             </div>
