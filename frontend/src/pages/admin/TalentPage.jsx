@@ -9,7 +9,7 @@ import {
   ADMIN_SIDEBAR, PageHeader,
   TalentAvatar, LeadBadge, ScoreBar,
   FILTER_INPUT, PAGE_SIZE, Pagination,
-  driveThumbUrl,
+  driveThumbUrl, safeArray,
 } from './shared'
 
 // ---------------------------------------------------------------------------
@@ -357,8 +357,8 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
             ]))}
 
             {accSection('disp', 'Disponibilità', grid([
-              field('Province lavoro', (d.province_lavoro ?? []).join(', ') || null),
-              field('Patente', (d.patente_tipologie ?? []).join(', ') || null),
+              field('Province lavoro', safeArray(d.province_lavoro).join(', ') || null),
+              field('Patente', safeArray(d.patente_tipologie).join(', ') || null),
               field('Automunita', d.automunita),
               field('Trasferte', d.disponibilita_trasferte),
               field('Weekend', d.disponibilita_weekend),
@@ -370,22 +370,22 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
               field('Francese', d.lingua_francese && d.lingua_francese !== 'Non conosco' ? d.lingua_francese : null),
               field('Spagnolo', d.lingua_spagnolo && d.lingua_spagnolo !== 'Non conosco' ? d.lingua_spagnolo : null),
               field('Tedesco', d.lingua_tedesco && d.lingua_tedesco !== 'Non conosco' ? d.lingua_tedesco : null),
-              ...(d.altre_lingue ?? []).map((l, i) =>
-                field(`Altra ${i+1}`, l.nome && l.livello ? `${l.nome}: ${l.livello}` : l.nome || null)
+              ...safeArray(d.altre_lingue).map((l, i) =>
+                field(`Altra ${i+1}`, l?.nome && l?.livello ? `${l.nome}: ${l.livello}` : l?.nome || (typeof l === 'string' ? l : null))
               ),
             ]))}
 
             {accSection('exp', 'Esperienza Professionale', grid([
               field('Titolo studio', d.titolo_studio),
               field('Indirizzo studio', d.titolo_studio_indirizzo),
-              field('Professione attuale', (d.professione_attuale ?? []).join(', ') || null),
+              field('Professione attuale', safeArray(d.professione_attuale).join(', ') || null),
               field('Anni esperienza', d.anni_esperienza_settore),
-              field('Tipologie', (d.tipologie_esperienza ?? []).join(', ') || null),
+              field('Tipologie', safeArray(d.tipologie_esperienza).join(', ') || null),
             ]))}
 
-            {accSection('dot', 'Dotazione', (d.dotazione_personale ?? []).length > 0 ? (
+            {accSection('dot', 'Dotazione', safeArray(d.dotazione_personale).length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {(d.dotazione_personale ?? []).map(item => (
+                {safeArray(d.dotazione_personale).map(item => (
                   <span key={item} style={{ fontSize: 11, background: '#f5f5f5', color: COLORS.text, padding: '3px 10px', borderRadius: 10 }}>{item}</span>
                 ))}
               </div>
@@ -1140,8 +1140,8 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
               fld('Dove tatuaggi', d.tatuaggi_dove),
             ]))}
             {accSection('disp', 'Disponibilità', grid2([
-              fld('Province lavoro', (d.province_lavoro ?? []).join(', ') || null),
-              fld('Patente', (d.patente_tipologie ?? []).join(', ') || null),
+              fld('Province lavoro', safeArray(d.province_lavoro).join(', ') || null),
+              fld('Patente', safeArray(d.patente_tipologie).join(', ') || null),
               fld('Automunita', d.automunita),
               fld('Trasferte', d.disponibilita_trasferte),
               fld('Weekend', d.disponibilita_weekend),
@@ -1152,20 +1152,20 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
               fld('Francese', d.lingua_francese && d.lingua_francese !== 'Non conosco' ? d.lingua_francese : null),
               fld('Spagnolo', d.lingua_spagnolo && d.lingua_spagnolo !== 'Non conosco' ? d.lingua_spagnolo : null),
               fld('Tedesco', d.lingua_tedesco && d.lingua_tedesco !== 'Non conosco' ? d.lingua_tedesco : null),
-              ...(d.altre_lingue ?? (d.lingue ?? []).map(l => ({ nome: l }))).map((l, i) =>
-                fld(`Altra ${i+1}`, typeof l === 'object' ? (l.nome && l.livello ? `${l.nome}: ${l.livello}` : l.nome) : l)
+              ...(safeArray(d.altre_lingue).length ? safeArray(d.altre_lingue) : safeArray(d.lingue).map(l => ({ nome: l }))).map((l, i) =>
+                fld(`Altra ${i+1}`, typeof l === 'object' && l ? (l.nome && l.livello ? `${l.nome}: ${l.livello}` : l.nome) : l)
               ),
             ]))}
             {accSection('exp', 'Esperienza Professionale', grid2([
               fld('Titolo studio', d.titolo_studio),
               fld('Indirizzo studio', d.titolo_studio_indirizzo),
-              fld('Professione attuale', (d.professione_attuale ?? []).join(', ') || null),
+              fld('Professione attuale', safeArray(d.professione_attuale).join(', ') || null),
               fld('Anni esperienza', d.anni_esperienza_settore),
-              fld('Tipologie', (d.tipologie_esperienza ?? d.skills ?? []).join(', ') || null),
+              fld('Tipologie', (safeArray(d.tipologie_esperienza).length ? safeArray(d.tipologie_esperienza) : safeArray(d.skills)).join(', ') || null),
             ]))}
-            {accSection('dot', 'Dotazione', (d.dotazione_personale ?? d.attrezzatura ?? []).length > 0 ? (
+            {accSection('dot', 'Dotazione', (safeArray(d.dotazione_personale).length ? safeArray(d.dotazione_personale) : safeArray(d.attrezzatura)).length > 0 ? (
               <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {(d.dotazione_personale ?? d.attrezzatura ?? []).map(item => (
+                {(safeArray(d.dotazione_personale).length ? safeArray(d.dotazione_personale) : safeArray(d.attrezzatura)).map(item => (
                   <span key={item} style={{ fontSize:11, background:'#f5f5f5', color:COLORS.text, padding:'3px 10px', borderRadius:10 }}>{item}</span>
                 ))}
               </div>

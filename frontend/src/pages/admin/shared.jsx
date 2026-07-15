@@ -4,6 +4,27 @@ import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Button from '../../components/Button'
 
 // ---------------------------------------------------------------------------
+// SAFE ARRAY — i campi "array" del profilo talent (dotazione_personale,
+// tipologie_esperienza, patente_tipologie, province_lavoro, ecc.) possono
+// arrivare come stringa JSON o come free-text legacy invece che come array
+// già parsato (dati di talent più vecchi/schema precedente). Usare sempre
+// questo helper prima di .map()/.join()/.length su quei campi.
+// ---------------------------------------------------------------------------
+
+export function safeArray(val) {
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string' && val.trim()) {
+    try {
+      const parsed = JSON.parse(val)
+      return Array.isArray(parsed) ? parsed : [val]
+    } catch {
+      return [val] // free-text legacy (es. vecchio campo "attrezzatura")
+    }
+  }
+  return []
+}
+
+// ---------------------------------------------------------------------------
 // SIDEBAR CONFIG — route-based (no hash)
 // ---------------------------------------------------------------------------
 
@@ -215,8 +236,8 @@ export function LeadDrawer({ lead, nota, onNotaChange, onClose, onAction, action
               {row('Inglese', d.lingua_inglese)}
               {row('Altra lingua', d.lingua_francese && d.lingua_francese !== 'Non conosco' ? `Francese: ${d.lingua_francese}` : d.lingua_spagnolo && d.lingua_spagnolo !== 'Non conosco' ? `Spagnolo: ${d.lingua_spagnolo}` : null)}
               {row('Anni esperienza', d.anni_esperienza_settore)}
-              {row('Tipologie', (d.tipologie_esperienza ?? []).slice(0,3).join(', ') + ((d.tipologie_esperienza ?? []).length > 3 ? '…' : '') || null)}
-              {row('Patente', (d.patente_tipologie ?? []).join(', ') || null)}
+              {row('Tipologie', safeArray(d.tipologie_esperienza).slice(0,3).join(', ') + (safeArray(d.tipologie_esperienza).length > 3 ? '…' : '') || null)}
+              {row('Patente', safeArray(d.patente_tipologie).join(', ') || null)}
               {row('Trasferte', d.disponibilita_trasferte)}
               {row('Weekend', d.disponibilita_weekend)}
               {row('Ranking', d.ranking)}

@@ -9,7 +9,7 @@ import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 import Input from '../../components/Input'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray } from './shared'
 import CittaProvinciaSelect from '../../components/shared/CittaProvinciaSelect'
 
 // ---------------------------------------------------------------------------
@@ -1008,8 +1008,8 @@ function computeMatchPct(ed, td) {
     maxScore += 15
     const tLingue = [
       td.lingua_inglese, td.lingua_francese, td.lingua_spagnolo, td.lingua_tedesco,
-      ...((td.altre_lingue ?? []).map(l => l.nome || '')),
-      ...((td.lingue ?? []).map(l => typeof l === 'string' ? l : (l.nome || ''))),
+      ...(safeArray(td.altre_lingue).map(l => (typeof l === 'object' && l) ? (l.nome || '') : '')),
+      ...(safeArray(td.lingue).map(l => typeof l === 'string' ? l : (l?.nome || ''))),
     ].filter(Boolean).map(l => l.toLowerCase())
     const hasAll = lingueRichieste.every(r => tLingue.some(tl => tl.includes(r.toLowerCase())))
     if (hasAll) score += 15
