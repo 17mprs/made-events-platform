@@ -57,6 +57,74 @@ function stripHtml_(html) {
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE SHELL CONDIVISO — usato da TUTTE le email di Gmail.js e Newsletter.js.
+// Header bordeaux #630E33 + wordmark MADE EVENTS, corpo Arial neutro, footer
+// grigio piccolo, max-width 600px centrato. opts è opzionale:
+//   opts.headerColor — override colore header (usato solo da sendNoShowAlertEmail,
+//                      alert admin intenzionalmente rosso, non un'eccezione al brand)
+//   opts.footerExtra — HTML extra dopo la riga di footer standard (usato solo dalla
+//                      newsletter per link disiscrizione + bottoni social, contenuto
+//                      funzionalmente necessario che il footer minimale non può portare)
+// ---------------------------------------------------------------------------
+
+function buildEmailTemplate(title, subtitle, bodyHtml, opts) {
+  opts = opts || {};
+  var headerColor = opts.headerColor || '#630E33';
+  var footerExtra = opts.footerExtra || '';
+
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="it"><head><meta charset="UTF-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1"></head>',
+    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:Arial,sans-serif;">',
+
+    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
+    '<tr><td align="center">',
+    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
+
+    // Header
+    '<tr><td style="background:' + headerColor + ';padding:36px 48px;text-align:center;">',
+    '<p style="margin:0 0 12px;font-family:\'Montserrat\',Arial,sans-serif;font-size:12px;letter-spacing:5px;text-transform:uppercase;color:#FFFFFF;font-weight:600;">MADE EVENTS</p>',
+    title ? '<h1 style="margin:0;font-family:\'Montserrat\',Arial,sans-serif;font-size:22px;font-weight:400;letter-spacing:0.3px;color:#FFFFFF;line-height:1.3;">' + title + '</h1>' : '',
+    '</td></tr>',
+
+    // Subtitle (greeting, es. "Ciao Nome,")
+    subtitle ? (
+      '<tr><td style="padding:32px 48px 0;">' +
+      '<p style="margin:0;font-family:Arial,sans-serif;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:bold;">' + subtitle + '</p>' +
+      '</td></tr>'
+    ) : '',
+
+    // Body
+    '<tr><td style="padding:' + (subtitle ? '16px 48px 44px' : '44px 48px') + ';font-family:Arial,sans-serif;font-size:14px;color:#2E2E2E;line-height:1.7;">',
+    bodyHtml,
+    '</td></tr>',
+
+    // Footer
+    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
+    '<p style="margin:0;font-family:Arial,sans-serif;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Sistema automatico</p>',
+    footerExtra,
+    '</td></tr>',
+
+    '</table>',
+    '</td></tr></table>',
+    '</body></html>'
+  ].join('\n');
+}
+
+/**
+ * CTA button coerente — sempre bordeaux #630E33, usato da ogni email col bottone.
+ */
+function buildEmailButton_(label, url) {
+  return [
+    '<table cellpadding="0" cellspacing="0" style="margin:24px 0;">',
+    '<tr><td style="background:#630E33;border-radius:4px;">',
+    '<a href="' + escapeHtml_(url) + '" style="display:inline-block;padding:14px 32px;font-family:Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#FFFFFF;text-decoration:none;">' + escapeHtml_(label) + '</a>',
+    '</td></tr></table>'
+  ].join('');
+}
+
+// ---------------------------------------------------------------------------
 // TEMPLATE 1 — Credenziali nuovo utente (talent approvato)
 // ---------------------------------------------------------------------------
 
@@ -70,30 +138,19 @@ function stripHtml_(html) {
 function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
   var url = loginUrl || (getFrontendUrl() + '/login');
 
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#630E33;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<h2 style="color:#630E33;">Benvenuto/a, ' + escapeHtml_(nome) + '!</h2>',
-    '<p>Il tuo profilo è stato <strong>approvato</strong>. ',
+  var body = [
+    '<p style="margin:0 0 20px;">Il tuo profilo è stato <strong>approvato</strong>. ',
     'Puoi ora accedere alla piattaforma e candidarti agli eventi.</p>',
-    '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:24px 0;">',
+    '<div style="background:#F5F5F5;border-radius:8px;padding:20px;margin:0 0 20px;">',
     '<p style="margin:0 0 8px;"><strong>Le tue credenziali di accesso:</strong></p>',
     '<p style="margin:4px 0;">Email: <code>' + escapeHtml_(to) + '</code></p>',
-    '<p style="margin:4px 0;">Password temporanea: <code style="background:#e0e0e0;padding:2px 6px;border-radius:4px;">' + escapeHtml_(tempPassword) + '</code></p>',
+    '<p style="margin:4px 0;">Password temporanea: <code style="background:#EAEAEA;padding:2px 6px;border-radius:4px;">' + escapeHtml_(tempPassword) + '</code></p>',
     '</div>',
-    '<p style="color:#d32f2f;font-size:13px;">⚠ Cambia la password al primo accesso.</p>',
-    '<a href="' + url + '" style="display:inline-block;background:#630E33;color:#fff;',
-    'padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;margin:16px 0;">',
-    'Accedi alla piattaforma</a>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — gestione staffing eventi.<br>',
-    'Non rispondere a questa email.</p>',
-    '</div>',
-    '</div>'
+    '<p style="color:#C62828;font-size:13px;margin:0 0 8px;">⚠ Cambia la password al primo accesso.</p>',
+    buildEmailButton_('Accedi alla piattaforma', url),
   ].join('');
+
+  var html = buildEmailTemplate('Benvenuto/a!', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = [
     'Benvenuto/a, ' + nome + '!',
@@ -120,26 +177,17 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
 // ---------------------------------------------------------------------------
 
 function sendProfileApprovedEmail(to, nome) {
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#630E33;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<h2 style="color:#630E33;">Profilo approvato ✓</h2>',
-    '<p>Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p>Il tuo profilo talent è stato <strong>approvato</strong> dal team MADE EVENTS.</p>',
-    '<p>Ora puoi:</p>',
-    '<ul>',
+  var body = [
+    '<p style="margin:0 0 16px;">Il tuo profilo talent è stato <strong>approvato</strong> dal team MADE EVENTS.</p>',
+    '<p style="margin:0 0 8px;">Ora puoi:</p>',
+    '<ul style="margin:0 0 8px;padding-left:20px;">',
     '<li>Visualizzare gli shift disponibili</li>',
     '<li>Candidarti agli eventi</li>',
     '<li>Gestire il tuo profilo e i tuoi documenti</li>',
     '</ul>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
-    '</div>',
-    '</div>'
   ].join('');
+
+  var html = buildEmailTemplate('Profilo approvato ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   return sendEmail_(to, 'Profilo approvato — Benvenuto nel team!', html);
 }
@@ -162,44 +210,35 @@ function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId, eventDa
   var orarioFormatted  = (shiftData.orario_inizio || '') + (shiftData.orario_fine ? ' – ' + shiftData.orario_fine : '');
   var luogoFormatted   = [eventData.luogo, eventData.citta].filter(Boolean).join(' — ');
 
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#630E33;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<h2 style="color:#630E33;">Turno confermato ✓</h2>',
-    '<p>Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p>La tua candidatura è stata <strong>approvata</strong>. Sei ufficialmente assegnato/a al seguente turno:</p>',
+  var body = [
+    '<p style="margin:0 0 16px;">La tua candidatura è stata <strong>approvata</strong>. Sei ufficialmente assegnato/a al seguente turno:</p>',
     // Sezione evento
     eventData.titolo ? (
-      '<div style="background:#fdf2f5;border-left:4px solid #630E33;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">' +
-      '<p style="margin:0 0 6px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#630E33;font-weight:700;">Evento</p>' +
-      '<p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1a1a1a;">' + escapeHtml_(eventData.titolo) + '</p>' +
-      (luogoFormatted ? '<p style="margin:4px 0;font-size:13px;color:#555;">📍 ' + escapeHtml_(luogoFormatted) + '</p>' : '') +
-      (eventData.compenso ? '<p style="margin:4px 0;font-size:13px;color:#555;">💶 Compenso: <strong>' + escapeHtml_(String(eventData.compenso)) + '</strong></p>' : '') +
+      '<div style="background:#FDF2F5;border-left:4px solid #630E33;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 16px;">' +
+      '<p style="margin:0 0 6px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#630E33;font-weight:bold;">Evento</p>' +
+      '<p style="margin:0 0 4px;font-size:16px;font-weight:bold;color:#2E2E2E;">' + escapeHtml_(eventData.titolo) + '</p>' +
+      (luogoFormatted ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">📍 ' + escapeHtml_(luogoFormatted) + '</p>' : '') +
+      (eventData.compenso ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">💶 Compenso: <strong>' + escapeHtml_(String(eventData.compenso)) + '</strong></p>' : '') +
       '</div>'
     ) : '',
     // Sezione turno
-    '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:16px 0;">',
-    '<p style="margin:0 0 10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#888;font-weight:700;">Dettagli turno</p>',
+    '<div style="background:#F5F5F5;border-radius:8px;padding:20px;margin:0 0 16px;">',
+    '<p style="margin:0 0 10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#6B6B6B;font-weight:bold;">Dettagli turno</p>',
     shiftData.ruolo    ? '<p style="margin:4px 0;"><strong>Ruolo:</strong> '         + escapeHtml_(shiftData.ruolo)         + '</p>' : '',
     '<p style="margin:4px 0;"><strong>Data:</strong> '                               + escapeHtml_(dataFormatted)           + '</p>',
     orarioFormatted    ? '<p style="margin:4px 0;"><strong>Orario:</strong> '        + escapeHtml_(orarioFormatted)         + '</p>' : '',
     shiftData.meeting_point ? '<p style="margin:4px 0;"><strong>Punto di ritrovo:</strong> ' + escapeHtml_(shiftData.meeting_point) + '</p>' : '',
     shiftData.dress_code    ? '<p style="margin:4px 0;"><strong>Dress code:</strong> '       + escapeHtml_(shiftData.dress_code)    + '</p>' : '',
-    shiftData.note_operational ? '<p style="margin:8px 0 0;font-size:13px;color:#555;"><em>' + escapeHtml_(shiftData.note_operational) + '</em></p>' : '',
+    shiftData.note_operational ? '<p style="margin:8px 0 0;font-size:13px;color:#6B6B6B;"><em>' + escapeHtml_(shiftData.note_operational) + '</em></p>' : '',
     '</div>',
-    '<div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px 16px;border-radius:4px;margin:16px 0;">',
+    '<div style="background:#FFF3CD;border-left:4px solid #FFC107;padding:12px 16px;border-radius:4px;margin:0 0 16px;">',
     '<p style="margin:0;font-size:13px;"><strong>Ricorda:</strong> effettua il check-in dalla piattaforma ',
     'al momento dell\'arrivo (disponibile 30 minuti prima dell\'inizio turno).</p>',
     '</div>',
-    '<p style="font-size:13px;color:#888;">Rif. Assignment: <code>' + assignmentId + '</code></p>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
-    '</div>',
-    '</div>'
+    '<p style="font-size:13px;color:#AAAAAA;margin:0;">Rif. Assignment: <code>' + assignmentId + '</code></p>',
   ].join('');
+
+  var html = buildEmailTemplate('Turno confermato ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   return sendEmail_(to, 'Turno confermato — ' + (eventData.titolo ? escapeHtml_(eventData.titolo) + ' · ' : '') + dataFormatted, html);
 }
@@ -212,26 +251,18 @@ function sendReminder24hEmail(to, nome, shiftData) {
   var dataFormatted   = formatDate_(shiftData.data);
   var orario          = (shiftData.orario_inizio || '') + (shiftData.orario_fine ? ' – ' + shiftData.orario_fine : '');
 
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#630E33;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<h2 style="color:#630E33;">⏰ Reminder — Il tuo turno è domani</h2>',
-    '<p>Ciao ' + escapeHtml_(nome) + ', ti ricordiamo che domani hai un turno confermato:</p>',
-    '<div style="background:#f5f5f5;border-radius:8px;padding:20px;margin:24px 0;">',
+  var body = [
+    '<p style="margin:0 0 16px;">Ti ricordiamo che domani hai un turno confermato:</p>',
+    '<div style="background:#F5F5F5;border-radius:8px;padding:20px;margin:0 0 16px;">',
     '<p style="margin:4px 0;"><strong>Data:</strong> '   + escapeHtml_(dataFormatted) + '</p>',
     orario ? '<p style="margin:4px 0;"><strong>Orario:</strong> ' + escapeHtml_(orario) + '</p>' : '',
     shiftData.meeting_point ? '<p style="margin:4px 0;"><strong>Punto di ritrovo:</strong> ' + escapeHtml_(shiftData.meeting_point) + '</p>' : '',
     shiftData.dress_code    ? '<p style="margin:4px 0;"><strong>Dress code:</strong> '       + escapeHtml_(shiftData.dress_code)    + '</p>' : '',
     '</div>',
-    '<p>Non dimenticare di fare il <strong>check-in</strong> dalla piattaforma al tuo arrivo.</p>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
-    '</div>',
-    '</div>'
+    '<p style="margin:0;">Non dimenticare di fare il <strong>check-in</strong> dalla piattaforma al tuo arrivo.</p>',
   ].join('');
+
+  var html = buildEmailTemplate('⏰ Il tuo turno è domani', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   return sendEmail_(to, 'Reminder turno domani — ' + dataFormatted, html);
 }
@@ -243,22 +274,13 @@ function sendReminder24hEmail(to, nome, shiftData) {
 function sendReminder2hEmail(to, nome, shiftData) {
   var orario = shiftData.orario_inizio || '';
 
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#630E33;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<h2 style="color:#d32f2f;">🔔 Il tuo turno inizia tra 2 ore!</h2>',
-    '<p>Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p>Il tuo turno inizia alle <strong>' + escapeHtml_(orario) + '</strong>.</p>',
-    shiftData.meeting_point ? '<p><strong>Punto di ritrovo:</strong> ' + escapeHtml_(shiftData.meeting_point) + '</p>' : '',
-    '<p>Ricorda: puoi fare il <strong>check-in</strong> dalla piattaforma a partire da <strong>30 minuti prima</strong> dell\'inizio.</p>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
-    '</div>',
-    '</div>'
+  var body = [
+    '<p style="margin:0 0 12px;">Il tuo turno inizia alle <strong>' + escapeHtml_(orario) + '</strong>.</p>',
+    shiftData.meeting_point ? '<p style="margin:0 0 12px;"><strong>Punto di ritrovo:</strong> ' + escapeHtml_(shiftData.meeting_point) + '</p>' : '',
+    '<p style="margin:0;">Ricorda: puoi fare il <strong>check-in</strong> dalla piattaforma a partire da <strong>30 minuti prima</strong> dell\'inizio.</p>',
   ].join('');
+
+  var html = buildEmailTemplate('🔔 Il tuo turno inizia tra 2 ore!', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   return sendEmail_(to, 'Il tuo turno inizia tra 2 ore!', html);
 }
@@ -270,25 +292,18 @@ function sendReminder2hEmail(to, nome, shiftData) {
 function sendNoShowAlertEmail(adminEmail, talentNome, talentEmail, shiftData, assignmentId) {
   var dataFormatted = formatDate_(shiftData.data);
 
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#d32f2f;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">⚠ Alert No-Show</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<p>Un talent <strong>non ha effettuato il check-in</strong> entro i 30 minuti dall\'inizio del turno.</p>',
-    '<div style="background:#fdecea;border-radius:8px;padding:20px;margin:24px 0;">',
+  var body = [
+    '<p style="margin:0 0 16px;">Un talent <strong>non ha effettuato il check-in</strong> entro i 30 minuti dall\'inizio del turno.</p>',
+    '<div style="background:#FDECEA;border-radius:8px;padding:20px;margin:0 0 16px;">',
     '<p style="margin:4px 0;"><strong>Talent:</strong> ' + escapeHtml_(talentNome)  + ' (' + escapeHtml_(talentEmail) + ')</p>',
     '<p style="margin:4px 0;"><strong>Data turno:</strong> ' + escapeHtml_(dataFormatted) + '</p>',
     '<p style="margin:4px 0;"><strong>Orario inizio:</strong> ' + escapeHtml_(shiftData.orario_inizio || 'N/D') + '</p>',
-    '<p style="margin:4px 0;font-size:13px;color:#888;">Assignment ID: ' + assignmentId + '</p>',
+    '<p style="margin:4px 0;font-size:13px;color:#AAAAAA;">Assignment ID: ' + assignmentId + '</p>',
     '</div>',
-    '<p>L\'assignment è stato marcato come <strong>NO_SHOW</strong>. Intervieni per coprire il turno se necessario.</p>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — Sistema automatico.</p>',
-    '</div>',
-    '</div>'
+    '<p style="margin:0;">L\'assignment è stato marcato come <strong>NO_SHOW</strong>. Intervieni per coprire il turno se necessario.</p>',
   ].join('');
+
+  var html = buildEmailTemplate('⚠ Alert No-Show', null, body, { headerColor: '#d32f2f' });
 
   return sendEmail_(adminEmail, 'ALERT: No-Show rilevato — ' + dataFormatted, html);
 }
@@ -301,22 +316,13 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
   var urgency = giorniMancanti <= 7 ? 'URGENTE: ' : '';
   var color   = giorniMancanti <= 7 ? '#d32f2f' : '#f57c00';
 
-  var html = [
-    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">',
-    '<div style="background:#630E33;padding:24px;text-align:center;">',
-    '<h1 style="color:#ffffff;margin:0;font-size:22px;">MADE EVENTS</h1>',
-    '</div>',
-    '<div style="padding:32px;">',
-    '<h2 style="color:' + color + ';">📄 ' + urgency + 'Documento in scadenza</h2>',
-    '<p>Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p>Il tuo documento <strong>' + escapeHtml_(tipoDocumento) + '</strong> ',
+  var body = [
+    '<p style="margin:0 0 12px;">Il tuo documento <strong style="color:' + color + ';">' + escapeHtml_(tipoDocumento) + '</strong> ',
     'scadrà tra <strong>' + giorniMancanti + ' giorni</strong>.</p>',
-    '<p>Aggiorna il documento accedendo alla piattaforma per evitare interruzioni nelle future assegnazioni.</p>',
-    '<hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0;">',
-    '<p style="font-size:12px;color:#888;">MADE EVENTS — Non rispondere a questa email.</p>',
-    '</div>',
-    '</div>'
+    '<p style="margin:0;">Aggiorna il documento accedendo alla piattaforma per evitare interruzioni nelle future assegnazioni.</p>',
   ].join('');
+
+  var html = buildEmailTemplate('📄 ' + urgency + 'Documento in scadenza', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   return sendEmail_(to, urgency + 'Documento in scadenza: ' + tipoDocumento, html);
 }
@@ -333,78 +339,30 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
  * @param {string} completionUrl  URL completo con lead_token es. https://…/registrazione/completa?token=UUID
  */
 function sendOnboardingStep1Email(to, nome, completionUrl) {
-  var ACCENT = '#630E33';
-
-  var html = [
-    '<!DOCTYPE html>',
-    '<html lang="it"><head><meta charset="UTF-8">',
-    '<meta name="viewport" content="width=device-width,initial-scale=1">',
-    '<title>Completa la tua iscrizione — MADE EVENTS</title></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-
-    // Header bordeaux
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 20px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0;font-size:26px;font-weight:300;letter-spacing:1.5px;color:#FFFFFF;line-height:1.3;">',
-    'Hai fatto<br>il primo passo.',
-    '</h1>',
-    '</td></tr>',
-
-    // Body
-    '<tr><td style="padding:48px;">',
-
-    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">',
-    'Ciao ' + escapeHtml_(nome) + ',',
-    '</p>',
-
-    '<p style="margin:0 0 28px;font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;letter-spacing:0.3px;">',
+  var body = [
+    '<p style="margin:0 0 24px;">',
     'Per ricevere proposte di lavoro in linea con il tuo profilo, completa la tua scheda — ',
     'ti chiederemo disponibilità, esperienza e un po\' di te.<br><br>',
     'Bastano pochi minuti.',
     '</p>',
 
-    // Divider accent
-    '<div style="height:2px;background:' + ACCENT + ';margin:0 0 32px;width:48px;"></div>',
+    '<div style="height:2px;background:#630E33;margin:0 0 28px;width:48px;"></div>',
 
-    '<p style="margin:0 0 12px;font-size:13px;font-weight:500;letter-spacing:0.8px;text-transform:uppercase;color:#2E2E2E;">Come funziona</p>',
-    '<p style="margin:0 0 32px;font-size:14px;font-weight:300;color:#6B6B6B;line-height:1.8;">',
+    '<p style="margin:0 0 10px;font-size:13px;font-weight:bold;letter-spacing:0.8px;text-transform:uppercase;color:#2E2E2E;">Come funziona</p>',
+    '<p style="margin:0 0 8px;color:#6B6B6B;">',
     'Una volta approvato il tuo profilo, riceverai comunicazioni su eventi, date e location ',
     'selezionati in base alle tue caratteristiche e disponibilità.',
     '</p>',
 
-    // CTA button
-    '<table cellpadding="0" cellspacing="0" style="margin:0 0 40px;">',
-    '<tr><td style="background:' + ACCENT + ';border-radius:4px;">',
-    '<a href="' + escapeHtml_(completionUrl) + '" ',
-    'style="display:inline-block;padding:16px 36px;font-size:12px;font-weight:500;',
-    'letter-spacing:2px;text-transform:uppercase;color:#FFFFFF;text-decoration:none;">',
-    'Completa la tua iscrizione',
-    '</a>',
-    '</td></tr></table>',
+    buildEmailButton_('Completa la tua iscrizione', completionUrl),
 
     '<p style="margin:0;font-size:12px;color:#AAAAAA;line-height:1.6;">',
     'Il link è personale e valido per la tua registrazione.<br>',
     'Se non hai richiesto tu questa iscrizione, ignora questa email.',
     '</p>',
+  ].join('');
 
-    '</td></tr>',
-
-    // Footer
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:24px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;line-height:1.6;">',
-    'MADE EVENTS &mdash; Gestione staffing eventi<br>',
-    'Non rispondere a questa email &middot; noreply@madeevent.it',
-    '</p>',
-    '</td></tr>',
-
-    '</table>',
-    '</td></tr></table>',
-    '</body></html>'
-  ].join('\n');
+  var html = buildEmailTemplate('Hai fatto<br>il primo passo.', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = [
     'Ciao ' + nome + ',',
@@ -433,35 +391,18 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
 // ---------------------------------------------------------------------------
 
 function sendProfiloRicevutoEmail(to, nome) {
-  var ACCENT = '#630E33';
-
-  var html = [
-    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0;font-size:24px;font-weight:300;letter-spacing:1.5px;color:#FFFFFF;line-height:1.3;">Profilo ricevuto ✓</h1>',
-    '</td></tr>',
-    '<tr><td style="padding:48px;">',
-    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p style="margin:0 0 24px;font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;">',
+  var body = [
+    '<p style="margin:0 0 24px;">',
     'Il tuo profilo è stato ricevuto ed è ora in attesa di revisione da parte del team MADE EVENTS.',
     '</p>',
-    '<div style="height:2px;background:' + ACCENT + ';margin:0 0 28px;width:48px;"></div>',
-    '<p style="margin:0 0 8px;font-size:13px;font-weight:500;letter-spacing:0.8px;text-transform:uppercase;color:#2E2E2E;">Cosa succede ora</p>',
-    '<p style="margin:0 0 6px;font-size:14px;font-weight:300;color:#6B6B6B;line-height:1.8;">1. Il team esamina il tuo profilo (solitamente 2–5 giorni lavorativi)</p>',
-    '<p style="margin:0 0 6px;font-size:14px;font-weight:300;color:#6B6B6B;line-height:1.8;">2. Ricevi una email con l\'esito della valutazione</p>',
-    '<p style="margin:0 0 32px;font-size:14px;font-weight:300;color:#6B6B6B;line-height:1.8;">3. Se approvata, accedi alla piattaforma e candidati agli eventi</p>',
-    '<p style="margin:0;font-size:12px;color:#AAAAAA;">Non rispondere a questa email &middot; noreply@madeevent.it</p>',
-    '</td></tr>',
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
-    '</td></tr>',
-    '</table></td></tr></table></body></html>'
-  ].join('\n');
+    '<div style="height:2px;background:#630E33;margin:0 0 24px;width:48px;"></div>',
+    '<p style="margin:0 0 10px;font-size:13px;font-weight:bold;letter-spacing:0.8px;text-transform:uppercase;color:#2E2E2E;">Cosa succede ora</p>',
+    '<p style="margin:0 0 4px;color:#6B6B6B;">1. Il team esamina il tuo profilo (solitamente 2–5 giorni lavorativi)</p>',
+    '<p style="margin:0 0 4px;color:#6B6B6B;">2. Ricevi una email con l\'esito della valutazione</p>',
+    '<p style="margin:0 0 16px;color:#6B6B6B;">3. Se approvata, accedi alla piattaforma e candidati agli eventi</p>',
+  ].join('');
+
+  var html = buildEmailTemplate('Profilo ricevuto ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = 'Ciao ' + nome + ',\n\nIl tuo profilo è stato ricevuto ed è in attesa di revisione.\nTi contatteremo via email con l\'esito entro pochi giorni.\n\n— MADE EVENTS';
   return sendEmail_(to, 'Profilo ricevuto — in attesa di approvazione', html, text);
@@ -472,33 +413,19 @@ function sendProfiloRicevutoEmail(to, nome) {
 // ---------------------------------------------------------------------------
 
 function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
-  var ACCENT = '#630E33';
   var rankingLabel = score >= 80 ? 'A — Eccellente' : score >= 60 ? 'B — Buono' : score >= 40 ? 'C — Medio' : 'D — Base';
 
-  var html = [
-    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-    '<tr><td style="background:#2E2E2E;padding:28px 48px;">',
-    '<p style="margin:0;font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.5);">MADE EVENTS — Admin</p>',
-    '<h1 style="margin:8px 0 0;font-size:20px;font-weight:400;color:#FFFFFF;">Nuovo profilo da approvare</h1>',
-    '</td></tr>',
-    '<tr><td style="padding:40px 48px;">',
-    '<div style="background:#FAFAFA;border-left:4px solid ' + ACCENT + ';padding:20px 24px;margin-bottom:28px;border-radius:0 4px 4px 0;">',
-    '<p style="margin:0 0 8px;font-size:14px;font-weight:500;color:#2E2E2E;">' + escapeHtml_(nome) + ' ' + escapeHtml_(cognome) + '</p>',
+  var body = [
+    '<div style="background:#FAFAFA;border-left:4px solid #630E33;padding:20px 24px;margin:0 0 20px;border-radius:0 4px 4px 0;">',
+    '<p style="margin:0 0 8px;font-size:14px;font-weight:bold;color:#2E2E2E;">' + escapeHtml_(nome) + ' ' + escapeHtml_(cognome) + '</p>',
     '<p style="margin:0 0 4px;font-size:13px;color:#6B6B6B;">Score interno: <strong>' + score + '/100</strong></p>',
     '<p style="margin:0 0 4px;font-size:13px;color:#6B6B6B;">Ranking: <strong>' + rankingLabel + '</strong></p>',
     '<p style="margin:4px 0 0;font-size:11px;color:#AAAAAA;">Lead ID: ' + leadId + '</p>',
     '</div>',
-    '<p style="font-size:14px;font-weight:300;color:#2E2E2E;line-height:1.7;">Accedi alla piattaforma per esaminare il profilo completo e procedere con approvazione o rifiuto.</p>',
-    '</td></tr>',
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;">MADE EVENTS — Sistema automatico</p>',
-    '</td></tr>',
-    '</table></td></tr></table></body></html>'
-  ].join('\n');
+    '<p style="margin:0;">Accedi alla piattaforma per esaminare il profilo completo e procedere con approvazione o rifiuto.</p>',
+  ].join('');
+
+  var html = buildEmailTemplate('Nuovo profilo da approvare', null, body);
 
   var text = 'NUOVO PROFILO DA APPROVARE\n\nNome: ' + nome + ' ' + cognome + '\nScore: ' + score + '/100\nLead ID: ' + leadId + '\n\nAccedi alla piattaforma per approvare o rifiutare.\n\n— MADE EVENTS';
   return sendEmail_(to, 'Nuovo profilo da approvare — ' + nome + ' ' + cognome + ' [' + score + '/100]', html, text);
@@ -509,8 +436,6 @@ function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
 // ---------------------------------------------------------------------------
 
 function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
-  var ACCENT = '#630E33';
-
   var completatiHtml = completati.map(function(s) {
     return '<li style="margin:4px 0;font-size:13px;color:#2E7D32;">✓ ' + escapeHtml_(s) + '</li>';
   }).join('');
@@ -519,34 +444,17 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
     return '<li style="margin:4px 0;font-size:13px;color:#C62828;">— ' + escapeHtml_(s) + '</li>';
   }).join('');
 
-  var html = [
-    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Hai lasciato la registrazione a metà</h1>',
-    '</td></tr>',
-    '<tr><td style="padding:48px;">',
-    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<p style="margin:0 0 28px;font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;">',
+  var body = [
+    '<p style="margin:0 0 20px;">',
     'Stai completando la tua iscrizione a MADE EVENTS. Riprendi da dove ti eri fermata!',
     '</p>',
-    completati.length ? '<p style="margin:0 0 8px;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;">Hai già compilato:</p><ul style="margin:0 0 24px;padding-left:20px;">' + completatiHtml + '</ul>' : '',
-    mancanti.length   ? '<p style="margin:0 0 8px;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;">Manca ancora:</p><ul style="margin:0 0 32px;padding-left:20px;">' + mancantiHtml + '</ul>' : '',
-    '<table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">',
-    '<tr><td style="background:' + ACCENT + ';border-radius:4px;">',
-    '<a href="' + escapeHtml_(completionUrl) + '" style="display:inline-block;padding:16px 36px;font-size:12px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:#FFFFFF;text-decoration:none;">Riprendi la registrazione</a>',
-    '</td></tr></table>',
+    completati.length ? '<p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;">Hai già compilato:</p><ul style="margin:0 0 20px;padding-left:20px;">' + completatiHtml + '</ul>' : '',
+    mancanti.length   ? '<p style="margin:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;">Manca ancora:</p><ul style="margin:0 0 20px;padding-left:20px;">' + mancantiHtml + '</ul>' : '',
+    buildEmailButton_('Riprendi la registrazione', completionUrl),
     '<p style="margin:0;font-size:12px;color:#AAAAAA;">Il link è personale e valido per la tua registrazione.</p>',
-    '</td></tr>',
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;">MADE EVENTS &mdash; Non rispondere a questa email</p>',
-    '</td></tr>',
-    '</table></td></tr></table></body></html>'
-  ].join('\n');
+  ].join('');
+
+  var html = buildEmailTemplate('Hai lasciato la registrazione a metà', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = 'Ciao ' + nome + ',\n\nHai lasciato la registrazione incompleta.\nRiprendi qui: ' + completionUrl + '\n\nManca ancora: ' + mancanti.join(', ') + '\n\n— MADE EVENTS';
   return sendEmail_(to, 'Completa la tua iscrizione — ' + (mancanti.length ? mancanti.length + ' sezioni mancanti' : 'quasi pronta!'), html, text);
@@ -557,36 +465,19 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
 // ---------------------------------------------------------------------------
 
 function sendCustomAdminEmail(to, nome, contenutoTesto, emailAdmin) {
-  var ACCENT = '#630E33';
-
-  var html = [
-    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Comunicazione dal team</h1>',
-    '</td></tr>',
-    '<tr><td style="padding:48px;">',
-    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<div style="height:2px;background:' + ACCENT + ';margin:16px 0 28px;width:48px;"></div>',
-    '<div style="font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
+  var body = [
+    '<div style="font-size:15px;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
     escapeHtml_(contenutoTesto),
     '</div>',
-    '<div style="margin-top:40px;padding-top:24px;border-top:1px solid #EAEAEA;">',
+    '<div style="margin-top:32px;padding-top:20px;border-top:1px solid #EAEAEA;">',
     '<p style="margin:0;font-size:12px;color:#AAAAAA;">',
     'Il team MADE EVENTS',
     emailAdmin ? ' &middot; ' + escapeHtml_(emailAdmin) : '',
     '</p>',
     '</div>',
-    '</td></tr>',
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
-    '</td></tr>',
-    '</table></td></tr></table></body></html>'
-  ].join('\n');
+  ].join('');
+
+  var html = buildEmailTemplate('Comunicazione dal team', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = 'Ciao ' + nome + ',\n\n' + contenutoTesto + '\n\n— Il team MADE EVENTS';
   return sendEmail_(to, 'Comunicazione dal team MADE EVENTS', html, text);
@@ -597,34 +488,17 @@ function sendCustomAdminEmail(to, nome, contenutoTesto, emailAdmin) {
 // ---------------------------------------------------------------------------
 
 function sendSocialInviteEmail(to, nome, contenutoTesto) {
-  var ACCENT = '#630E33';
-
-  var html = [
-    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Seguici sui social 📱</h1>',
-    '</td></tr>',
-    '<tr><td style="padding:48px;">',
-    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<div style="height:2px;background:' + ACCENT + ';margin:16px 0 28px;width:48px;"></div>',
-    '<div style="font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
+  var body = [
+    '<div style="font-size:15px;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
     escapeHtml_(contenutoTesto),
     '</div>',
-    '<div style="margin-top:36px;display:flex;gap:12px;">',
-    '<a href="https://www.instagram.com/madeevents" style="display:inline-block;background:' + ACCENT + ';color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;margin-right:8px;">Instagram</a>',
-    '<a href="https://www.facebook.com/Made-Events" style="display:inline-block;background:#1877F2;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;">Facebook</a>',
+    '<div style="margin-top:28px;">',
+    '<a href="https://www.instagram.com/madeevents" style="display:inline-block;background:#630E33;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin-right:8px;">Instagram</a>',
+    '<a href="https://www.facebook.com/Made-Events" style="display:inline-block;background:#1877F2;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">Facebook</a>',
     '</div>',
-    '</td></tr>',
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
-    '</td></tr>',
-    '</table></td></tr></table></body></html>'
-  ].join('\n');
+  ].join('');
+
+  var html = buildEmailTemplate('Seguici sui social 📱', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = contenutoTesto + '\n\nInstagram: @madeevents\nFacebook: Made Events\n\n— Il team MADE EVENTS';
   return sendEmail_(to, 'Seguici sui social — MADE EVENTS', html, text);
@@ -635,48 +509,92 @@ function sendSocialInviteEmail(to, nome, contenutoTesto) {
 // ---------------------------------------------------------------------------
 
 function sendConvocazioneEmail(to, nome, titoloEvento, dataEvento, luogoEvento, contenutoTesto) {
-  var ACCENT = '#630E33';
-
   var eventoBlock = titoloEvento
-    ? '<div style="background:#FAFAFA;border-left:4px solid ' + ACCENT + ';padding:16px 20px;margin-bottom:28px;border-radius:0 4px 4px 0;">' +
-      '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#2E2E2E;">' + escapeHtml_(titoloEvento) + '</p>' +
+    ? '<div style="background:#FAFAFA;border-left:4px solid #630E33;padding:16px 20px;margin:0 0 24px;border-radius:0 4px 4px 0;">' +
+      '<p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#2E2E2E;">' + escapeHtml_(titoloEvento) + '</p>' +
       (dataEvento   ? '<p style="margin:0 0 4px;font-size:13px;color:#6B6B6B;">&#128197; ' + escapeHtml_(dataEvento)   + '</p>' : '') +
       (luogoEvento  ? '<p style="margin:0;font-size:13px;color:#6B6B6B;">&#128205; '       + escapeHtml_(luogoEvento)  + '</p>' : '') +
       '</div>'
     : '';
 
-  var html = [
-    '<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Helvetica Neue\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0;font-size:22px;font-weight:300;letter-spacing:1px;color:#FFFFFF;line-height:1.3;">Sei stata selezionata ✨</h1>',
-    '</td></tr>',
-    '<tr><td style="padding:48px;">',
-    '<p style="margin:0 0 8px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#6B6B6B;font-weight:500;">Ciao ' + escapeHtml_(nome) + ',</p>',
-    '<div style="height:2px;background:' + ACCENT + ';margin:16px 0 28px;width:48px;"></div>',
+  var body = [
     eventoBlock,
-    '<div style="font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
+    '<div style="font-size:15px;color:#2E2E2E;line-height:1.8;white-space:pre-wrap;">',
     escapeHtml_(contenutoTesto),
     '</div>',
-    '<div style="margin-top:40px;padding-top:24px;border-top:1px solid #EAEAEA;">',
+    '<div style="margin-top:32px;padding-top:20px;border-top:1px solid #EAEAEA;">',
     '<p style="margin:0;font-size:12px;color:#AAAAAA;">Il team MADE EVENTS</p>',
     '</div>',
-    '</td></tr>',
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:20px 48px;">',
-    '<p style="margin:0;font-size:11px;color:#AAAAAA;letter-spacing:0.5px;">MADE EVENTS &mdash; Gestione staffing eventi</p>',
-    '</td></tr>',
-    '</table></td></tr></table></body></html>'
-  ].join('\n');
+  ].join('');
+
+  var html = buildEmailTemplate('Sei stata selezionata ✨', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var textHeader = titoloEvento
     ? titoloEvento + (dataEvento ? ' · ' + dataEvento : '') + (luogoEvento ? ' · ' + luogoEvento : '') + '\n\n'
     : '';
   var text = 'Ciao ' + nome + ',\n\n' + textHeader + contenutoTesto + '\n\n— Il team MADE EVENTS';
   return sendEmail_(to, 'Sei stata selezionata — ' + (titoloEvento || 'MADE EVENTS'), html, text);
+}
+
+// ---------------------------------------------------------------------------
+// TEMPLATE 15 — Candidatura approvata per evento specifico (con auto-login)
+// ---------------------------------------------------------------------------
+
+/**
+ * Notifica il talent che la sua candidatura per uno specifico evento è stata
+ * approvata (APPLICATION:APPROVED → ASSIGNMENT:CONFIRMED). Include un link di
+ * accesso automatico all'area riservata (token pre-autenticato nell'URL).
+ * @param {string} to         email del talent
+ * @param {string} nome       nome completo del talent
+ * @param {object} eventData  dati evento (titolo, luogo, citta, compenso...)
+ * @param {object} shiftData  dati turno (data, orario_inizio, orario_fine, ruolo, meeting_point...)
+ * @param {string} portaleUrl URL completo dell'area riservata con token di accesso automatico
+ */
+function sendApplicationApprovedEmail(to, nome, eventData, shiftData, portaleUrl) {
+  eventData = eventData || {};
+  shiftData = shiftData || {};
+  var dataFormatted   = formatDate_(shiftData.data);
+  var orarioFormatted = (shiftData.orario_inizio || '') + (shiftData.orario_fine ? ' – ' + shiftData.orario_fine : '');
+  var luogoFormatted  = [eventData.luogo, eventData.citta].filter(Boolean).join(' — ');
+
+  var body = [
+    '<p style="margin:0 0 20px;">La tua candidatura è stata <strong>approvata</strong>! Sei stato selezionato per il seguente evento:</p>',
+
+    '<div style="background:#FDF2F5;border-left:4px solid #630E33;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 16px;">',
+    '<p style="margin:0 0 6px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#630E33;font-weight:bold;">Evento</p>',
+    '<p style="margin:0 0 4px;font-size:16px;font-weight:bold;color:#2E2E2E;">' + escapeHtml_(eventData.titolo || '') + '</p>',
+    dataFormatted  ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">📅 ' + escapeHtml_(dataFormatted)  + '</p>' : '',
+    luogoFormatted ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">📍 ' + escapeHtml_(luogoFormatted) + '</p>' : '',
+    '</div>',
+
+    (shiftData.ruolo || orarioFormatted || shiftData.meeting_point) ? (
+      '<div style="background:#F5F5F5;border-radius:8px;padding:20px;margin:0 0 20px;">' +
+      '<p style="margin:0 0 10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#6B6B6B;font-weight:bold;">Dettagli turno</p>' +
+      (shiftData.ruolo        ? '<p style="margin:4px 0;"><strong>Ruolo:</strong> '            + escapeHtml_(shiftData.ruolo)        + '</p>' : '') +
+      (orarioFormatted        ? '<p style="margin:4px 0;"><strong>Orario:</strong> '           + escapeHtml_(orarioFormatted)        + '</p>' : '') +
+      (shiftData.meeting_point ? '<p style="margin:4px 0;"><strong>Punto di ritrovo:</strong> ' + escapeHtml_(shiftData.meeting_point) + '</p>' : '') +
+      '</div>'
+    ) : '',
+
+    buildEmailButton_('Accedi alla tua area riservata', portaleUrl),
+  ].join('');
+
+  var html = buildEmailTemplate('Sei stato selezionato! 🎉', 'Ciao ' + escapeHtml_(nome) + ',', body);
+
+  var text = [
+    'Ciao ' + nome + ',',
+    '',
+    'La tua candidatura è stata approvata! Sei stato selezionato per: ' + (eventData.titolo || ''),
+    dataFormatted  ? 'Data: '   + dataFormatted  : '',
+    luogoFormatted ? 'Luogo: '  + luogoFormatted : '',
+    orarioFormatted ? 'Orario: ' + orarioFormatted : '',
+    '',
+    'Accedi alla tua area riservata: ' + portaleUrl,
+    '',
+    '— MADE EVENTS'
+  ].filter(Boolean).join('\n');
+
+  return sendEmail_(to, 'Sei stato selezionato per ' + (eventData.titolo || 'un evento'), html, text);
 }
 
 // ---------------------------------------------------------------------------

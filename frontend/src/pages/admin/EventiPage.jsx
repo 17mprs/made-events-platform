@@ -1496,7 +1496,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {pendingApps.map(a => (
-                  <TRow key={a.entity_id} t={talentMap[a.data?.talent_profile_id]} app={a}>
+                  <TRow key={a.entity_id} t={talentMap[a.data?.talent_profile_id]} app={a} matchPct={computeMatchPct(d, talentMap[a.data?.talent_profile_id]?.data ?? {})}>
                     <button
                       onClick={() => handleApprove(a.entity_id)}
                       disabled={!!(actionLoading)}
@@ -1527,7 +1527,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                   const ctBusy = actionLoading === a.entity_id + '_ct'
                   const mcBusy = markingCompleted === a.entity_id
                   return (
-                    <TRow key={a.entity_id} t={t} app={a}>
+                    <TRow key={a.entity_id} t={t} app={a} matchPct={computeMatchPct(d, t?.data ?? {})}>
                       <button
                         disabled={ctBusy}
                         onClick={() => handleContractGenerate(a.data?.talent_profile_id, a.entity_id)}

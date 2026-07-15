@@ -181,24 +181,32 @@ function sideEffect_ApplicationApproved_(application, auth) {
     appData.talent_profile_id, auth.user_id, auth.tenant_id
   );
 
-  // Email notifica talent (best-effort: non blocca se fallisce)
+  // Email notifica talent — candidatura approvata, con link di accesso
+  // automatico all'area riservata (best-effort: non blocca se fallisce).
   try {
     var talentProfile = getEntityById(appData.talent_profile_id, auth.tenant_id);
     if (talentProfile && talentProfile.data.email_contatto) {
       var shift = getEntityById(appData.shift_id, auth.tenant_id);
       var event = getEntityById(appData.event_id, auth.tenant_id);
       if (shift) {
-        sendAssignmentConfirmedEmail(
+        var portaleUrl = getFrontendUrl() + '/portale';
+        if (talentProfile.data.user_id) {
+          var talentUser = getRowById('Users', talentProfile.data.user_id);
+          if (talentUser) {
+            portaleUrl = getFrontendUrl() + '/portale?token=' + encodeURIComponent(generateToken_(talentUser));
+          }
+        }
+        sendApplicationApprovedEmail(
           talentProfile.data.email_contatto,
           (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
+          event ? event.data : {},
           shift.data,
-          assignment.entity_id,
-          event ? event.data : {}
+          portaleUrl
         );
       }
     }
   } catch (emailErr) {
-    Logger.log('[WORKFLOWS] Email assignment fallita: ' + emailErr.message);
+    Logger.log('[WORKFLOWS] Email candidatura approvata fallita: ' + emailErr.message);
   }
 
   return successResponse({ assignment_id: assignment.entity_id });

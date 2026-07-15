@@ -20,6 +20,16 @@ import { Section5Fields } from '../components/registration/sections/Section5'
 import { Section6Fields } from '../components/registration/sections/Section6'
 import { FOTO_FIELDS, CRITERI_NON_ACCETTAZIONE } from '../components/registration/questionnaireOptions'
 
+// Mirror di driveThumbUrl() in pages/admin/shared.jsx — i link foto sono
+// share link Drive (drive.google.com/file/d/<id>/view), non utilizzabili
+// direttamente come <img src>, vanno convertiti in link thumbnail incorporabile.
+function driveThumbUrl(url, size = 200) {
+  if (typeof url !== 'string') return url
+  const m = url.match(/\/file\/d\/([^/]+)/)
+  if (!m) return url
+  return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w${size}`
+}
+
 const SIDEBAR_ITEMS = [
   { type:'section', label:'Talent' },
   { label:'Offerte di Lavoro',    to:'/portale#events' },
@@ -641,20 +651,20 @@ function MyProfile({ handleApiResponse }) {
     <form onSubmit={save}>
       {/* Header: avatar + global progress */}
       <Card style={{ marginBottom:16, padding:'20px' }}>
-        <div style={{ display:'flex', gap:16, alignItems:'center', marginBottom:14 }}>
+        <div style={{ display:'flex', gap:16, alignItems:'center', marginBottom:14, flexWrap:'wrap' }}>
           {d.foto_busto_url ? (
-            <img src={d.foto_busto_url} alt={d.nome} style={{ width:64, height:64, borderRadius:'50%', objectFit:'cover', border:`2px solid ${COLORS.border}` }} />
+            <img src={driveThumbUrl(d.foto_busto_url, 128)} alt={d.nome} style={{ width:64, height:64, borderRadius:'50%', objectFit:'cover', border:`2px solid ${COLORS.border}`, flexShrink:0 }} />
           ) : (
-            <div style={{ width:64, height:64, borderRadius:'50%', background:'#630E33', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, color:'#fff', fontWeight:700 }}>
+            <div style={{ width:64, height:64, borderRadius:'50%', background:'#630E33', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, color:'#fff', fontWeight:700, flexShrink:0 }}>
               {(d.nome?.[0] ?? '?').toUpperCase()}
             </div>
           )}
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:16, fontWeight:600, marginBottom:2 }}>{d.nome} {d.cognome}</div>
-            <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:6 }}>{d.email_contatto}</div>
+          <div style={{ flex:'1 1 160px', minWidth:0 }}>
+            <div style={{ fontSize:16, fontWeight:600, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis' }}>{d.nome} {d.cognome}</div>
+            <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis' }}>{d.email_contatto}</div>
             <StatusBadge status={profile.status} />
           </div>
-          <div style={{ textAlign:'right' }}>
+          <div style={{ textAlign:'right', flexShrink:0 }}>
             <div style={{ fontSize:22, fontWeight:300, color: pct >= 70 ? '#10B981' : pct >= 40 ? '#F97316' : '#EF4444' }}>{pct}%</div>
             <div style={{ fontSize:10, color:COLORS.textSecondary }}>completato</div>
           </div>

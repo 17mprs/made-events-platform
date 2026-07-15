@@ -134,62 +134,27 @@ function buildNewsletterHtml(tier, eventi, destinatario) {
 
   var sectionLabel = isTier1 ? 'ANTEPRIMA EVENTI' : 'EVENTI DISPONIBILI';
 
-  return [
-    '<!DOCTYPE html>',
-    '<html lang="it"><head><meta charset="UTF-8">',
-    '<meta name="viewport" content="width=device-width,initial-scale=1">',
-    '<title>Nuove opportunit&agrave; — Made Events</title></head>',
-    '<body style="margin:0;padding:0;background:#F6F6F6;font-family:\'Montserrat\',Arial,sans-serif;">',
-    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#F6F6F6;padding:40px 16px;">',
-    '<tr><td align="center">',
-    '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:4px;overflow:hidden;">',
-
-    // Header bordeaux
-    '<tr><td style="background:' + ACCENT + ';padding:40px 48px 36px;">',
-    '<p style="margin:0 0 16px;font-size:11px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.6);">MADE EVENTS</p>',
-    '<h1 style="margin:0 0 8px;font-size:24px;font-weight:300;letter-spacing:1.5px;color:#FFFFFF;line-height:1.3;">Opportunit&agrave; di lavoro</h1>',
-    nome ? '<p style="margin:0;font-size:13px;color:rgba(255,255,255,0.75);font-weight:300;">Ciao ' + nome + ',</p>' : '',
-    '</td></tr>',
-
-    // Intro + CTA top
-    '<tr><td style="padding:36px 48px 24px;">',
-    '<p style="margin:0 0 24px;font-size:15px;font-weight:300;color:#2E2E2E;line-height:1.8;">' + introText + '</p>',
-    '<table cellpadding="0" cellspacing="0" style="margin-bottom:32px;">',
-    '<tr><td style="background:' + ACCENT + ';border-radius:4px;">',
-    '<a href="' + escapeHtml_(ctaUrl) + '" style="display:inline-block;padding:14px 32px;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#FFFFFF;text-decoration:none;">' + ctaLabel + '</a>',
-    '</td></tr></table>',
-    '</td></tr>',
-
-    // Cards section
-    '<tr><td style="padding:0 48px;">',
-    '<div style="height:2px;background:' + ACCENT + ';width:48px;margin-bottom:20px;"></div>',
-    '<p style="margin:0 0 20px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6B6B6B;">' + sectionLabel + '</p>',
+  var body = [
+    '<p style="margin:0 0 24px;">' + introText + '</p>',
+    buildEmailButton_(ctaLabel, ctaUrl),
+    '<div style="height:2px;background:' + ACCENT + ';width:48px;margin:8px 0 20px;"></div>',
+    '<p style="margin:0 0 20px;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#6B6B6B;">' + sectionLabel + '</p>',
     cardsHtml || '<p style="color:#6B6B6B;font-size:13px;">Nessun evento disponibile al momento.</p>',
-    '</td></tr>',
-
-    // CTA bottom
-    '<tr><td style="padding:24px 48px 40px;">',
-    '<table cellpadding="0" cellspacing="0">',
-    '<tr><td style="background:' + ACCENT + ';border-radius:4px;">',
-    '<a href="' + escapeHtml_(ctaUrl) + '" style="display:inline-block;padding:14px 32px;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#FFFFFF;text-decoration:none;">' + ctaLabel + '</a>',
-    '</td></tr></table>',
-    '</td></tr>',
-
-    // Footer
-    '<tr><td style="background:#FAFAFA;border-top:1px solid #EAEAEA;padding:24px 48px;">',
-    '<p style="margin:0 0 10px;font-size:11px;color:#AAAAAA;line-height:1.6;">',
-    'MADE EVENTS &mdash; Gestione staffing eventi<br>',
-    'Non rispondere a questa email &middot; noreply@madeevent.it',
-    '</p>',
-    '<a href="https://www.instagram.com/madeevents" style="display:inline-block;background:' + ACCENT + ';color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:11px;font-weight:500;letter-spacing:1px;text-transform:uppercase;margin-right:6px;">Instagram</a>',
-    '<a href="https://www.facebook.com/Made-Events" style="display:inline-block;background:#1877F2;color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:11px;font-weight:500;letter-spacing:1px;text-transform:uppercase;">Facebook</a>',
-    '<p style="margin:14px 0 0;font-size:10px;"><a href="' + escapeHtml_(unsubUrl) + '" style="color:#CCCCCC;">Annulla iscrizione</a></p>',
-    '</td></tr>',
-
-    '</table>',
-    '</td></tr></table>',
-    '</body></html>',
+    cardsHtml ? '<div style="margin-top:8px;">' + buildEmailButton_(ctaLabel, ctaUrl) + '</div>' : '',
   ].join('\n');
+
+  var footerExtra = [
+    '<a href="https://www.instagram.com/madeevents" style="display:inline-block;background:' + ACCENT + ';color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin:10px 6px 0 0;">Instagram</a>',
+    '<a href="https://www.facebook.com/Made-Events" style="display:inline-block;background:#1877F2;color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin-top:10px;">Facebook</a>',
+    '<p style="margin:14px 0 0;font-size:10px;"><a href="' + escapeHtml_(unsubUrl) + '" style="color:#CCCCCC;">Annulla iscrizione</a></p>',
+  ].join('\n');
+
+  return buildEmailTemplate(
+    'Opportunit&agrave; di lavoro',
+    nome ? 'Ciao ' + nome + ',' : null,
+    body,
+    { footerExtra: footerExtra }
+  );
 }
 
 // ---------------------------------------------------------------------------
