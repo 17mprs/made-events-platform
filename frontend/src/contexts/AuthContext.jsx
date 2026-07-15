@@ -8,11 +8,40 @@ export function AuthProvider({ children }) {
   const [token, setTokenState]   = useState(() => getToken())
   const [user,  setUser]         = useState(() => decodeToken(getToken()))
   const [loading, setLoading]    = useState(false)
+  // true solo se c'è un token locale da verificare col backend — evita lo stato
+  // "loggato ma non autorizzato" quando un token scaduto/invalidato sopravvive
+  // in localStorage e la pagina tenta di renderizzare contenuti prima di saperlo.
+  const [authChecking, setAuthChecking] = useState(() => !!getToken())
 
   // Sync decoded user whenever token changes
   useEffect(() => {
     setUser(decodeToken(token))
   }, [token])
+
+  // Verifica col backend il token già presente al mount (una tantum — dopo un
+  // login riuscito il token è già stato appena validato lato server, non serve
+  // ricontrollarlo qui). Se non valido: logout locale + redirect (gestito da
+  // RequireAuth leggendo isAuthenticated una volta che authChecking torna false).
+  useEffect(() => {
+    let cancelled = false
+    const initialToken = getToken()
+    if (!initialToken) { setAuthChecking(false); return }
+
+    authApi.getMe().then(res => {
+      if (cancelled) return
+      if (!res.success) {
+        removeToken()
+        setTokenState(null)
+        setUser(null)
+      } else if (res.data?.user) {
+        setUser(res.data.user)
+      }
+      setAuthChecking(false)
+    })
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const login = useCallback(async (email, password) => {
     setLoading(true)
@@ -45,6 +74,7 @@ export function AuthProvider({ children }) {
     token,
     user,
     loading,
+    authChecking,
     login,
     logout,
     handleApiResponse,

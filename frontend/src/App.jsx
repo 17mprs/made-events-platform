@@ -24,9 +24,23 @@ import ResetPasswordConfirm   from './pages/ResetPasswordConfirm'
 // ROUTE GUARDS
 // ---------------------------------------------------------------------------
 
+function AuthChecking() {
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}>
+      <div className="spinner" />
+    </div>
+  )
+}
+
 function RequireAuth({ children, allowedRoles }) {
-  const { isAuthenticated, role } = useAuth()
+  const { isAuthenticated, authChecking, role } = useAuth()
   const location = useLocation()
+
+  // Non decidere nulla finché il token non è stato verificato col backend —
+  // altrimenti un token scaduto/invalidato sopravvissuto in localStorage fa
+  // renderizzare la pagina prima di sapere che non è più valido ("loggato ma
+  // non autorizzato", schermata vuota).
+  if (authChecking) return <AuthChecking />
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
@@ -40,7 +54,9 @@ function RequireAuth({ children, allowedRoles }) {
 }
 
 function RootRedirect() {
-  const { isAuthenticated, role } = useAuth()
+  const { isAuthenticated, authChecking, role } = useAuth()
+
+  if (authChecking) return <AuthChecking />
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
