@@ -480,7 +480,7 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, onDeleted, actionLoa
                 const res = await leadApi.softDelete(lead.entity_id)
                 if (!res.success) return false
                 await adminStore.refresh()
-                onDeleted?.()
+                await onDeleted?.()
                 onClose()
                 showToast('Eliminato')
                 return true
@@ -1326,7 +1326,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
                 const res = await talentApi.softDelete(talent.entity_id)
                 if (!res.success) return false
                 await adminStore.refresh()
-                onSuspended?.()
+                await onSuspended?.()
                 onClose()
                 showToast('Eliminato')
                 return true
@@ -1384,6 +1384,7 @@ export function TalentsSection({ handleApiResponse }) {
   const [items,          setItems]          = useState([])
   const [profiles,       setProfiles]       = useState([])
   const [loading,        setLoading]        = useState(true)
+  const [loadedOnce,     setLoadedOnce]     = useState(false)
   const [error,          setError]          = useState(null)
   const [search,         setSearch]         = useState('')
   const [filterStatus,   setFilterStatus]   = useState('ALL')
@@ -1406,6 +1407,7 @@ export function TalentsSection({ handleApiResponse }) {
     setLoading(true)
     const data = await adminStore.ensure()
     setLoading(false)
+    setLoadedOnce(true)
     if (!data) { setError('Errore nel caricamento dati.'); return }
     const seen = new Set()
     const profili = (data.leads ?? []).filter(l => {
@@ -1503,7 +1505,7 @@ export function TalentsSection({ handleApiResponse }) {
     else alert(getErrorMessage(res.error))
   }
 
-  if (loading) return <div className="spinner" />
+  if (loading && !loadedOnce) return <div className="spinner" />
   if (error)   return <div className="error-banner">{error}</div>
 
   const BTN = {
@@ -1715,7 +1717,7 @@ export function TalentsSection({ handleApiResponse }) {
           talent={selectedScheda}
           onClose={() => setSelectedScheda(null)}
           handleApiResponse={handleApiResponse}
-          onSuspended={() => { adminStore.refresh().then(load) }}
+          onSuspended={() => adminStore.refresh().then(load)}
         />
       )}
       {selectedChanges && (
@@ -1732,6 +1734,7 @@ export function TalentsSection({ handleApiResponse }) {
 export function PendingApprovalSection({ handleApiResponse }) {
   const [items,         setItems]         = useState([])
   const [loading,       setLoading]       = useState(true)
+  const [loadedOnce,    setLoadedOnce]    = useState(false)
   const [selectedReview,setSelectedReview]= useState(null)
   const [actionLoading, setActionLoading] = useState(null)
 
@@ -1739,6 +1742,7 @@ export function PendingApprovalSection({ handleApiResponse }) {
     setLoading(true)
     const data = await adminStore.ensure()
     setLoading(false)
+    setLoadedOnce(true)
     if (!data) return
     const seen = new Set()
     const pending = (data.leads ?? []).filter(l => {
@@ -1768,7 +1772,7 @@ export function PendingApprovalSection({ handleApiResponse }) {
     else alert(getErrorMessage(res.error))
   }
 
-  if (loading) return <div className="spinner" />
+  if (loading && !loadedOnce) return <div className="spinner" />
   if (items.length === 0) return (
     <div className="empty-state" style={{ padding: '20px 0' }}>Nessun profilo in attesa di approvazione.</div>
   )

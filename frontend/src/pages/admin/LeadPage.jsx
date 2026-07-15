@@ -65,16 +65,23 @@ function SollecitiCounter({ data }) {
 export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSelect = false, showCompletion = false }) {
   const [leads,      setLeads]      = useState([])
   const [loading,    setLoading]    = useState(true)
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [error,      setError]      = useState(null)
   const [search,     setSearch]     = useState('')
   const [page,       setPage]       = useState(1)
   const [perPage,    setPerPage]    = useState(pageSize)
   const [rowLoading, setRowLoading] = useState({}) // { [entity_id]: 'solicit'|'reset'|null }
 
+  // Il pulsante "elimina" apre un modal DENTRO la tabella — se il primo render
+  // (loading) smonta l'intera tabella per mostrare solo lo spinner, un reload
+  // lanciato da un'azione riga (elimina/sollecita/reset) smonterebbe anche il
+  // modal a metà, prima che l'azione risulti completata. Lo spinner pieno-pagina
+  // deve comparire SOLO al primissimo caricamento, mai sui reload successivi.
   const load = useCallback(async () => {
     setLoading(true)
     const data = await adminStore.ensure()
     setLoading(false)
+    setLoadedOnce(true)
     if (!data) { setError('Errore nel caricamento dati.'); return }
     const seen = new Set()
     const bozze = (data.leads ?? []).filter(l => {
@@ -138,7 +145,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
     load()
   }
 
-  if (loading) return <div className="spinner" />
+  if (loading && !loadedOnce) return <div className="spinner" />
   if (error)   return <div className="error-banner">{error}</div>
 
   return (
@@ -252,7 +259,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
                               const res = await leadApi.softDelete(l.entity_id)
                               if (!res.success) return false
                               await adminStore.refresh()
-                              load()
+                              await load()
                               showToast('Eliminato')
                               return true
                             }}
