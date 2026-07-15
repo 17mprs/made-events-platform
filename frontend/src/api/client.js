@@ -158,6 +158,7 @@ export const talentApi = {
   updateScoreAdmin:    (entity_id, score_admin)   => gasPost('talent.updateScoreAdmin',    { entity_id, score_admin }, t()),
   updateEventiPreCRM: (entity_id, eventi_precrm) => gasPost('talent.updateEventiPreCRM', { entity_id, eventi_precrm }, t()),
   generateCard:       (talent_id)                => gasPost('talent.generateCard',        { talent_id },               t(), GAS_UPLOAD_TIMEOUT_MS),
+  softDelete:         (entity_id)                => gasPost('talent.softDelete',          { entity_id },               t()),
 }
 
 export const leadApi = {
@@ -165,6 +166,7 @@ export const leadApi = {
   solicit:    (entity_id)       => gasPost('lead.solicit',    { entity_id },          t()),
   update:     (entity_id, data) => gasPost('lead.update',     { entity_id, ...data }, t()),
   getByEmail: (email)           => gasPost('lead.getByEmail', { email }),
+  softDelete: (entity_id)       => gasPost('lead.softDelete', { entity_id },          t()),
 }
 
 export const clientApi = {

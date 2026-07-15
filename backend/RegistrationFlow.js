@@ -501,6 +501,29 @@ function handleLeadUpdate(payload, auth) {
 }
 
 // ---------------------------------------------------------------------------
+// LEAD SOFT DELETE
+// ---------------------------------------------------------------------------
+
+function handleLeadSoftDelete(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato: solo gli admin possono eliminare entity');
+  }
+
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity || entity.type !== 'LEAD_TALENT') {
+    return errorResponse('SYS_002', 'Lead non trovato');
+  }
+
+  var ok = softDeleteEntity(payload.entity_id, auth.tenant_id, auth.user_id);
+  if (!ok) return errorResponse('SYS_001', 'Impossibile eliminare il lead');
+
+  return successResponse({ entity_id: payload.entity_id });
+}
+
+// ---------------------------------------------------------------------------
 // LEAD SOLICIT — invia manualmente sollecito e aggiorna contatore
 // ---------------------------------------------------------------------------
 

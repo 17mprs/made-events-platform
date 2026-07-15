@@ -1,7 +1,7 @@
 // === TALENT PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { talentApi, applicationApi, contractApi, emailApi, getErrorMessage } from '../../api/client'
+import { talentApi, leadApi, applicationApi, contractApi, emailApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
 import { COLORS } from '../../styles/theme'
@@ -10,6 +10,7 @@ import {
   TalentAvatar, LeadBadge, ScoreBar,
   FILTER_INPUT, PAGE_SIZE, Pagination,
   driveThumbUrl, safeArray,
+  DeleteEntityButton, showToast,
 } from './shared'
 import { TAGLIE_SHIRT, TIPOLOGIE_ESPERIENZA, LINGUE_FISSE, DISPONIBILITA_TIPI } from '../../components/registration/questionnaireOptions'
 
@@ -51,7 +52,7 @@ function photoExpiryStatus(talent) {
 // REVIEW DRAWER — scheda completa revisione per COMPLETED_PENDING_APPROVAL
 // ---------------------------------------------------------------------------
 
-function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
+function ReviewDrawer({ lead, onClose, onApprove, onReject, onDeleted, actionLoading }) {
   const d = lead.data ?? {}
   const nome = `${d.nome ?? ''} ${d.cognome ?? ''}`.trim() || '—'
 
@@ -472,6 +473,19 @@ function ReviewDrawer({ lead, onClose, onApprove, onReject, actionLoading }) {
             >
               Invita social
             </button>
+            <DeleteEntityButton
+              label="Elimina"
+              confirmText="Elimina questo lead. Inserisci la password per confermare."
+              onConfirm={async () => {
+                const res = await leadApi.softDelete(lead.entity_id)
+                if (!res.success) return false
+                await adminStore.refresh()
+                onDeleted?.()
+                onClose()
+                showToast('Eliminato')
+                return true
+              }}
+            />
           </div>
         </div>
       </div>
@@ -1303,6 +1317,20 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
               style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', color:'#EF4444', border:'1px solid #EF4444', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif', fontWeight:600 }}>
               Sospendi
             </button>
+            <DeleteEntityButton
+              label="Elimina"
+              confirmText="Elimina il profilo talent. L'account utente collegato NON viene rimosso. Inserisci la password per confermare."
+              style={{ flex:'1 1 90px', padding:'9px 12px' }}
+              onConfirm={async () => {
+                const res = await talentApi.softDelete(talent.entity_id)
+                if (!res.success) return false
+                await adminStore.refresh()
+                onSuspended?.()
+                onClose()
+                showToast('Eliminato')
+                return true
+              }}
+            />
             <button onClick={() => { setContractResult(null); setContractEventId(''); setShowContractModal(true) }}
               style={{ flex:'1 1 90px', padding:'9px 12px', background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif', fontWeight:700 }}>
               Genera contratto
@@ -1679,7 +1707,7 @@ export function TalentsSection({ handleApiResponse }) {
       )}
 
       {selectedReview && (
-        <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} actionLoading={actionLoading} />
+        <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} onDeleted={load} actionLoading={actionLoading} />
       )}
       {selectedScheda && (
         <TalentProfileDrawer
@@ -1785,7 +1813,7 @@ export function PendingApprovalSection({ handleApiResponse }) {
       </div>
 
       {selectedReview && (
-        <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} actionLoading={actionLoading} />
+        <ReviewDrawer lead={selectedReview} onClose={() => setSelectedReview(null)} onApprove={handleApprove} onReject={handleReject} onDeleted={load} actionLoading={actionLoading} />
       )}
     </div>
   )

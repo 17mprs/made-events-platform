@@ -9,7 +9,7 @@ import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 import Input from '../../components/Input'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray, showToast } from './shared'
 import CittaProvinciaSelect from '../../components/shared/CittaProvinciaSelect'
 
 // ---------------------------------------------------------------------------
@@ -106,15 +106,13 @@ function DeleteConfirmModal({ event, onConfirm, onClose, loading }) {
         </p>
         <div style={{ marginBottom:20 }}>
           <label style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:COLORS.textSecondary, display:'block', marginBottom:4 }}>
-            Per confermare digita il codice
+            Password
           </label>
-          <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:8 }}>
-            Codice: <strong style={{ fontFamily:'monospace', fontSize:14 }}>12345</strong>
-          </div>
           <input
+            type="password"
             value={code}
             onChange={e => setCode(e.target.value)}
-            placeholder="12345"
+            placeholder="Password"
             autoFocus
             style={{
               border:`1.5px solid ${isValid ? '#4CAF50' : COLORS.border}`,
@@ -179,18 +177,9 @@ function EventStatusToggle({ event, onChangeStatus, onRequestDelete, isChanging 
     }
   }, [open])
 
-  if (!options.length) {
-    return (
-      <span style={{
-        display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px',
-        borderRadius:20, background:meta.bg, color:meta.color,
-        fontSize:10, fontWeight:700, letterSpacing:'0.3px',
-      }}>
-        <span style={{ width:6, height:6, borderRadius:'50%', background:meta.dot, flexShrink:0 }} />
-        {meta.label}
-      </span>
-    )
-  }
+  // Anche senza transizioni di stato disponibili (es. CANCELLED, non presente in
+  // STATUS_TRANSITIONS) il pulsante resta interattivo: il dropdown contiene
+  // sempre l'opzione "Elimina evento", che altrimenti diventerebbe irraggiungibile.
 
   return (
     <div style={{ position:'relative' }}>
@@ -2051,6 +2040,7 @@ export default function EventiPage() {
       alert(getErrorMessage(res.error))
     } else {
       load()
+      showToast('Eliminato')
     }
   }
 

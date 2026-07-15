@@ -832,6 +832,26 @@ function handleTalentUpdateProfile(payload, auth) {
   return successResponse({ talent: talentToPublic(updated, auth.role) });
 }
 
+function handleTalentSoftDelete(payload, auth) {
+  if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
+    return errorResponse('AUTH_003', 'Permesso negato: solo gli admin possono eliminare entity');
+  }
+
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var entity = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!entity || entity.type !== 'TALENT_PROFILE') {
+    return errorResponse('SYS_002', 'Talent profile non trovato');
+  }
+
+  // Soft delete solo del TALENT_PROFILE — lo Users associato NON viene toccato.
+  var ok = softDeleteEntity(payload.entity_id, auth.tenant_id, auth.user_id);
+  if (!ok) return errorResponse('SYS_001', 'Impossibile eliminare il profilo talent');
+
+  return successResponse({ entity_id: payload.entity_id });
+}
+
 function handleUpdateScoreAdmin(payload, auth) {
   if (!auth || (auth.role !== ROLES.ADMIN && auth.role !== ROLES.SUPER_ADMIN)) {
     return errorResponse('AUTH_003', 'Permesso negato');

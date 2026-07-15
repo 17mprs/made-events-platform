@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { leadApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, Pagination } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, Pagination, DeleteEntityButton, showToast } from './shared'
 
 // ---------------------------------------------------------------------------
 // COMPLETION BADGE — % sezioni questionario completate (solo tab Lead)
@@ -244,6 +244,19 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
                               {busy === 'reset' ? '…' : 'Reset solleciti'}
                             </button>
                           )}
+                          <DeleteEntityButton
+                            label="Elimina"
+                            confirmText={`Elimina il lead di ${l.data?.nome ?? ''} ${l.data?.cognome ?? ''}. Inserisci la password per confermare.`}
+                            style={{ padding: '4px 10px' }}
+                            onConfirm={async () => {
+                              const res = await leadApi.softDelete(l.entity_id)
+                              if (!res.success) return false
+                              await adminStore.refresh()
+                              load()
+                              showToast('Eliminato')
+                              return true
+                            }}
+                          />
                         </div>
                       </td>
                     </tr>

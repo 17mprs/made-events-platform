@@ -7,7 +7,7 @@ import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 import Input from '../../components/Input'
-import { ADMIN_SIDEBAR, PageHeader } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, showToast } from './shared'
 
 const EMPTY_FORM = {
   ragione_sociale:'', partita_iva:'', email:'',
@@ -32,15 +32,13 @@ function DeleteClientModal({ client, onConfirm, onClose, loading }) {
         </p>
         <div style={{ marginBottom:20 }}>
           <label style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', color:COLORS.textSecondary, display:'block', marginBottom:4 }}>
-            Per confermare digita il codice
+            Password
           </label>
-          <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:8 }}>
-            Codice: <strong style={{ fontFamily:'monospace', fontSize:14 }}>12345</strong>
-          </div>
           <input
+            type="password"
             value={code}
             onChange={e => setCode(e.target.value)}
-            placeholder="12345"
+            placeholder="Password"
             autoFocus
             style={{
               border:`1.5px solid ${isValid ? '#4CAF50' : COLORS.border}`,
@@ -191,6 +189,7 @@ export default function ClientiPage() {
     if (!res.success) { alert(getErrorMessage(res.error)); return }
     setDeleteModal(null)
     load()
+    showToast('Eliminato')
   }
 
   return (

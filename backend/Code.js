@@ -130,6 +130,7 @@ function handleRequest(action, payload, token) {
     case 'talent.updateScoreAdmin':  return handleUpdateScoreAdmin(payload, auth);
     case 'talent.updateEventiPreCRM': return handleUpdateEventiPreCRM(payload, auth);
     case 'talent.generateCard':      return handleGenerateTalentCard(payload, auth);
+    case 'talent.softDelete':        return handleTalentSoftDelete(payload, auth);
 
     // CLIENT
     case 'client.create':     return handleClientCreate(payload, auth);
@@ -183,9 +184,10 @@ function handleRequest(action, payload, token) {
     case 'drive.setup':     return handleDriveSetup(payload, auth);
 
     // LEAD
-    case 'lead.list':    return handleLeadList(payload, auth);
-    case 'lead.update':  return handleLeadUpdate(payload, auth);
-    case 'lead.solicit': return handleLeadSolicit(payload, auth);
+    case 'lead.list':       return handleLeadList(payload, auth);
+    case 'lead.update':     return handleLeadUpdate(payload, auth);
+    case 'lead.solicit':    return handleLeadSolicit(payload, auth);
+    case 'lead.softDelete': return handleLeadSoftDelete(payload, auth);
 
     // CONTRACT
     case 'contract.generate': return handleContractGenerate(payload, auth);
