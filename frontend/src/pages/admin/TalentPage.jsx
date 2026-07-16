@@ -608,7 +608,7 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
 // TALENT PROFILE DRAWER — scheda completa talent approvato
 // ---------------------------------------------------------------------------
 
-function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }) {
+function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleApiResponse }) {
   const d = talent.data ?? {}
   const nome = `${d.nome ?? ''} ${d.cognome ?? ''}`.trim() || '—'
   const photoExp = photoExpiryStatus(talent)
@@ -1326,7 +1326,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, handleApiResponse }
                 const res = await talentApi.softDelete(talent.entity_id)
                 if (!res.success) return false
                 await adminStore.refresh()
-                await onSuspended?.()
+                await onDeleted?.(talent)
                 onClose()
                 showToast('Eliminato')
                 return true
@@ -1718,6 +1718,11 @@ export function TalentsSection({ handleApiResponse }) {
           onClose={() => setSelectedScheda(null)}
           handleApiResponse={handleApiResponse}
           onSuspended={() => adminStore.refresh().then(load)}
+          onDeleted={(deletedTalent) => {
+            const email = (deletedTalent?.data?.email_contatto || '').toLowerCase()
+            setItems(prev => prev.filter(l => (l.data?.email ?? '').toLowerCase() !== email))
+            return load()
+          }}
         />
       )}
       {selectedChanges && (

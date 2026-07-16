@@ -2069,6 +2069,7 @@ export default function EventiPage() {
   // UI state
   const [toggling,     setToggling]     = useState(null)
   const [deleteModal,  setDeleteModal]  = useState(null)
+  const [deleting,     setDeleting]     = useState(false)
   const [showForm,     setShowForm]     = useState(false)
   const [formPrefill,  setFormPrefill]  = useState(null)
   const [isEdit,       setIsEdit]       = useState(false)
@@ -2149,17 +2150,16 @@ export default function EventiPage() {
   }, [])
 
   const handleConfirmDelete = async (entity_id) => {
-    const prevEvents = events
-    setEvents(prev => prev.filter(e => e.entity_id !== entity_id))
-    setDeleteModal(null)
+    setDeleting(true)
     const res = handleApiResponse(await eventApi.softDelete(entity_id))
+    setDeleting(false)
     if (!res.success) {
-      setEvents(prevEvents)
       alert(getErrorMessage(res.error))
-    } else {
-      load()
-      showToast('Eliminato')
+      return
     }
+    setDeleteModal(null)
+    await load()
+    showToast('Eliminato')
   }
 
   const handleDuplica = useCallback((event) => {
@@ -2294,7 +2294,7 @@ export default function EventiPage() {
           event={deleteModal}
           onConfirm={handleConfirmDelete}
           onClose={() => setDeleteModal(null)}
-          loading={false}
+          loading={deleting}
         />
       )}
 
