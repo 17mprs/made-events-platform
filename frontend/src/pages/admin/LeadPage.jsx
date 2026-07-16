@@ -155,6 +155,8 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
           placeholder="Cerca nome o email…"
           value={search}
           onChange={e => setSearch(e.target.value)}
+          autoComplete="off"
+          name="lead-search-no-autofill"
           style={{ ...FILTER_INPUT, minWidth: 180 }}
         />
         {showPageSizeSelect && (
