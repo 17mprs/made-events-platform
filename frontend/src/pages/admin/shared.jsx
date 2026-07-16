@@ -242,9 +242,9 @@ export function ConfirmDeleteModal({ confirmText, onConfirm, onClose }) {
           {confirmText || 'Inserisci la password per confermare l\'eliminazione.'}
         </p>
         <input
-          type="password"
+          type="text"
           placeholder="Password"
-          autoComplete="new-password"
+          autoComplete="off"
           value={password}
           onChange={e => { setPassword(e.target.value); setError(null) }}
           onKeyDown={e => { if (e.key === 'Enter') handleConfirm() }}
@@ -252,7 +252,7 @@ export function ConfirmDeleteModal({ confirmText, onConfirm, onClose }) {
           style={{
             width:'100%', boxSizing:'border-box', padding:'8px 12px',
             border:`1px solid ${error ? '#C62828' : '#e0e0e0'}`, borderRadius:6,
-            fontSize:14, marginBottom:8, fontFamily:'Montserrat, sans-serif',
+            fontSize:14, marginBottom:8, fontFamily:'monospace', letterSpacing:'4px',
           }}
         />
         {error && <p style={{ fontSize:12, color:'#C62828', marginBottom:8 }}>{error}</p>}
@@ -343,9 +343,9 @@ export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, 
               {confirmText || 'Inserisci la password per confermare l\'eliminazione.'}
             </p>
             <input
-              type="password"
+              type="text"
               placeholder="Password"
-              autoComplete="new-password"
+              autoComplete="off"
               value={password}
               onChange={e => { setPassword(e.target.value); setError(null) }}
               onKeyDown={e => { if (e.key === 'Enter') handleConfirm() }}
@@ -353,7 +353,7 @@ export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, 
               style={{
                 width:'100%', boxSizing:'border-box', padding:'8px 12px',
                 border:`1px solid ${error ? '#C62828' : '#e0e0e0'}`, borderRadius:6,
-                fontSize:14, marginBottom:8, fontFamily:'Montserrat, sans-serif',
+                fontSize:14, marginBottom:8, fontFamily:'monospace', letterSpacing:'4px',
               }}
             />
             {error && <p style={{ fontSize:12, color:'#C62828', marginBottom:8 }}>{error}</p>}

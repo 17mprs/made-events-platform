@@ -35,16 +35,16 @@ function DeleteClientModal({ client, onConfirm, onClose, loading }) {
             Password
           </label>
           <input
-            type="password"
+            type="text"
             value={code}
             onChange={e => setCode(e.target.value)}
             placeholder="Password"
-            autoComplete="new-password"
+            autoComplete="off"
             autoFocus
             style={{
               border:`1.5px solid ${isValid ? '#4CAF50' : COLORS.border}`,
               borderRadius:4, padding:'9px 12px', fontSize:15,
-              fontFamily:'Montserrat,sans-serif', width:'100%',
+              fontFamily:'monospace', letterSpacing:'4px', width:'100%',
               boxSizing:'border-box', outline:'none', transition:'border-color 0.2s',
             }}
           />
