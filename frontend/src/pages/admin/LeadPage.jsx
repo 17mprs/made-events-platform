@@ -285,9 +285,9 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
           onConfirm={async () => {
             const res = await leadApi.softDelete(deleteTarget.entity_id)
             if (!res.success) return false
-            await adminStore.refresh()
-            await load()
-            showToast('Lead eliminato')
+            setLeads(prev => prev.filter(l => l.entity_id !== deleteTarget.entity_id))
+            adminStore.refresh()
+            showToast('Lead eliminato con successo')
             return true
           }}
         />
