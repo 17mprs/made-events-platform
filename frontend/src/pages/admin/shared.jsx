@@ -204,8 +204,6 @@ export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, 
   const [error, setError]     = useState(null)
   const [loading, setLoading] = useState(false)
 
-  console.log('[DIAG] DeleteEntityButton render, open =', open)
-
   function close() {
     if (loading) return
     setOpen(false)
@@ -234,7 +232,7 @@ export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, 
     <>
       <button
         type="button"
-        onClick={(e) => { console.log('[DIAG] Elimina clicked, calling setOpen(true)'); e.stopPropagation(); e.preventDefault(); setOpen(true) }}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen(true) }}
         style={{
           background:'none', border:'1px solid #C62828', color:'#C62828',
           borderRadius:6, padding:'6px 14px', fontSize:12, fontWeight:600,
