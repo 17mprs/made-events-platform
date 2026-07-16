@@ -78,6 +78,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
   // modal a metà, prima che l'azione risulti completata. Lo spinner pieno-pagina
   // deve comparire SOLO al primissimo caricamento, mai sui reload successivi.
   const load = useCallback(async () => {
+    console.trace('[DIAG] LeadPage load() called')
     setLoading(true)
     const data = await adminStore.ensure()
     setLoading(false)
