@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { leadApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, Pagination, DeleteEntityButton, showToast } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, LeadBadge, FILTER_INPUT, Pagination, ConfirmDeleteModal, showToast } from './shared'
 
 // ---------------------------------------------------------------------------
 // COMPLETION BADGE — % sezioni questionario completate (solo tab Lead)
@@ -71,6 +71,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
   const [page,       setPage]       = useState(1)
   const [perPage,    setPerPage]    = useState(pageSize)
   const [rowLoading, setRowLoading] = useState({}) // { [entity_id]: 'solicit'|'reset'|null }
+  const [deleteTarget, setDeleteTarget] = useState(null) // lead in eliminazione — modal singleton fuori dalla lista
 
   // Il pulsante "elimina" apre un modal DENTRO la tabella — se il primo render
   // (loading) smonta l'intera tabella per mostrare solo lo spinner, un reload
@@ -152,6 +153,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
     <div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         <input
+          type="search"
           placeholder="Cerca nome o email…"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -253,19 +255,17 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
                               {busy === 'reset' ? '…' : 'Reset solleciti'}
                             </button>
                           )}
-                          <DeleteEntityButton
-                            label="Elimina"
-                            confirmText={`Elimina il lead di ${l.data?.nome ?? ''} ${l.data?.cognome ?? ''}. Inserisci la password per confermare.`}
-                            style={{ padding: '4px 10px' }}
-                            onConfirm={async () => {
-                              const res = await leadApi.softDelete(l.entity_id)
-                              if (!res.success) return false
-                              await adminStore.refresh()
-                              await load()
-                              showToast('Eliminato')
-                              return true
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); setDeleteTarget(l) }}
+                            style={{
+                              background:'none', border:'1px solid #C62828', color:'#C62828',
+                              borderRadius:6, padding:'4px 10px', fontSize:11, fontWeight:600,
+                              cursor:'pointer', fontFamily:'Montserrat, sans-serif', whiteSpace:'nowrap',
                             }}
-                          />
+                          >
+                            Elimina
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -276,6 +276,21 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
           </div>
           <Pagination page={page} totalPages={totalPages} onPage={setPage} />
         </>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          confirmText={`Elimina il lead di ${deleteTarget.data?.nome ?? ''} ${deleteTarget.data?.cognome ?? ''}. Inserisci la password per confermare.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            const res = await leadApi.softDelete(deleteTarget.entity_id)
+            if (!res.success) return false
+            await adminStore.refresh()
+            await load()
+            showToast('Eliminato')
+            return true
+          }}
+        />
       )}
     </div>
   )

@@ -1607,7 +1607,7 @@ export function TalentsSection({ handleApiResponse }) {
 
       {/* Filters */}
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8, alignItems:'center' }}>
-        <input placeholder="Cerca nome o email…" value={search} onChange={e => setSearch(e.target.value)} autoComplete="off" name="talent-search-no-autofill" style={{ ...FILTER_INPUT, minWidth:180 }} />
+        <input type="search" placeholder="Cerca nome o email…" value={search} onChange={e => setSearch(e.target.value)} autoComplete="off" name="talent-search-no-autofill" style={{ ...FILTER_INPUT, minWidth:180 }} />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={FILTER_INPUT}>
           <option value="ALL">Tutti</option>
           <option value="COMPLETED_PENDING_APPROVAL">In Attesa</option>

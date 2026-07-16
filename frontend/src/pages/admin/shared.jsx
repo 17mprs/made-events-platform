@@ -198,6 +198,87 @@ export function showToast(message) {
   setTimeout(() => { el.remove() }, 2200)
 }
 
+// Variante singleton: nessun trigger interno, nessuno stato "open" — il
+// genitore controlla apertura/chiusura renderizzandolo condizionalmente
+// una sola volta fuori dalla lista, cosi' non si smonta se la lista cambia.
+export function ConfirmDeleteModal({ confirmText, onConfirm, onClose }) {
+  const [password, setPassword] = useState('')
+  const [error, setError]       = useState(null)
+  const [loading, setLoading]   = useState(false)
+
+  function close() {
+    if (loading) return
+    onClose()
+  }
+
+  async function handleConfirm() {
+    if (password !== DELETE_PASSWORD) {
+      setError('Password non corretta')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    const ok = await onConfirm()
+    setLoading(false)
+    if (ok) onClose()
+    else setError('Errore durante l\'eliminazione. Riprova.')
+  }
+
+  return (
+    <div
+      onClick={close}
+      style={{
+        position:'fixed', inset:0, zIndex:2000, display:'flex',
+        alignItems:'center', justifyContent:'center',
+        background:'rgba(0,0,0,0.5)', padding:'20px',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background:'#fff', borderRadius:8, padding:24, width:340, maxWidth:'100%' }}
+      >
+        <div style={{ fontSize:15, fontWeight:700, marginBottom:8, color:'#C62828' }}>⚠ Conferma eliminazione</div>
+        <p style={{ fontSize:13, color:'#666', marginBottom:16, lineHeight:1.5 }}>
+          {confirmText || 'Inserisci la password per confermare l\'eliminazione.'}
+        </p>
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={e => { setPassword(e.target.value); setError(null) }}
+          onKeyDown={e => { if (e.key === 'Enter') handleConfirm() }}
+          autoFocus
+          style={{
+            width:'100%', boxSizing:'border-box', padding:'8px 12px',
+            border:`1px solid ${error ? '#C62828' : '#e0e0e0'}`, borderRadius:6,
+            fontSize:14, marginBottom:8, fontFamily:'Montserrat, sans-serif',
+          }}
+        />
+        {error && <p style={{ fontSize:12, color:'#C62828', marginBottom:8 }}>{error}</p>}
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
+          <button
+            type="button" onClick={close} disabled={loading}
+            style={{ background:'none', border:'1px solid #e0e0e0', color:'#333', borderRadius:6, padding:'7px 14px', fontSize:12, cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'Montserrat, sans-serif' }}
+          >
+            Annulla
+          </button>
+          <button
+            type="button" onClick={handleConfirm} disabled={loading || !password}
+            style={{
+              background:'#C62828', color:'#fff', border:'none', borderRadius:6,
+              padding:'7px 14px', fontSize:12, fontWeight:600, fontFamily:'Montserrat, sans-serif',
+              cursor: (loading || !password) ? 'not-allowed' : 'pointer',
+              opacity: (loading || !password) ? 0.6 : 1,
+            }}
+          >
+            {loading ? 'Eliminazione…' : 'Elimina'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, style }) {
   const [open, setOpen]       = useState(false)
   const [password, setPassword] = useState('')
