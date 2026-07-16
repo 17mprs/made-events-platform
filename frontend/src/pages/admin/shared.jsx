@@ -1,5 +1,5 @@
 // === ADMIN SHARED — MADE EVENTS Platform ===
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Button from '../../components/Button'
 
@@ -199,10 +199,14 @@ export function showToast(message) {
 }
 
 export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, style }) {
+  const [mountId]             = useState(() => Math.random().toString(36).slice(2, 8))
   const [open, setOpen]       = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError]     = useState(null)
   const [loading, setLoading] = useState(false)
+
+  console.log('[DIAG]', mountId, 'render, open =', open)
+  useEffect(() => () => console.log('[DIAG]', mountId, 'UNMOUNTED'), [mountId])
 
   function close() {
     if (loading) return
@@ -232,7 +236,7 @@ export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, 
     <>
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen(true) }}
+        onClick={(e) => { console.log('[DIAG]', mountId, 'Elimina clicked'); e.stopPropagation(); e.preventDefault(); setOpen(true) }}
         style={{
           background:'none', border:'1px solid #C62828', color:'#C62828',
           borderRadius:6, padding:'6px 14px', fontSize:12, fontWeight:600,
