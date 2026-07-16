@@ -287,7 +287,7 @@ export function LeadsSection({ handleApiResponse, pageSize = 10, showPageSizeSel
             if (!res.success) return false
             await adminStore.refresh()
             await load()
-            showToast('Eliminato')
+            showToast('Lead eliminato')
             return true
           }}
         />

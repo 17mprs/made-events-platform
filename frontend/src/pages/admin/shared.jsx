@@ -244,6 +244,7 @@ export function ConfirmDeleteModal({ confirmText, onConfirm, onClose }) {
         <input
           type="password"
           placeholder="Password"
+          autoComplete="new-password"
           value={password}
           onChange={e => { setPassword(e.target.value); setError(null) }}
           onKeyDown={e => { if (e.key === 'Enter') handleConfirm() }}
@@ -344,6 +345,7 @@ export function DeleteEntityButton({ label = 'Elimina', confirmText, onConfirm, 
             <input
               type="password"
               placeholder="Password"
+              autoComplete="new-password"
               value={password}
               onChange={e => { setPassword(e.target.value); setError(null) }}
               onKeyDown={e => { if (e.key === 'Enter') handleConfirm() }}

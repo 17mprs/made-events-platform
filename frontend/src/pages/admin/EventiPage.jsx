@@ -114,6 +114,7 @@ function DeleteConfirmModal({ event, onConfirm, onClose, loading }) {
             value={code}
             onChange={e => setCode(e.target.value)}
             placeholder="Password"
+            autoComplete="new-password"
             autoFocus
             style={{
               border:`1.5px solid ${isValid ? '#4CAF50' : COLORS.border}`,
