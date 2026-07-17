@@ -2,6 +2,9 @@
 // Generazione contratti da template Google Doc.
 // Copia il template, sostituisce i placeholder, restituisce il link.
 
+// TODO: ID del vecchio Drive — dopo il cutover il template va duplicato nel
+// nuovo Drive e questo fallback aggiornato (o impostare CONTRACT_TEMPLATE_ID
+// come Script Property, che ha comunque priorità su questo valore).
 var _CONTRACT_TEMPLATE_ID_FALLBACK = '1WyVn17-7Iaq3H5uF0DZPDN_DVC-KQPmFnU4bWbFNYgM';
 
 function getContractTemplateId_() {

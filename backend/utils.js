@@ -280,7 +280,7 @@ function calcTimesheet(checkinTs, checkoutTs) {
  * Genera password temporanea sicura (12 chars).
  */
 function getFrontendUrl() {
-  return PropertiesService.getScriptProperties().getProperty('FRONTEND_URL') || 'https://made-events-platform.vercel.app';
+  return PropertiesService.getScriptProperties().getProperty('FRONTEND_URL') || 'https://platform.madeevents.it';
 }
 
 function generateTempPassword() {

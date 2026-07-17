@@ -5,7 +5,7 @@
 // DATABASE
 // ---------------------------------------------------------------------------
 
-var _SPREADSHEET_ID_FALLBACK = '12ITb5K_ZcskSFgLmpdWXvqqP2oh5cJ51KKhPq2PhlHQ';
+var _SPREADSHEET_ID_FALLBACK = '1DFYW8ybbMiXuQOyHBV7CDw0anFIGIZ7LbM3oRu84pLI';
 
 function getSpreadsheetId_() {
   try {

@@ -5,7 +5,7 @@
 // sostituire GAS_ENDPOINT con l'URL fornito da GAS
 // (es. https://script.google.com/macros/s/AKfycby.../exec)
 
-export const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxx22bM7g-QPdhh_fqSy1mwhKQdh8zg6f3IgK2ah8P8F_cSEOtaKM_l66G2gs9CKm3i/exec'
+export const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyCosawZ1j9WclKX_EY10Gnl3_rmaZfvQ_sGuTrNLur2Hpz_2sfIdGpgqa8S3re0rjfUg/exec'
 
 // ---------------------------------------------------------------------------
 // CORE FETCH
