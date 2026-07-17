@@ -34,6 +34,7 @@ function getEventiPerNewsletter_() {
     var d = parseJSON(e.data);
     return {
       entity_id:          e.entity_id,
+      status:             e.status             || '',
       titolo:             d.titolo             || '',
       data_inizio:        d.data_inizio        || '',
       data_fine:          d.data_fine          || '',
@@ -80,6 +81,10 @@ function buildNewsletterHtml(tier, eventi, destinatario) {
     var dataFmt    = ev.data_inizio ? formatDate_(ev.data_inizio) : '';
     var localita   = (ev.luogo ? ev.luogo : '') + (ev.luogo && ev.citta ? ', ' : '') + (ev.citta || '');
 
+    // TIER2-only: eventi COMPLETED non sono più candidabili — niente CTA di
+    // candidatura, badge grigio al posto del colore brand.
+    var isConcluso = !isTier1 && ev.status === 'COMPLETED';
+
     var cardCtaUrl, cardCtaLabel;
     if (isTier1) {
       cardCtaUrl   = baseUrl + '/registrazione/completa?token=' + encodeURIComponent(destinatario.lead_token || '');
@@ -92,6 +97,10 @@ function buildNewsletterHtml(tier, eventi, destinatario) {
     var titleHtml = isTier1
       ? '<span style="color:#aaa;letter-spacing:2px;">Opportunità ••••••</span>'
       : escapeHtml_(ev.titolo);
+
+    var badgeHtml = isConcluso
+      ? '<span style="display:inline-block;margin-bottom:6px;padding:2px 10px;border-radius:10px;background:#EEEEEE;color:#8888A0;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Concluso</span><br/>'
+      : '';
 
     var imgBlock = imgUrl
       ? '<tr><td style="padding:0;line-height:0;">' +
@@ -116,13 +125,16 @@ function buildNewsletterHtml(tier, eventi, destinatario) {
       '<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;border-radius:4px;overflow:hidden;background:#FFFFFF;border:1px solid #EAEAEA;">',
       imgBlock,
       '<tr><td style="padding:20px 24px 12px;">',
+      badgeHtml,
       '<p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#2E2E2E;line-height:1.3;">' + titleHtml + '</p>',
       dataFmt   ? '<p style="margin:0 0 3px;font-size:12px;color:#6B6B6B;">&#128197; ' + escapeHtml_(dataFmt) + '</p>' : '',
       localita  ? '<p style="margin:0 0 3px;font-size:12px;color:#6B6B6B;">&#128205; ' + escapeHtml_(localita)  + '</p>' : '',
       detailBlock,
       '</td></tr>',
       '<tr><td style="padding:0 24px 20px;">',
-      '<a href="' + escapeHtml_(cardCtaUrl) + '" style="display:inline-block;background:' + ACCENT + ';color:#FFFFFF;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">' + cardCtaLabel + '</a>',
+      isConcluso
+        ? '<p style="margin:0;font-size:12px;font-style:italic;color:#8888A0;">Opportunità conclusa — resta connesso per le prossime!</p>'
+        : '<a href="' + escapeHtml_(cardCtaUrl) + '" style="display:inline-block;background:' + ACCENT + ';color:#FFFFFF;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">' + cardCtaLabel + '</a>',
       '</td></tr>',
       '</table>',
     ].join('\n');
