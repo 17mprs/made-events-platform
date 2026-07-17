@@ -849,6 +849,23 @@ function handleTalentSoftDelete(payload, auth) {
   var ok = softDeleteEntity(payload.entity_id, auth.tenant_id, auth.user_id);
   if (!ok) return errorResponse('SYS_001', 'Impossibile eliminare il profilo talent');
 
+  // Cascade: soft delete anche del LEAD_TALENT collegato per email, se esiste.
+  var emailContatto = entity.data && entity.data.email_contatto;
+  if (emailContatto) {
+    var emailLower = String(emailContatto).toLowerCase().trim();
+    var allEntities = getAllRows('Entities');
+    for (var i = 0; i < allEntities.length; i++) {
+      var e = allEntities[i];
+      if (e.type !== 'LEAD_TALENT') continue;
+      if (String(e.tenant_id) !== String(entity.tenant_id)) continue;
+      var leadData = parseJSON(e.data);
+      if (String(leadData.email).toLowerCase().trim() === emailLower) {
+        softDeleteEntity(e.entity_id, entity.tenant_id, auth.user_id);
+        break;
+      }
+    }
+  }
+
   return successResponse({ entity_id: payload.entity_id });
 }
 
