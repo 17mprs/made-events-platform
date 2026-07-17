@@ -22,19 +22,36 @@ function handleRegisterStep1(payload) {
 
   var emailLower = payload.email.toLowerCase().trim();
 
+  // CASO 1 — lead già esistente (non ancora talent): non si procede con una
+  // nuova registrazione, si rimanda un nuovo link per completare quella in corso.
   var existing = findLeadByEmail_(emailLower);
   if (existing && existing.status !== ENTITY_STATUS.LEAD_TALENT.REJECTED) {
-    return successResponse({
-      lead_id:        existing.entity_id,
-      step_completed: parseInt(existing.data.step_completed) || 1,
-      message:        'Registrazione già avviata. Continua con il passo successivo.'
-    });
+    var completionUrl = getFrontendUrl() + '/registrazione/completa?token=' + (existing.data.lead_token || '');
+    try {
+      sendRegistrazioneEsistenteEmail(existing.data.email, existing.data.nome || '', completionUrl);
+    } catch (e) {
+      Logger.log('[REGISTER_STEP1] Email lead esistente non inviata: ' + e.message);
+    }
+    return successResponse({ message: 'LEAD_ESISTENTE' });
   }
 
+  // CASO 2 — account talent già attivo (Users): niente nuova registrazione,
+  // si invia un link di accesso diretto con token temporaneo.
   var users = getAllRows('Users');
   for (var i = 0; i < users.length; i++) {
     if (String(users[i].email).toLowerCase() === emailLower) {
-      return errorResponse('VAL_004', 'Email già registrata nel sistema');
+      var talentUser = users[i];
+      var portalPath = talentUser.role === 'CLIENTE' ? '/cliente'
+                      : (talentUser.role === 'ADMIN' || talentUser.role === 'SUPER_ADMIN') ? '/admin'
+                      : '/portale';
+      var loginUrl = getFrontendUrl() + portalPath + '?token=' + encodeURIComponent(generateToken_(talentUser));
+      var talentLead = findLeadByEmail_(emailLower);
+      try {
+        sendAccountEsistenteEmail(talentUser.email, (talentLead && talentLead.data.nome) || '', loginUrl);
+      } catch (e) {
+        Logger.log('[REGISTER_STEP1] Email account esistente non inviata: ' + e.message);
+      }
+      return successResponse({ message: 'TALENT_ESISTENTE' });
     }
   }
 

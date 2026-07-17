@@ -598,6 +598,42 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, portaleUrl
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE 16 — Registrazione duplicata: lead già esistente (non ancora talent)
+// ---------------------------------------------------------------------------
+
+function sendRegistrazioneEsistenteEmail(to, nome, completionUrl) {
+  var body = [
+    '<p style="margin:0 0 20px;">',
+    'Ci risulti già registrato/a nel nostro sistema. Non è possibile procedere a una nuova registrazione, ',
+    'ma abbiamo appena inviato un nuovo link per riprendere e completare il tuo profilo esattamente da dove ti eri fermato/a.',
+    '</p>',
+    buildEmailButton_('Riprendi la registrazione', completionUrl),
+  ].join('');
+
+  var html = buildEmailTemplate('Registrazione già in corso', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nCi risulti già registrato/a. Riprendi da qui: ' + completionUrl + '\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Riprendi la tua registrazione — MADE EVENTS', html, text);
+}
+
+// ---------------------------------------------------------------------------
+// TEMPLATE 17 — Registrazione duplicata: account talent già attivo
+// ---------------------------------------------------------------------------
+
+function sendAccountEsistenteEmail(to, nome, loginUrl) {
+  var body = [
+    '<p style="margin:0 0 20px;">',
+    'Hai già un account attivo su MADE EVENTS. ',
+    'Ecco il link per accedere alla tua area riservata — se non ricordi la password potrai reimpostarla dall\'interno.',
+    '</p>',
+    buildEmailButton_('Accedi alla tua area riservata', loginUrl),
+  ].join('');
+
+  var html = buildEmailTemplate('Hai già un account', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nHai già un account attivo. Accedi qui: ' + loginUrl + '\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Il tuo account MADE EVENTS', html, text);
+}
+
+// ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
 
