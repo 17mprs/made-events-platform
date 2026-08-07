@@ -411,6 +411,17 @@ function countFilled(checks) {
   return { filled: checks.filter(Boolean).length, total: checks.length }
 }
 
+function isValidCodiceFiscale(v) {
+  return /^[A-Z0-9]{16}$/.test(String(v || '').toUpperCase())
+}
+function isValidPartitaIva(v) {
+  if (!v) return true // opzionale
+  return /^\d{11}$/.test(String(v))
+}
+function isValidIban(v) {
+  return /^IT\d{2}[A-Z0-9]{23}$/.test(String(v || '').toUpperCase().replace(/\s/g, ''))
+}
+
 const PROFILE_SECTIONS = [
   { id: 'S1', title: 'Dati Personali',
     completeness: d => countFilled([!!d.genere, !!d.nascita_citta, !!d.nascita_provincia, !!d.residenza_citta, !!d.residenza_provincia, !!(d.domicilio_coincide || d.domicilio_provincia)]) },
@@ -429,6 +440,10 @@ const PROFILE_SECTIONS = [
     completeness: () => countFilled([true]) },
   { id: 'S7', title: 'Foto Profilo',
     completeness: d => countFilled([!!d.foto_busto_url, !!d.foto_intera_url]) },
+  { id: 'S8', title: 'Dati Fiscali e Bancari',
+    completeness: d => countFilled([isValidCodiceFiscale(d.codice_fiscale), isValidIban(d.iban), !!d.disponibile_chiamata, !!d.disponibile_ritenuta]) },
+  { id: 'S9', title: 'Documenti',
+    completeness: d => countFilled([!!d.doc_identita_url, !!d.doc_cf_url, !!d.cv_url]) },
 ]
 
 function globalCompleteness(data) {
@@ -592,6 +607,184 @@ function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiRespon
   )
 }
 
+// Sezione 8 — Dati Fiscali e Bancari: campi ex-questionario rimossi dalla
+// registrazione (mai raccolti da nessuna sezione). Salvataggio indipendente
+// dal form principale — chiama talent.updateProfile solo con questi 5 campi,
+// perché sono dati sensibili che l'utente deve poter confermare a parte.
+function FiscalRadioGroup({ label, name, value, onChange, error }) {
+  return (
+    <div>
+      <label style={COMPONENT_STYLES.label}>{label} *</label>
+      <div style={{ display:'flex', gap:20, marginTop:4 }}>
+        {['Sì', 'No'].map(opt => (
+          <label key={opt} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:14, color:COLORS.text }}>
+            <input
+              type="radio"
+              name={name}
+              value={opt}
+              checked={value === opt}
+              onChange={() => onChange(opt)}
+              style={{ accentColor: COLORS.accent }}
+            />
+            {opt}
+          </label>
+        ))}
+      </div>
+      {error && <p style={{ fontSize:12, color:COLORS.error, marginTop:4 }}>{error}</p>}
+    </div>
+  )
+}
+
+const FISCALE_FIELDS = ['codice_fiscale', 'partita_iva', 'iban', 'disponibile_chiamata', 'disponibile_ritenuta']
+
+function FiscaleCard({ sec, form, onChange, entityId, handleApiResponse }) {
+  const { filled, total } = sec.completeness(form)
+  const [saving, setSaving] = useState(false)
+  const [saved,  setSaved]  = useState(false)
+  const [errors, setErrors] = useState({})
+
+  function validate() {
+    const e = {}
+    if (!isValidCodiceFiscale(form.codice_fiscale)) e.codice_fiscale = 'Codice fiscale non valido (16 caratteri alfanumerici)'
+    if (!isValidPartitaIva(form.partita_iva)) e.partita_iva = 'Partita IVA non valida (11 cifre)'
+    if (!isValidIban(form.iban)) e.iban = 'IBAN non valido (IT + 25 caratteri, 27 totali)'
+    if (!form.disponibile_chiamata) e.disponibile_chiamata = 'Campo obbligatorio'
+    if (!form.disponibile_ritenuta) e.disponibile_ritenuta = 'Campo obbligatorio'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  async function handleSave() {
+    if (!validate()) return
+    setSaving(true)
+    setSaved(false)
+    const payload = { entity_id: entityId }
+    FISCALE_FIELDS.forEach(f => { payload[f] = form[f] })
+    const res = handleApiResponse(await talentApi.updateProfile(payload))
+    setSaving(false)
+    if (!res.success) {
+      alert(getErrorMessage(res.error))
+    } else {
+      setSaved(true)
+    }
+  }
+
+  return (
+    <SectionCardShell sec={sec} filled={filled} total={total}>
+      <div className="form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
+        <Input
+          label="Codice Fiscale *"
+          value={form.codice_fiscale || ''}
+          onChange={e => onChange('codice_fiscale', e.target.value.toUpperCase())}
+          maxLength={16}
+          placeholder="— non compilato —"
+          error={errors.codice_fiscale}
+        />
+        <Input
+          label="Partita IVA (opzionale)"
+          value={form.partita_iva || ''}
+          onChange={e => onChange('partita_iva', e.target.value)}
+          maxLength={11}
+          placeholder="— non compilato —"
+          error={errors.partita_iva}
+        />
+        <Input
+          label="IBAN *"
+          value={form.iban || ''}
+          onChange={e => onChange('iban', e.target.value.toUpperCase())}
+          maxLength={27}
+          placeholder="— non compilato —"
+          error={errors.iban}
+          style={{ gridColumn: '1 / -1' }}
+        />
+        <FiscalRadioGroup
+          label="Disponibile a chiamata diretta"
+          name="disponibile_chiamata"
+          value={form.disponibile_chiamata}
+          onChange={v => onChange('disponibile_chiamata', v)}
+          error={errors.disponibile_chiamata}
+        />
+        <FiscalRadioGroup
+          label="Disponibile a ritenuta d'acconto"
+          name="disponibile_ritenuta"
+          value={form.disponibile_ritenuta}
+          onChange={v => onChange('disponibile_ritenuta', v)}
+          error={errors.disponibile_ritenuta}
+        />
+      </div>
+      <div style={{ marginTop:20, display:'flex', alignItems:'center', gap:12 }}>
+        <Button type="button" onClick={handleSave} loading={saving}>Salva Dati Fiscali</Button>
+        {saved && <span style={{ fontSize:13, color:'#10B981', fontWeight:500 }}>✓ Salvato</span>}
+      </div>
+    </SectionCardShell>
+  )
+}
+
+// Sezione 9 — Documenti: stesso meccanismo di upload immediato di
+// FotoProfiloCard (document.upload salva su Drive + shortcut field
+// non appena il file viene selezionato — nessun pulsante Salva separato,
+// coerente col comportamento già esistente per le foto).
+const DOCUMENTI_FIELDS = {
+  doc_identita:        { label: 'Documento di identità', accept: 'image/jpeg,image/png,application/pdf', maxMB: 5, required: true },
+  doc_cf:              { label: 'Codice fiscale (tessera o documento)', accept: 'image/jpeg,image/png,application/pdf', maxMB: 5, required: true },
+  cv:                  { label: 'Curriculum vitae', accept: 'application/pdf', maxMB: 10, required: true, hint: 'Formato PDF, max 10MB.' },
+  attestato_haccp:     { label: 'Attestato HACCP', accept: 'application/pdf', maxMB: 10, required: false, hint: 'Opzionale.' },
+  attestato_sicurezza: { label: 'Attestato Sicurezza sul lavoro', accept: 'application/pdf', maxMB: 10, required: false, hint: 'Opzionale.' },
+}
+
+function DocumentiCard({ sec, form, onChange, talentProfileId, handleApiResponse }) {
+  const { filled, total } = sec.completeness(form)
+  const [uploadState, setUploadState]   = useState({})
+  const [uploadErrors, setUploadErrors] = useState({})
+
+  async function handleFile(fieldKey, { base64, filename, mimeType }) {
+    setUploadState(prev => ({ ...prev, [fieldKey]: 'uploading' }))
+    setUploadErrors(prev => ({ ...prev, [fieldKey]: null }))
+    const res = handleApiResponse(await documentApi.upload(talentProfileId, fieldKey, base64, filename, mimeType))
+    if (!res.success) {
+      setUploadState(prev => ({ ...prev, [fieldKey]: 'error' }))
+      setUploadErrors(prev => ({ ...prev, [fieldKey]: getErrorMessage(res.error) }))
+      return
+    }
+    setUploadState(prev => ({ ...prev, [fieldKey]: 'done' }))
+    onChange(`${fieldKey}_url`, res.data?.url)
+  }
+
+  function handleClear(fieldKey) {
+    setUploadState(prev => ({ ...prev, [fieldKey]: undefined }))
+    onChange(`${fieldKey}_url`, '')
+  }
+
+  return (
+    <SectionCardShell sec={sec} filled={filled} total={total}>
+      <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+        {Object.entries(DOCUMENTI_FIELDS).map(([fieldKey, cfg]) => (
+          <div key={fieldKey}>
+            <FileUpload
+              label={cfg.label}
+              accept={cfg.accept}
+              maxMB={cfg.maxMB}
+              required={cfg.required}
+              uploaded={uploadState[fieldKey] === 'done' || !!form[`${fieldKey}_url`]}
+              uploadedUrl={form[`${fieldKey}_url`]}
+              onFile={fileData => handleFile(fieldKey, fileData)}
+              onClear={() => handleClear(fieldKey)}
+              error={uploadErrors[fieldKey]}
+              hint={cfg.hint}
+            />
+            {uploadState[fieldKey] === 'uploading' && (
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
+                <div className="spinner" style={{ width:14, height:14, borderWidth:'1.5px' }} />
+                <span style={{ fontSize:12, color:COLORS.textSecondary }}>Caricamento in corso…</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCardShell>
+  )
+}
+
 function MyProfile({ handleApiResponse }) {
   const [profile,  setProfile]  = useState(null)
   const [loading,  setLoading]  = useState(true)
@@ -646,6 +839,11 @@ function MyProfile({ handleApiResponse }) {
 
   const d   = profile.data ?? {}
   const pct = globalCompleteness(form)
+  const fiscaleDocIncompleto = ['S8', 'S9'].some(id => {
+    const sec = PROFILE_SECTIONS.find(s => s.id === id)
+    const r   = sec.completeness(form)
+    return r.filled < r.total
+  })
 
   return (
     <form onSubmit={save}>
@@ -693,10 +891,23 @@ function MyProfile({ handleApiResponse }) {
         </div>
       )}
 
+      {fiscaleDocIncompleto && (
+        <div style={{
+          background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: 8,
+          padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>📋</span>
+          <span style={{ fontSize: 13, color: '#B71C1C', lineHeight: 1.6 }}>
+            Completa i tuoi dati fiscali e carica i documenti per poter ricevere offerte di lavoro.
+          </span>
+        </div>
+      )}
+
       {PROFILE_SECTIONS.map(sec => (
-        sec.id === 'S7'
-          ? <FotoProfiloCard key={sec.id} sec={sec} form={form} onChange={onChange} talentProfileId={profile.entity_id} handleApiResponse={handleApiResponse} />
-          : <SectionCard key={sec.id} sec={sec} form={form} onChange={onChange} />
+        sec.id === 'S7' ? <FotoProfiloCard  key={sec.id} sec={sec} form={form} onChange={onChange} talentProfileId={profile.entity_id} handleApiResponse={handleApiResponse} />
+        : sec.id === 'S8' ? <FiscaleCard    key={sec.id} sec={sec} form={form} onChange={onChange} entityId={profile.entity_id} handleApiResponse={handleApiResponse} />
+        : sec.id === 'S9' ? <DocumentiCard  key={sec.id} sec={sec} form={form} onChange={onChange} talentProfileId={profile.entity_id} handleApiResponse={handleApiResponse} />
+        : <SectionCard key={sec.id} sec={sec} form={form} onChange={onChange} />
       ))}
 
       <div style={{ paddingBottom:32 }}>
