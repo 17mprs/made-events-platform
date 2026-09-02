@@ -29,6 +29,22 @@ function handleGenerateTalentCard(payload, auth) {
 // CORE
 // ---------------------------------------------------------------------------
 
+// Calcola l'età da data_nascita (DD/MM/YYYY, stesso formato usato in
+// admin/TalentPage.jsx formatEtaData e RegistrationFlow.js). Ritorna
+// stringa età (es. "22") o '—' se assente/non valida.
+function calcolaEta_(dataNascita) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataNascita || '');
+  if (!m) return '—';
+  var nascita = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  if (isNaN(nascita.getTime())) return '—';
+  var oggi = new Date();
+  var eta = oggi.getFullYear() - nascita.getFullYear();
+  var meseNonRaggiunto = oggi.getMonth() < nascita.getMonth() ||
+    (oggi.getMonth() === nascita.getMonth() && oggi.getDate() < nascita.getDate());
+  if (meseNonRaggiunto) eta--;
+  return String(eta);
+}
+
 function generateTalentCard_(talent, auth) {
   var d = talent.data || {};
 
@@ -78,6 +94,8 @@ function generateTalentCard_(talent, auth) {
     '{{RANKING}}':               v(d.ranking),
     '{{PROVINCE_LAVORO}}':       v(province),
     '{{DATA_GENERAZIONE}}':      dataGen,
+    '{{DATA_NASCITA}}':          v(d.data_nascita),
+    '{{ETA}}':                   calcolaEta_(d.data_nascita),
   };
 
   // --- Filename ---
@@ -115,33 +133,13 @@ function generateTalentCard_(talent, auth) {
   if (footer) { for (var ph3 in replacements) footer.replaceText(ph3, replacements[ph3]); }
 
   // --- Gestione foto ---
-  var paras    = body.getParagraphs();
-  var fotoPara = null;
-  for (var i = 0; i < paras.length; i++) {
-    if (paras[i].getText().indexOf('{{FOTO_PROFILO}}') !== -1) {
-      fotoPara = paras[i];
-      break;
-    }
-  }
-
-  if (fotoPara) {
-    var photoBlob = null;
-    if (d.foto_busto_url) {
-      // Pass tenant_id so the Drive-path check can verify file ownership
-      photoBlob = fetchTenantImageBlob_(d.foto_busto_url, auth.tenant_id);
-    }
-    if (photoBlob) {
-      try {
-        var paraIdx = body.getChildIndex(fotoPara);
-        body.insertImage(paraIdx, photoBlob);
-        body.removeChild(fotoPara);
-      } catch (imgErr) {
-        body.replaceText('\\{\\{FOTO_PROFILO\\}\\}', '');
-      }
-    } else {
-      body.removeChild(fotoPara);
-    }
-  }
+  // {{FOTO_BUSTO}}/{{FOTO_INTERA}} sono i placeholder del template corrente;
+  // {{FOTO_PROFILO}} resta come fallback per compatibilità coi vecchi template
+  // (stessa foto di {{FOTO_BUSTO}}). Ogni placeholder è cercato/gestito
+  // indipendentemente: un template può averne uno, due o tutti e tre.
+  insertPhotoAtPlaceholder_(body, '{{FOTO_BUSTO}}',   d.foto_busto_url,  auth.tenant_id);
+  insertPhotoAtPlaceholder_(body, '{{FOTO_INTERA}}',  d.foto_intera_url, auth.tenant_id);
+  insertPhotoAtPlaceholder_(body, '{{FOTO_PROFILO}}', d.foto_busto_url,  auth.tenant_id);
 
   doc.saveAndClose();
 
@@ -162,6 +160,36 @@ function generateTalentCard_(talent, auth) {
     pdf_url: pdfFile.getUrl(),
     pdf_id:  pdfFile.getId(),
   };
+}
+
+// Cerca il paragrafo che contiene placeholderText, inserisce l'immagine
+// (con la stessa validazione di sicurezza di fetchTenantImageBlob_) nella sua
+// posizione e rimuove il paragrafo placeholder. Se il placeholder non è nel
+// doc (template diverso) non fa nulla; se manca l'URL o il download fallisce,
+// rimuove comunque il paragrafo per non lasciare {{...}} visibile nel PDF.
+function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
+  var paras  = body.getParagraphs();
+  var target = null;
+  for (var i = 0; i < paras.length; i++) {
+    if (paras[i].getText().indexOf(placeholderText) !== -1) {
+      target = paras[i];
+      break;
+    }
+  }
+  if (!target) return;
+
+  var photoBlob = url ? fetchTenantImageBlob_(url, tenantId) : null;
+  if (photoBlob) {
+    try {
+      var paraIdx = body.getChildIndex(target);
+      body.insertImage(paraIdx, photoBlob);
+      body.removeChild(target);
+    } catch (imgErr) {
+      body.replaceText(placeholderText.replace(/[{}]/g, '\\$&'), '');
+    }
+  } else {
+    body.removeChild(target);
+  }
 }
 
 // ---------------------------------------------------------------------------
