@@ -6,6 +6,21 @@ import SectionShell from '../SectionShell'
 import { PROVINCE_ALFA } from '../data/province'
 import CittaProvinciaSelect from '../../shared/CittaProvinciaSelect'
 
+// L'<input type="date"> nativo richiede value in ISO YYYY-MM-DD, ma il campo
+// applicativo data_nascita è sempre DD/MM/YYYY (formato Sheet, coerente con
+// formatEtaData in admin/TalentPage.jsx). Conversione locale solo per l'input:
+// registrazione (campo vuoto → ISO scelto dall'utente → IT verso onChange) e
+// edit profilo (IT già salvato → ISO per precompilare il datepicker) usano
+// la stessa identica logica.
+function isoToItalianDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+function italianDateToIso(it) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(it || '')
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
+}
+
 // Campi della sezione, esportati a parte così l'area riservata (UserPortal.jsx)
 // può renderli identici, senza la cornice/navigazione del wizard.
 export function Section1Fields({ data, onChange, errors = {} }) {
@@ -46,6 +61,17 @@ export function Section1Fields({ data, onChange, errors = {} }) {
             onChange('nascita_citta', citta)
             onChange('nascita_provincia', provincia)
           }}
+        />
+      </div>
+
+      {/* Data di nascita */}
+      <div style={{ marginBottom: '28px', maxWidth: '320px' }}>
+        <Input
+          label="Data di nascita *"
+          type="date"
+          value={italianDateToIso(data.data_nascita)}
+          onChange={e => onChange('data_nascita', isoToItalianDate(e.target.value))}
+          error={errors.data_nascita}
         />
       </div>
 
@@ -135,6 +161,7 @@ export default function Section1({ data, onChange, onNext, loading }) {
     // Luogo di nascita
     if (!data.nascita_citta) e.nascita_citta = 'Campo obbligatorio'
     if (!data.nascita_provincia) e.nascita_provincia = 'Seleziona la provincia'
+    if (!data.data_nascita) e.data_nascita = 'Campo obbligatorio'
     // Residenza
     if (!data.residenza_citta || data.residenza_citta.trim().length < 2) e.residenza_citta = 'Campo obbligatorio'
     if (!data.residenza_provincia) e.residenza_provincia = 'Seleziona la provincia'

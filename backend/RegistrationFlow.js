@@ -100,6 +100,15 @@ function handleRegisterStep1(payload) {
 // Chiamato dopo ogni sezione "Salva e continua". Idempotente.
 // ---------------------------------------------------------------------------
 
+// Converte una data da formato HTML <input type="date"> (YYYY-MM-DD) a DD/MM/YYYY,
+// formato unico usato nel Sheet per data_nascita. Ritorna '' se input assente/non valido.
+function toItalianDate_(isoDate) {
+  if (!isoDate) return '';
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!m) return isoDate; // già in altro formato (es. DD/MM/YYYY salvato in precedenza): lascia invariato
+  return m[3] + '/' + m[2] + '/' + m[1];
+}
+
 function handleRegisterStep2(payload) {
   var valid = requireFields(payload, ['lead_id', 'email']);
   if (valid) return valid;
@@ -126,6 +135,7 @@ function handleRegisterStep2(payload) {
     nascita_provincia:  payload.nascita_provincia  || entity.data.nascita_provincia  || '',
     nascita_citta:      payload.nascita_citta      || entity.data.nascita_citta      || '',
     nascita_paese:      payload.nascita_paese      || entity.data.nascita_paese      || '',
+    data_nascita:       payload.data_nascita ? toItalianDate_(payload.data_nascita) : (entity.data.data_nascita || ''),
     residenza_nazione:  payload.residenza_nazione  || entity.data.residenza_nazione  || 'Italia',
     residenza_regione:  payload.residenza_regione  || entity.data.residenza_regione  || '',
     residenza_provincia:payload.residenza_provincia|| entity.data.residenza_provincia|| '',

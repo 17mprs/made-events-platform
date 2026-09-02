@@ -424,7 +424,7 @@ function isValidIban(v) {
 
 const PROFILE_SECTIONS = [
   { id: 'S1', title: 'Dati Personali',
-    completeness: d => countFilled([!!d.genere, !!d.nascita_citta, !!d.nascita_provincia, !!d.residenza_citta, !!d.residenza_provincia, !!(d.domicilio_coincide || d.domicilio_provincia)]) },
+    completeness: d => countFilled([!!d.genere, !!d.nascita_citta, !!d.nascita_provincia, !!d.data_nascita, !!d.residenza_citta, !!d.residenza_provincia, !!(d.domicilio_coincide || d.domicilio_provincia)]) },
   { id: 'S2', title: 'Profilo Fisico',
     completeness: d => {
       const isMale = d.genere === 'M'
