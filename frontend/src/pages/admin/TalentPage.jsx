@@ -27,6 +27,22 @@ function getFotoUrl(data) {
   return data?.foto_busto_url || data?.documenti?.foto?.url || data?.foto_url || null
 }
 
+/** Calcola "32 anni · 15/03/1994" da data_nascita (DD/MM/YYYY). Ritorna '—' se assente/non valida. */
+function formatEtaData(dataNascita) {
+  if (!dataNascita) return '—'
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataNascita)
+  if (!m) return '—'
+  const [, gg, mm, yyyy] = m
+  const nascita = new Date(Number(yyyy), Number(mm) - 1, Number(gg))
+  if (isNaN(nascita)) return '—'
+  const oggi = new Date()
+  let eta = oggi.getFullYear() - nascita.getFullYear()
+  const meseNonRaggiunto = oggi.getMonth() < nascita.getMonth() ||
+    (oggi.getMonth() === nascita.getMonth() && oggi.getDate() < nascita.getDate())
+  if (meseNonRaggiunto) eta--
+  return `${eta} anni · ${dataNascita}`
+}
+
 // ---------------------------------------------------------------------------
 // PHOTO EXPIRY HELPER
 // ---------------------------------------------------------------------------
@@ -1008,6 +1024,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
                 <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:COLORS.text }}>{nome}</h2>
                 <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:2 }}>{d.email ?? '—'}</div>
                 <div style={{ fontSize:12, color:COLORS.textSecondary }}>{d.citta ?? d.residenza_citta ?? '—'}</div>
+                <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:2 }}>{formatEtaData(d.data_nascita)}</div>
               </div>
             </div>
             <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#666', padding:'4px 8px', lineHeight:1 }}>✕</button>
