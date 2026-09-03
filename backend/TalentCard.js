@@ -60,10 +60,10 @@ function generateTalentCard_(talent, auth) {
 
   // --- Lingue ---
   var lingueList = [];
-  if (d.lingua_inglese  && d.lingua_inglese  !== 'Base' && d.lingua_inglese  !== '') lingueList.push('Inglese ('  + d.lingua_inglese  + ')');
-  if (d.lingua_francese && d.lingua_francese !== 'Base' && d.lingua_francese !== '') lingueList.push('Francese (' + d.lingua_francese + ')');
-  if (d.lingua_spagnolo && d.lingua_spagnolo !== 'Base' && d.lingua_spagnolo !== '') lingueList.push('Spagnolo (' + d.lingua_spagnolo + ')');
-  if (d.lingua_tedesco  && d.lingua_tedesco  !== 'Base' && d.lingua_tedesco  !== '') lingueList.push('Tedesco ('  + d.lingua_tedesco  + ')');
+  if (d.lingua_inglese  && d.lingua_inglese  !== 'Base' && d.lingua_inglese  !== '' && d.lingua_inglese  !== 'Non conosco') lingueList.push('Inglese ('  + d.lingua_inglese  + ')');
+  if (d.lingua_francese && d.lingua_francese !== 'Base' && d.lingua_francese !== '' && d.lingua_francese !== 'Non conosco') lingueList.push('Francese (' + d.lingua_francese + ')');
+  if (d.lingua_spagnolo && d.lingua_spagnolo !== 'Base' && d.lingua_spagnolo !== '' && d.lingua_spagnolo !== 'Non conosco') lingueList.push('Spagnolo (' + d.lingua_spagnolo + ')');
+  if (d.lingua_tedesco  && d.lingua_tedesco  !== 'Base' && d.lingua_tedesco  !== '' && d.lingua_tedesco  !== 'Non conosco') lingueList.push('Tedesco ('  + d.lingua_tedesco  + ')');
   var lingue = lingueList.length ? lingueList.join(', ') : 'Italiano';
 
   // --- Disponibilità ---
@@ -81,7 +81,8 @@ function generateTalentCard_(talent, auth) {
   var BLANK = '—';
   var v = function(val) { return String(val == null ? '' : val).trim() || BLANK; };
 
-  var nomeCognome = [d.nome, d.cognome].filter(Boolean).join(' ');
+  var cognomeIniziale = d.cognome ? d.cognome.trim().charAt(0).toUpperCase() + '.' : '';
+  var nomeCognome = [d.nome ? d.nome.trim() : '', cognomeIniziale].filter(Boolean).join(' ');
 
   var replacements = {
     '{{NOME_COGNOME}}':          v(nomeCognome),
@@ -184,14 +185,46 @@ function generateTalentCard_(talent, auth) {
 // tabella — caso comune nei template a griglia. insertInlineImage() opera sul
 // paragrafo stesso, funziona indipendentemente dalla profondità di nesting.
 function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
-  var paras  = body.getParagraphs();
   var target = null;
+
+  // 1. Cerca nei paragrafi del body principale
+  var paras = body.getParagraphs();
   for (var i = 0; i < paras.length; i++) {
     if (paras[i].getText().indexOf(placeholderText) !== -1) {
       target = paras[i];
       break;
     }
   }
+  Logger.log('body paras count=' + paras.length);
+
+  // 2. Se non trovato, cerca nelle celle di tutte le tabelle
+  if (!target) {
+    var tables = body.getTables();
+    outer: for (var t = 0; t < tables.length; t++) {
+      var table = tables[t];
+      for (var r = 0; r < table.getNumRows(); r++) {
+        var row = table.getRow(r);
+        for (var c = 0; c < row.getNumCells(); c++) {
+          var cell = row.getCell(c);
+          var cellText = cell.getText();
+          Logger.log('cell[' + r + '][' + c + '] text=' + cellText.substring(0, 80));
+          if (cellText.indexOf(placeholderText) !== -1) {
+            // Trovato — itera i figli della cella per trovare il paragrafo esatto
+            for (var p = 0; p < cell.getNumChildren(); p++) {
+              var child = cell.getChild(p);
+              if (child.getType() === DocumentApp.ElementType.PARAGRAPH &&
+                  child.getText().indexOf(placeholderText) !== -1) {
+                target = child.asParagraph();
+                break outer;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Logger.log('insertPhotoAtPlaceholder_ placeholder=' + placeholderText + ' target=' + (target ? 'FOUND' : 'NULL'));
   if (!target) return;
 
   var photoBlob = url ? fetchTenantImageBlob_(url, tenantId) : null;
@@ -251,11 +284,38 @@ function isDriveFileInTenantFolder_(fileId, tenantId) {
   try {
     var tenantFolderId = ensureTenantFolders(tenantId).tenantFolder.getId();
     var file = DriveApp.getFileById(fileId);
+
+    // --- Log diagnostico: dove vive davvero il file vs. dove ci aspettiamo la root tenant ---
+    var chain = collectParentChain_(file, 5);
+    var diagMsg = 'isDriveFileInTenantFolder_ fileId=' + fileId +
+      ' tenantId=' + tenantId +
+      ' tenantFolderId(atteso)=' + tenantFolderId +
+      ' parentChain=[' + chain.join(' -> ') + ']';
+    Logger.log(diagMsg);
+    logError_('TALENT_CARD_DIAG', 'isDriveFileInTenantFolder_', diagMsg, '', null, tenantId);
+
     // Cammina i parent fino a 4 livelli cercando la cartella tenant
     return searchParents_(file.getParents(), tenantFolderId, 4);
   } catch (e) {
     return false;
   }
+}
+
+// Raccoglie fino a maxDepth livelli di parent del file (solo il primo parent
+// per livello, per una diagnostica leggibile — un file può avere più parent
+// se condiviso in più cartelle, ma per i file caricati dalla piattaforma è
+// sempre uno solo). Ogni voce è "nomeCartella (id)".
+function collectParentChain_(file, maxDepth) {
+  var chain = [];
+  var current = file;
+  for (var i = 0; i < maxDepth; i++) {
+    var parents = current.getParents();
+    if (!parents.hasNext()) break;
+    var parent = parents.next();
+    chain.push(parent.getName() + ' (' + parent.getId() + ')');
+    current = parent;
+  }
+  return chain;
 }
 
 function searchParents_(iter, targetId, depth) {
