@@ -529,8 +529,8 @@ function SectionCard({ sec, form, onChange }) {
 // Aspect ratio fisso per i placeholder inseriti nel PDF scheda talent
 // (dimensioni reali celle template, vedi TalentCard.js insertPhotoAtPlaceholder_).
 const FOTO_CROP_ASPECT = {
-  foto_busto:  7 / 15.5,
-  foto_intera: 6 / 15.5,
+  foto_busto:  255 / 510,
+  foto_intera: 213 / 510,
 }
 
 function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiResponse }) {
