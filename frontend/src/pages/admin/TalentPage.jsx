@@ -1,7 +1,8 @@
 // === TALENT PAGE — MADE EVENTS Platform ===
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { talentApi, leadApi, applicationApi, contractApi, emailApi, getErrorMessage } from '../../api/client'
+import { talentApi, leadApi, applicationApi, contractApi, emailApi, documentApi, getErrorMessage } from '../../api/client'
+import CropModal from '../../components/registration/CropModal'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
 import { COLORS } from '../../styles/theme'
@@ -669,6 +670,41 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   const [cardLoading, setCardLoading] = useState(false)
   const [cardError,   setCardError]   = useState(null)
 
+  // Sostituzione foto da admin — crop con lo stesso aspect ratio delle celle
+  // template PDF (vedi CropModal.jsx / TalentCard.js insertPhotoAtPlaceholder_).
+  const FOTO_CROP_ASPECT = { foto_busto: 9.49 / 15, foto_intera: 8.07 / 15 }
+  const [localFotoBustoUrl,  setLocalFotoBustoUrl]  = useState(d.foto_busto_url  || d.documenti?.foto?.url || d.foto_url || null)
+  const [localFotoInteraUrl, setLocalFotoInteraUrl] = useState(d.foto_intera_url || null)
+  const [photoCropModal, setPhotoCropModal] = useState({ isOpen:false, file:null, aspect:null, fieldKey:null })
+  const [photoUploading, setPhotoUploading] = useState({})
+  const bustoFileInputRef  = useRef(null)
+  const interaFileInputRef = useRef(null)
+
+  const handleFotoFileSelected = (fieldKey, e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoCropModal({ isOpen:true, file, aspect: FOTO_CROP_ASPECT[fieldKey], fieldKey })
+  }
+
+  const handlePhotoCropConfirm = async (base64DataUrl) => {
+    const { fieldKey } = photoCropModal
+    setPhotoCropModal({ isOpen:false, file:null, aspect:null, fieldKey:null })
+    setPhotoUploading(prev => ({ ...prev, [fieldKey]: true }))
+    const base64   = base64DataUrl.split(',')[1]
+    const filename = `${fieldKey}.jpg`
+    const res = handleApiResponse
+      ? handleApiResponse(await documentApi.upload(talent.entity_id, fieldKey, base64, filename, 'image/jpeg'))
+      : await documentApi.upload(talent.entity_id, fieldKey, base64, filename, 'image/jpeg')
+    setPhotoUploading(prev => ({ ...prev, [fieldKey]: false }))
+    if (!res.success) { alert(getErrorMessage(res.error)); return }
+    const url = res.data?.url
+    if (fieldKey === 'foto_busto')       setLocalFotoBustoUrl(url)
+    else if (fieldKey === 'foto_intera') setLocalFotoInteraUrl(url)
+  }
+
+  const handlePhotoCropCancel = () => setPhotoCropModal({ isOpen:false, file:null, aspect:null, fieldKey:null })
+
   // Score admin override
   const [localScore,          setLocalScore]          = useState(d.score ?? null)
   const [editableScoreAdmin,  setEditableScoreAdmin]  = useState(d.score_admin ?? 5)
@@ -752,8 +788,8 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   // Fallback su forme legacy per profili approvati prima del fix BUG7 —
   // stessa catena di getFotoUrl() usata per l'avatar in lista.
   const photos = [
-    { key:'busto',  label:'Mezzo busto',   url: d.foto_busto_url  || d.documenti?.foto?.url || d.foto_url },
-    { key:'intera', label:'Figura intera', url: d.foto_intera_url },
+    { key:'busto',  label:'Mezzo busto',   url: localFotoBustoUrl },
+    { key:'intera', label:'Figura intera', url: localFotoInteraUrl },
     { key:'extra',  label:'Aggiuntiva',    url: d.foto_extra_url  },
   ].filter(p => p.url)
 
@@ -1119,6 +1155,29 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
           {(photos.length > 0 || photoExp.label) && (
             <div style={{ marginBottom:24 }}>
               <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:12 }}>Foto e scadenze</div>
+
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+                <button onClick={() => bustoFileInputRef.current?.click()} disabled={photoUploading.foto_busto}
+                  style={{ background:'none', border:`1px solid ${COLORS.accent}`, color: photoUploading.foto_busto ? '#ccc' : COLORS.accent, borderRadius:6, padding:'6px 12px', fontSize:12, cursor: photoUploading.foto_busto ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                  {photoUploading.foto_busto ? 'Caricamento…' : '📷 Sostituisci foto busto'}
+                </button>
+                <input ref={bustoFileInputRef} type="file" accept="image/jpeg,image/png" style={{ display:'none' }} onChange={e => handleFotoFileSelected('foto_busto', e)} />
+
+                <button onClick={() => interaFileInputRef.current?.click()} disabled={photoUploading.foto_intera}
+                  style={{ background:'none', border:`1px solid ${COLORS.accent}`, color: photoUploading.foto_intera ? '#ccc' : COLORS.accent, borderRadius:6, padding:'6px 12px', fontSize:12, cursor: photoUploading.foto_intera ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                  {photoUploading.foto_intera ? 'Caricamento…' : '📷 Sostituisci foto intera'}
+                </button>
+                <input ref={interaFileInputRef} type="file" accept="image/jpeg,image/png" style={{ display:'none' }} onChange={e => handleFotoFileSelected('foto_intera', e)} />
+              </div>
+
+              <CropModal
+                isOpen={photoCropModal.isOpen}
+                imageFile={photoCropModal.file}
+                aspect={photoCropModal.aspect}
+                onConfirm={handlePhotoCropConfirm}
+                onCancel={handlePhotoCropCancel}
+              />
+
               {photos.length > 0 && (
                 <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:12 }}>
                   {photos.map(p => (
