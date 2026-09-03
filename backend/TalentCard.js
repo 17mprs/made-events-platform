@@ -197,7 +197,7 @@ function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
   var photoBlob = url ? fetchTenantImageBlob_(url, tenantId) : null;
   if (photoBlob) {
     try {
-      target.clear();
+      target.replaceText(placeholderText.replace(/[{}]/g, '\\$&'), '');
       target.insertInlineImage(0, photoBlob);
     } catch (imgErr) {
       target.setText('');
