@@ -176,7 +176,13 @@ function generateTalentCard_(talent, auth) {
 // (con la stessa validazione di sicurezza di fetchTenantImageBlob_) nella sua
 // posizione e rimuove il paragrafo placeholder. Se il placeholder non è nel
 // doc (template diverso) non fa nulla; se manca l'URL o il download fallisce,
-// rimuove comunque il paragrafo per non lasciare {{...}} visibile nel PDF.
+// svuota comunque il paragrafo per non lasciare {{...}} visibile nel PDF.
+//
+// Usa Paragraph.insertInlineImage() invece di Body.insertImage()/removeChild():
+// questi ultimi richiedono che l'elemento sia figlio diretto di body e falliscono
+// silenziosamente (o lanciano) quando il placeholder è dentro una cella di
+// tabella — caso comune nei template a griglia. insertInlineImage() opera sul
+// paragrafo stesso, funziona indipendentemente dalla profondità di nesting.
 function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
   var paras  = body.getParagraphs();
   var target = null;
@@ -191,14 +197,13 @@ function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
   var photoBlob = url ? fetchTenantImageBlob_(url, tenantId) : null;
   if (photoBlob) {
     try {
-      var paraIdx = body.getChildIndex(target);
-      body.insertImage(paraIdx, photoBlob);
-      body.removeChild(target);
+      target.clear();
+      target.insertInlineImage(0, photoBlob);
     } catch (imgErr) {
-      body.replaceText(placeholderText.replace(/[{}]/g, '\\$&'), '');
+      target.setText('');
     }
   } else {
-    body.removeChild(target);
+    target.setText('');
   }
 }
 
