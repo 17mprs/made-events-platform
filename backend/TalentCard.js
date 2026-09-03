@@ -1,7 +1,17 @@
 // === TALENT_CARD.JS — MADE EVENT Platform ===
 // Generazione scheda talent PDF da template Google Docs.
 
-var _TALENT_CARD_TEMPLATE_ID = '13R2wcZa3ZchPRfQQFUeHYK4pI3zwOT1tJF2ndBif20E';
+// Fallback storico — ha priorità la Script Property TALENT_CARD_TEMPLATE_ID
+// se impostata (stesso pattern di getContractTemplateId_ in ContractManager.js).
+var _TALENT_CARD_TEMPLATE_ID_FALLBACK = '13R2wcZa3ZchPRfQQFUeHYK4pI3zwOT1tJF2ndBif20E';
+
+function getTalentCardTemplateId_() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty('TALENT_CARD_TEMPLATE_ID') || _TALENT_CARD_TEMPLATE_ID_FALLBACK;
+  } catch (e) {
+    return _TALENT_CARD_TEMPLATE_ID_FALLBACK;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // HANDLER — talent.generateCard
@@ -115,7 +125,7 @@ function generateTalentCard_(talent, auth) {
   }
 
   // --- Copia template ---
-  var copyFile = DriveApp.getFileById(_TALENT_CARD_TEMPLATE_ID).makeCopy(filename, targetFolder);
+  var copyFile = DriveApp.getFileById(getTalentCardTemplateId_()).makeCopy(filename, targetFolder);
   var docId    = copyFile.getId();
 
   // --- Apri e sostituisci testo ---
