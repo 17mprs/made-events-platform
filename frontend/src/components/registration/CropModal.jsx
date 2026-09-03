@@ -7,9 +7,12 @@ import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import { COLORS } from '../../styles/theme'
 
+// Crop iniziale: massima altezza possibile, centrato orizzontalmente,
+// aspect ratio fisso — centerCrop clampa/centra dentro i bound reali
+// dell'immagine (corretto anche per immagini non quadrate).
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
   return centerCrop(
-    makeAspectCrop({ unit: 'px', width: mediaWidth * 0.8 }, aspect, mediaWidth, mediaHeight),
+    makeAspectCrop({ unit: 'px', height: mediaHeight }, aspect, mediaWidth, mediaHeight),
     mediaWidth,
     mediaHeight
   )
