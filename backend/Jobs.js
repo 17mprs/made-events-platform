@@ -7,6 +7,7 @@
 // documentExpiry       giorno 09:00  scadenza documenti → reminder/blocco
 // dailyMaintenance     giorno 03:00  cleanup token, report errori, contatori
 // monthlyArchive       1° mese 02:00 archivia entità oltre retention, ruota log
+// birthdateReminder    lunedì 08:00  sollecito data_nascita mancante (setupBirthdateReminderTrigger)
 //
 // REGOLE:
 //   - Ogni job wrappato in try/catch isolato (fallimento non blocca gli altri)
@@ -384,6 +385,172 @@ function jobDocumentExpiry() {
   }
 
   logJobEnd_(jobName, stats);
+}
+
+// ---------------------------------------------------------------------------
+// JOB — birthdateReminder (settimanale, lunedì mattina)
+// ---------------------------------------------------------------------------
+
+/**
+ * Invia email di sollecito ai talent APPROVED con data_nascita mancante.
+ * Idempotente: salta chi ha già ricevuto il sollecito negli ultimi 7 giorni
+ * (data_nascita_reminder_sent_at su TALENT_PROFILE.data).
+ * Trigger installato da setupBirthdateReminderTrigger() (una tantum).
+ */
+function sendBirthdateReminderEmails() {
+  var jobName = 'birthdateReminder';
+  var stats   = { checked: 0, sent: 0, skipped: 0, errors: 0 };
+  var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+  logJobStart_(jobName);
+  try {
+    var portalUrl = getFrontendUrl() + '/portale?section=S1';
+    var tenants   = getAllRows('Tenants').filter(function(t) { return t.status === 'active'; });
+
+    tenants.forEach(function(tenant) {
+      var tenantId = tenant.tenant_id;
+      var profiles = getAllRows('Entities').filter(function(e) {
+        return e.type === 'TALENT_PROFILE' &&
+               String(e.tenant_id) === String(tenantId) &&
+               String(e.deleted).toLowerCase() !== 'true' &&
+               e.status === 'APPROVED';
+      });
+
+      profiles.forEach(function(p) {
+        try {
+          stats.checked++;
+          var data = parseJSON(p.data);
+          if (data.data_nascita) { stats.skipped++; return; }
+
+          var lastSent = data.data_nascita_reminder_sent_at ? new Date(data.data_nascita_reminder_sent_at) : null;
+          if (lastSent && !isNaN(lastSent.getTime()) && (Date.now() - lastSent.getTime()) < WEEK_MS) {
+            stats.skipped++;
+            return;
+          }
+
+          var email = data.email || data.email_contatto;
+          if (!email) { stats.skipped++; return; }
+
+          var nome = data.nome || '';
+          var body = [
+            '<p style="margin:0 0 20px;">Abbiamo notato che manca la tua <strong>data di nascita</strong> nel profilo MADE EVENTS.</p>',
+            '<p style="margin:0 0 20px;">Completala per continuare a ricevere proposte di lavoro in linea con i requisiti degli eventi.</p>',
+            buildEmailButton_('Completa il profilo', portalUrl)
+          ].join('');
+          var html = buildEmailTemplate('Completa il tuo profilo', 'Ciao ' + escapeHtml_(nome) + ',', body);
+
+          var ok = sendEmail_(email, 'Completa il tuo profilo MADE EVENTS — data di nascita mancante', html);
+          if (ok) {
+            updateEntityData(p.entity_id, { data_nascita_reminder_sent_at: new Date().toISOString() }, tenantId, 'system');
+            stats.sent++;
+          } else {
+            stats.errors++;
+          }
+        } catch (e) {
+          stats.errors++;
+          Logger.log('[' + jobName + '] Errore su profile ' + p.entity_id + ': ' + e.message);
+        }
+      });
+    });
+
+  } catch (e) {
+    logJobError_(jobName, e);
+    return stats;
+  }
+
+  logJobEnd_(jobName, stats);
+  return stats;
+}
+
+/**
+ * Installa il trigger settimanale (lunedì 08:00) per sendBirthdateReminderEmails.
+ * Da eseguire UNA SOLA VOLTA dal GAS Editor. Rimuove eventuali trigger duplicati
+ * per lo stesso handler prima di crearne uno nuovo — non tocca gli altri trigger.
+ */
+function setupBirthdateReminderTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'sendBirthdateReminderEmails') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger('sendBirthdateReminderEmails')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .atHour(8)
+    .create();
+
+  Logger.log('[JOBS] Trigger sendBirthdateReminderEmails (lunedì 08:00) installato.');
+}
+
+// ---------------------------------------------------------------------------
+// ONE-OFF — richiesta ricarica foto (nuovo sistema di crop)
+// ---------------------------------------------------------------------------
+
+/**
+ * Invia UNA TANTUM ai talent APPROVED con almeno una foto già caricata
+ * (foto_busto_url o foto_intera_url) una email che chiede di ricaricare le
+ * foto col nuovo strumento di ritaglio. Da eseguire manualmente dal GAS
+ * Editor — NESSUN trigger installato. Logga foto_reupload_requested_at su
+ * TALENT_PROFILE.data per tracciare chi ha già ricevuto la richiesta.
+ */
+function sendPhotoReuploadRequest() {
+  var jobName = 'photoReuploadRequest';
+  var stats   = { checked: 0, sent: 0, skipped: 0, errors: 0 };
+
+  logJobStart_(jobName);
+  try {
+    var portalUrl = getFrontendUrl() + '/portale?section=S7';
+    var tenants   = getAllRows('Tenants').filter(function(t) { return t.status === 'active'; });
+
+    tenants.forEach(function(tenant) {
+      var tenantId = tenant.tenant_id;
+      var profiles = getAllRows('Entities').filter(function(e) {
+        return e.type === 'TALENT_PROFILE' &&
+               String(e.tenant_id) === String(tenantId) &&
+               String(e.deleted).toLowerCase() !== 'true' &&
+               e.status === 'APPROVED';
+      });
+
+      profiles.forEach(function(p) {
+        try {
+          stats.checked++;
+          var data = parseJSON(p.data);
+          if (!data.foto_busto_url && !data.foto_intera_url) { stats.skipped++; return; }
+          if (data.foto_reupload_requested_at) { stats.skipped++; return; }
+
+          var email = data.email || data.email_contatto;
+          if (!email) { stats.skipped++; return; }
+
+          var nome = data.nome || '';
+          var body = [
+            '<p style="margin:0 0 20px;">Abbiamo migliorato il sistema di caricamento foto sulla piattaforma: ora puoi ritagliare la tua foto direttamente prima di caricarla, per un risultato più preciso nella tua scheda talent.</p>',
+            '<p style="margin:0 0 20px;">Ti chiediamo gentilmente di ricaricare la tua foto di mezzo busto e figura intera dal portale, usando il nuovo strumento di ritaglio.</p>',
+            buildEmailButton_('Aggiorna le mie foto', portalUrl)
+          ].join('');
+          var html = buildEmailTemplate('Aggiorna le tue foto', 'Ciao ' + escapeHtml_(nome) + ',', body);
+
+          var ok = sendEmail_(email, 'Aggiorna le tue foto su MADE EVENTS — nuovo sistema di ritaglio', html);
+          if (ok) {
+            updateEntityData(p.entity_id, { foto_reupload_requested_at: new Date().toISOString() }, tenantId, 'system');
+            stats.sent++;
+          } else {
+            stats.errors++;
+          }
+        } catch (e) {
+          stats.errors++;
+          Logger.log('[' + jobName + '] Errore su profile ' + p.entity_id + ': ' + e.message);
+        }
+      });
+    });
+
+  } catch (e) {
+    logJobError_(jobName, e);
+    return stats;
+  }
+
+  logJobEnd_(jobName, stats);
+  return stats;
 }
 
 // ---------------------------------------------------------------------------

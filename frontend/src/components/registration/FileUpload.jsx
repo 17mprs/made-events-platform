@@ -15,6 +15,7 @@
 //   onClear: () => void
 //   error?: string
 //   hint?: string
+//   highlight?: boolean — bordo tratteggiato bordeaux quando il file è atteso ma manca
 import React, { useRef, useState } from 'react'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 
@@ -29,6 +30,7 @@ export default function FileUpload({
   onClear,
   error,
   hint,
+  highlight,
 }) {
   const inputRef   = useRef(null)
   const [localErr, setLocalErr] = useState(null)
@@ -90,7 +92,10 @@ export default function FileUpload({
       <div
         onClick={() => inputRef.current?.click()}
         style={{
-          border: `1px dashed ${displayError ? COLORS.error : isUploaded || isReady ? COLORS.accent : COLORS.border}`,
+          border: displayError ? `1px dashed ${COLORS.error}`
+            : isUploaded || isReady ? `1px dashed ${COLORS.accent}`
+            : highlight ? '2px dashed #630E33'
+            : `1px dashed ${COLORS.border}`,
           borderRadius: '4px',
           padding: '16px 20px',
           cursor: 'pointer',

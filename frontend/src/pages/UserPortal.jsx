@@ -1,5 +1,6 @@
 // === USER PORTAL — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   eventApi, applicationApi, assignmentApi, talentApi, documentApi,
@@ -495,10 +496,18 @@ const SECTION_FIELDS_COMPONENT = {
   S6: Section6Fields,
 }
 
-function SectionCardShell({ sec, filled, total, children }) {
+function MissingFieldBanner({ children }) {
+  return (
+    <div style={{ background:'#630E33', color:'#fff', borderRadius:6, padding:'10px 14px', marginBottom:16, fontSize:13, fontWeight:600, display:'flex', alignItems:'center', gap:8 }}>
+      {children}
+    </div>
+  )
+}
+
+function SectionCardShell({ sec, filled, total, banner, children }) {
   const pct = total > 0 ? Math.round((filled / total) * 100) : 0
   return (
-    <div style={{ background:'#fff', border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'20px', marginBottom:16 }}>
+    <div id={sec.id} style={{ background:'#fff', border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'20px', marginBottom:16, scrollMarginTop:20 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
         <div style={{ fontSize:13, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:COLORS.text }}>
           {sec.id} — {sec.title}
@@ -506,6 +515,7 @@ function SectionCardShell({ sec, filled, total, children }) {
         <span style={{ fontSize:11, color:COLORS.textSecondary }}>{filled}/{total}</span>
       </div>
       <ProgressBar pct={pct} style={{ marginBottom:16 }} />
+      {banner}
       {children}
     </div>
   )
@@ -516,9 +526,13 @@ function SectionCardShell({ sec, filled, total, children }) {
 function SectionCard({ sec, form, onChange }) {
   const { filled, total } = sec.completeness(form)
   const Fields = SECTION_FIELDS_COMPONENT[sec.id]
+  const missingNascita = sec.id === 'S1' && !form.data_nascita
+  const banner = missingNascita ? (
+    <MissingFieldBanner>⚠️ Data di nascita mancante — completa ora per il tuo profilo</MissingFieldBanner>
+  ) : null
   return (
-    <SectionCardShell sec={sec} filled={filled} total={total}>
-      <Fields data={form} onChange={onChange} errors={{}} />
+    <SectionCardShell sec={sec} filled={filled} total={total} banner={banner}>
+      <Fields data={form} onChange={onChange} errors={{}} highlightMissing={missingNascita} />
     </SectionCardShell>
   )
 }
@@ -578,8 +592,13 @@ function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiRespon
     setCropModal({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
   }
 
+  const missingFoto = !form.foto_busto_url || !form.foto_intera_url
+  const banner = missingFoto ? (
+    <MissingFieldBanner>⚠️ Foto mancante — carica busto e figura intera per completare il profilo</MissingFieldBanner>
+  ) : null
+
   return (
-    <SectionCardShell sec={sec} filled={filled} total={total}>
+    <SectionCardShell sec={sec} filled={filled} total={total} banner={banner}>
       <div style={{
         background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: '4px',
         padding: '14px 18px', marginBottom: '20px',
@@ -610,6 +629,7 @@ function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiRespon
               onClear={() => handleClear(fieldKey)}
               error={uploadErrors[fieldKey]}
               hint={cfg.hint}
+              highlight={cfg.required && !form[`${fieldKey}_url`]}
             />
             {uploadState[fieldKey] === 'uploading' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
@@ -829,6 +849,17 @@ function MyProfile({ handleApiResponse }) {
   const [saving,   setSaving]   = useState(false)
   const [form,     setForm]     = useState({})
   const [pending,  setPending]  = useState(false)
+  const [searchParams] = useSearchParams()
+
+  // Deep-link ?section=S1 / ?section=S7 dalla mail di sollecito — scrolla alla
+  // sezione richiesta appena il profilo (e quindi le sezioni) sono nel DOM.
+  useEffect(() => {
+    if (!profile) return
+    const sectionId = searchParams.get('section')
+    if (!sectionId) return
+    const el = document.getElementById(sectionId)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [profile, searchParams])
 
   useEffect(() => {
     (async () => {

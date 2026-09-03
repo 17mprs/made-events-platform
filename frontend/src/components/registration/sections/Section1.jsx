@@ -23,7 +23,7 @@ function italianDateToIso(it) {
 
 // Campi della sezione, esportati a parte così l'area riservata (UserPortal.jsx)
 // può renderli identici, senza la cornice/navigazione del wizard.
-export function Section1Fields({ data, onChange, errors = {} }) {
+export function Section1Fields({ data, onChange, errors = {}, highlightMissing = false }) {
   return (
     <>
       {/* Genere */}
@@ -72,6 +72,7 @@ export function Section1Fields({ data, onChange, errors = {} }) {
           value={italianDateToIso(data.data_nascita)}
           onChange={e => onChange('data_nascita', isoToItalianDate(e.target.value))}
           error={errors.data_nascita}
+          style={highlightMissing && !data.data_nascita ? { borderColor: '#630E33', background: '#fff0f3' } : undefined}
         />
       </div>
 
