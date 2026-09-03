@@ -81,8 +81,9 @@ function generateTalentCard_(talent, auth) {
   var BLANK = '—';
   var v = function(val) { return String(val == null ? '' : val).trim() || BLANK; };
 
+  var nome = d.nome ? d.nome.trim().charAt(0).toUpperCase() + d.nome.trim().slice(1).toLowerCase() : '';
   var cognomeIniziale = d.cognome ? d.cognome.trim().charAt(0).toUpperCase() + '.' : '';
-  var nomeCognome = [d.nome ? d.nome.trim() : '', cognomeIniziale].filter(Boolean).join(' ');
+  var nomeCognome = [nome, cognomeIniziale].filter(Boolean).join(' ');
 
   var replacements = {
     '{{NOME_COGNOME}}':          v(nomeCognome),
@@ -224,16 +225,25 @@ function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
     }
   }
 
-  Logger.log('insertPhotoAtPlaceholder_ placeholder=' + placeholderText + ' target=' + (target ? 'FOUND' : 'NULL'));
   if (!target) return;
 
   var photoBlob = url ? fetchTenantImageBlob_(url, tenantId) : null;
   if (photoBlob) {
     try {
-      target.insertInlineImage(0, photoBlob);
+      var isBusto = placeholderText.indexOf('BUSTO') !== -1;
+      var img = target.insertInlineImage(0, photoBlob);
+      var naturalW = img.getWidth();
+      var naturalH = img.getHeight();
+      var maxW = isBusto ? 310 : 258;
+      var maxH = 620;
+      var scaleByW = maxW / naturalW;
+      var scaleByH = maxH / naturalH;
+      var scale = Math.min(scaleByW, scaleByH);
+      img.setWidth(Math.round(naturalW * scale));
+      img.setHeight(Math.round(naturalH * scale));
       target.replaceText(placeholderText.replace(/[{}]/g, '\\$&'), '');
     } catch (imgErr) {
-      target.setText('');
+      // errore inserimento immagine — placeholder resta com'è
     }
   } else {
     try { target.setText(''); } catch (e) { /* paragrafo già vuoto, nessuna azione */ }
