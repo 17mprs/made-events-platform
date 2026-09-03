@@ -12,7 +12,7 @@ import { COLORS } from '../../styles/theme'
 // dell'immagine (corretto anche per immagini non quadrate).
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
   return centerCrop(
-    makeAspectCrop({ unit: 'px', height: mediaHeight }, aspect, mediaWidth, mediaHeight),
+    makeAspectCrop({ unit: 'px', width: mediaWidth }, aspect, mediaWidth, mediaHeight),
     mediaWidth,
     mediaHeight
   )
