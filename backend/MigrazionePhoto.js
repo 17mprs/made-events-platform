@@ -14,7 +14,7 @@
 // DRY_RUN = true di default: logga solo cosa farebbe, non sposta nulla.
 // Imposta DRY_RUN = false SOLO dopo aver controllato il report in dry-run.
 
-var DRY_RUN = false;
+var DRY_RUN = true;
 
 var REGISTRAZIONI_FOLDER_ID = '1iRnNCUWdDehJzvakDVSXmGeoZNh1mMiv';
 var TALENT_FOLDER_ID        = '14jBNkv2O97p61SnK5qa_2dJZpTMyxsIs';
