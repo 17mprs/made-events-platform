@@ -203,7 +203,7 @@ function insertPhotoAtPlaceholder_(body, placeholderText, url, tenantId) {
       target.setText('');
     }
   } else {
-    target.setText('');
+    try { target.setText(''); } catch (e) { /* paragrafo già vuoto, nessuna azione */ }
   }
 }
 
