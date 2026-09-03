@@ -12,6 +12,7 @@ import Card   from '../components/Card'
 import StatusBadge from '../components/StatusBadge'
 import Input from '../components/Input'
 import FileUpload from '../components/registration/FileUpload'
+import CropModal from '../components/registration/CropModal'
 import { Section1Fields } from '../components/registration/sections/Section1'
 import { Section2Fields } from '../components/registration/sections/Section2'
 import { Section3Fields } from '../components/registration/sections/Section3'
@@ -525,12 +526,20 @@ function SectionCard({ sec, form, onChange }) {
 // Sezione 7 — Foto Profilo: stessi FOTO_FIELDS/criteri del questionario, ma
 // l'upload va su document.upload (endpoint per talent già approvati) invece
 // di talent.uploadRegistrationDoc (endpoint pubblico pre-approvazione).
+// Aspect ratio fisso per i placeholder inseriti nel PDF scheda talent
+// (dimensioni reali celle template, vedi TalentCard.js insertPhotoAtPlaceholder_).
+const FOTO_CROP_ASPECT = {
+  foto_busto:  9.49 / 15,
+  foto_intera: 8.07 / 15,
+}
+
 function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiResponse }) {
   const { filled, total } = sec.completeness(form)
   const [uploadState, setUploadState]   = useState({})
   const [uploadErrors, setUploadErrors] = useState({})
+  const [cropModal, setCropModal] = useState({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
 
-  async function handleFile(fieldKey, { base64, filename, mimeType }) {
+  async function uploadFile(fieldKey, base64, filename, mimeType) {
     setUploadState(prev => ({ ...prev, [fieldKey]: 'uploading' }))
     setUploadErrors(prev => ({ ...prev, [fieldKey]: null }))
     const res = handleApiResponse(await documentApi.upload(talentProfileId, fieldKey, base64, filename, mimeType))
@@ -543,9 +552,30 @@ function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiRespon
     onChange(`${fieldKey}_url`, res.data?.url)
   }
 
+  function handleFile(fieldKey, { file, base64, filename, mimeType }) {
+    const aspect = FOTO_CROP_ASPECT[fieldKey]
+    if (aspect) {
+      setCropModal({ isOpen: true, file, aspect, fieldKey, filename })
+      return
+    }
+    uploadFile(fieldKey, base64, filename, mimeType)
+  }
+
   function handleClear(fieldKey) {
     setUploadState(prev => ({ ...prev, [fieldKey]: undefined }))
     onChange(`${fieldKey}_url`, '')
+  }
+
+  function handleCropConfirm(base64DataUrl) {
+    const { fieldKey, filename } = cropModal
+    setCropModal({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
+    const base64 = base64DataUrl.split(',')[1]
+    const croppedFilename = filename.replace(/\.\w+$/, '') + '.jpg'
+    uploadFile(fieldKey, base64, croppedFilename, 'image/jpeg')
+  }
+
+  function handleCropCancel() {
+    setCropModal({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
   }
 
   return (
@@ -603,6 +633,14 @@ function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiRespon
           </a>
         </div>
       )}
+
+      <CropModal
+        isOpen={cropModal.isOpen}
+        imageFile={cropModal.file}
+        aspect={cropModal.aspect}
+        onConfirm={handleCropConfirm}
+        onCancel={handleCropCancel}
+      />
     </SectionCardShell>
   )
 }
