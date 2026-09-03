@@ -95,7 +95,7 @@ export default function CropModal({ isOpen, imageFile, aspect, onConfirm, onCanc
                 ref={imgRef}
                 src={imgSrc}
                 onLoad={onImageLoad}
-                style={{ maxHeight: '60vh', maxWidth: '100%', display: 'block' }}
+                style={{ maxHeight: '80vh', width: 'auto' }}
               />
             </ReactCrop>
           )}
