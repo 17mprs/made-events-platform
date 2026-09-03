@@ -28,6 +28,22 @@ function getFotoUrl(data) {
   return data?.foto_busto_url || data?.documenti?.foto?.url || data?.foto_url || null
 }
 
+/** Calcola l'età in anni da data_nascita (DD/MM/YYYY). Ritorna null se assente/non valida. */
+function calcolaEta(dataNascita) {
+  if (!dataNascita) return null
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataNascita)
+  if (!m) return null
+  const [, gg, mm, yyyy] = m
+  const nascita = new Date(Number(yyyy), Number(mm) - 1, Number(gg))
+  if (isNaN(nascita)) return null
+  const oggi = new Date()
+  let eta = oggi.getFullYear() - nascita.getFullYear()
+  const meseNonRaggiunto = oggi.getMonth() < nascita.getMonth() ||
+    (oggi.getMonth() === nascita.getMonth() && oggi.getDate() < nascita.getDate())
+  if (meseNonRaggiunto) eta--
+  return eta
+}
+
 /** Calcola "32 anni · 15/03/1994" da data_nascita (DD/MM/YYYY). Ritorna '—' se assente/non valida. */
 function formatEtaData(dataNascita) {
   if (!dataNascita) return '—'
@@ -630,6 +646,14 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   const nome = `${d.nome ?? ''} ${d.cognome ?? ''}`.trim() || '—'
   const photoExp = photoExpiryStatus(talent)
 
+  const recapEta = calcolaEta(d.data_nascita)
+  const recapParts = [
+    recapEta != null ? `${recapEta} anni` : null,
+    d.altezza ? `${d.altezza} cm` : null,
+    d.taglia_pantalone ? `Taglia ${d.taglia_pantalone}` : null,
+  ].filter(Boolean)
+  const recapRapido = recapParts.join(' · ')
+
   const [openSections,  setOpenSections]  = useState({ dati:true, fisico:false, disp:false, lingue:false, exp:false, dot:false, documenti:true, eventi:true, storico:false })
   const toggleSection = k => setOpenSections(p => ({ ...p, [k]: !p[k] }))
 
@@ -1059,6 +1083,9 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
               <div>
                 <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:COLORS.text }}>{nome}</h2>
                 <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:2 }}>{d.email ?? '—'}</div>
+                {recapRapido && (
+                  <div style={{ fontSize:15, fontWeight:500, color:COLORS.accent, marginTop:4 }}>{recapRapido}</div>
+                )}
                 <div style={{ fontSize:12, color:COLORS.textSecondary }}>{d.citta ?? d.residenza_citta ?? '—'}</div>
                 <div style={{ fontSize:12, color:COLORS.textSecondary, marginTop:2 }}>{formatEtaData(d.data_nascita)}</div>
               </div>
