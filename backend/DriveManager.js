@@ -24,9 +24,20 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Ottiene o crea la cartella radice MADE_EVENT_ROOT.
+ * Ottiene la cartella radice MADE_EVENT_ROOT.
+ * Preferisce l'ID fisso in Script Property DRIVE_ROOT_FOLDER_ID (deterministico,
+ * evita ambiguità se esistono più cartelle con lo stesso nome in Drive — vedi
+ * isDriveFileInTenantFolder_ in TalentCard.js, che dipende da questa funzione
+ * per validare che le foto talent appartengano al tenant corretto).
+ * Fallback a ricerca per nome (comportamento storico) solo se la property
+ * non è impostata.
  */
 function getRootFolder_() {
+  var rootFolderId = PropertiesService.getScriptProperties().getProperty('DRIVE_ROOT_FOLDER_ID');
+  if (rootFolderId) {
+    return DriveApp.getFolderById(rootFolderId);
+  }
+
   var rootName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   var folders  = DriveApp.getFoldersByName(rootName);
   if (folders.hasNext()) return folders.next();
