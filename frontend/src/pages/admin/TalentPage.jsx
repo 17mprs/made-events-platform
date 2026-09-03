@@ -672,7 +672,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
 
   // Sostituzione foto da admin — crop con lo stesso aspect ratio delle celle
   // template PDF (vedi CropModal.jsx / TalentCard.js insertPhotoAtPlaceholder_).
-  const FOTO_CROP_ASPECT = { foto_busto: 9 / 15.5, foto_intera: 7.5 / 15.5 }
+  const FOTO_CROP_ASPECT = { foto_busto: 7 / 15.5, foto_intera: 6 / 15.5 }
   const [localFotoBustoUrl,  setLocalFotoBustoUrl]  = useState(d.foto_busto_url  || d.documenti?.foto?.url || d.foto_url || null)
   const [localFotoInteraUrl, setLocalFotoInteraUrl] = useState(d.foto_intera_url || null)
   const [photoCropModal, setPhotoCropModal] = useState({ isOpen:false, file:null, aspect:null, fieldKey:null })
