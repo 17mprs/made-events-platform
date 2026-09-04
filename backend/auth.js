@@ -520,7 +520,7 @@ function sendPasswordResetEmail_(email, token) {
     '<p style="color:#ccc;font-size:11px;margin:6px 0 0;word-break:break-all;">Link: ' + resetUrl + '</p>' +
     '</div>' +
     '<div style="background:#F8F8F8;padding:16px 40px;border-top:1px solid #eee;">' +
-    '<p style="color:#aaa;font-size:11px;margin:0;">MADE EVENTS Platform · noreply@madeevent.it</p>' +
+    '<p style="color:#aaa;font-size:11px;margin:0;">MADE EVENTS Platform · madeeventssrls@gmail.com</p>' +
     '</div>' +
     '</div>';
   var text =

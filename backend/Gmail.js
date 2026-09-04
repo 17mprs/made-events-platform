@@ -15,7 +15,7 @@
 
 var EMAIL_CONFIG = {
   FROM_NAME:    'MADE EVENTS',
-  REPLY_TO:     'noreply@madeevent.it',   // Override con config tenant se disponibile
+  REPLY_TO:     'madeeventssrls@gmail.com',   // Override con config tenant se disponibile
   SUBJECT_PREFIX: '[MADE EVENTS] '
 };
 
