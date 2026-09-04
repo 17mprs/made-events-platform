@@ -14,6 +14,7 @@ import {
   DeleteEntityButton, showToast,
 } from './shared'
 import { TAGLIE_SHIRT, TIPOLOGIE_ESPERIENZA, LINGUE_FISSE, DISPONIBILITA_TIPI } from '../../components/registration/questionnaireOptions'
+import { PROVINCE_ALFA } from '../../components/registration/data/province'
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -1526,10 +1527,6 @@ export function TalentsSection({ handleApiResponse }) {
   useEffect(() => { load() }, [load])
   useEffect(() => { setPage(1) }, [filterStatus, search, sortScore, filterCitta, filterLingue, filterDisp, filterEsp, filterAltezzaMin, filterAltezzaMax, filterTaglia])
 
-  const cittaOptions = useMemo(() =>
-    Array.from(new Set(items.flatMap(l => safeArray(l.data?.province_lavoro)).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
-  [items])
-
   const profileByEmail = useMemo(() => {
     const m = {}
     profiles.forEach(p => {
@@ -1553,7 +1550,15 @@ export function TalentsSection({ handleApiResponse }) {
         (l.data?.email ?? '').toLowerCase().includes(q)
       )
     }
-    if (filterCitta) list = list.filter(l => safeArray(l.data?.province_lavoro).includes(filterCitta))
+    if (filterCitta.trim()) {
+      const q = filterCitta.trim().toLowerCase()
+      list = list.filter(l =>
+        safeArray(l.data?.province_lavoro).some(sigla => {
+          const prov = PROVINCE_ALFA.find(p => p.sigla === sigla)
+          return prov ? prov.nome.toLowerCase().includes(q) : sigla.toLowerCase().includes(q)
+        })
+      )
+    }
     if (filterLingue.length > 0) {
       list = list.filter(l => filterLingue.some(campo => {
         const v = l.data?.[campo]
@@ -1720,10 +1725,7 @@ export function TalentsSection({ handleApiResponse }) {
           <option value="DESC">Score ↓</option>
           <option value="ASC">Score ↑</option>
         </select>
-        <select value={filterCitta} onChange={e => setFilterCitta(e.target.value)} style={FILTER_INPUT}>
-          <option value="">Città (tutte)</option>
-          {cittaOptions.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <input type="search" placeholder="Città…" value={filterCitta} onChange={e => setFilterCitta(e.target.value)} autoComplete="off" name="talent-citta-no-autofill" style={{ ...FILTER_INPUT, minWidth:180 }} />
         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
           {LINGUE_FISSE.map(l => {
             const active = filterLingue.includes(l.value)
