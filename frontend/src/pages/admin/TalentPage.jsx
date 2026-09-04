@@ -24,6 +24,20 @@ function isDriveUrl(url) {
   return typeof url === 'string' && (url.includes('drive.google.com') || url.includes('docs.google.com'))
 }
 
+/** Sigla provincia → nome per esteso via PROVINCE_ALFA. Ritorna null se non trovata. */
+function provinciaNome(sigla) {
+  return PROVINCE_ALFA.find(p => p.sigla === sigla)?.nome ?? null
+}
+
+/** Nome della provincia in province_lavoro del talent che matcha la query (lowercase). */
+function matchingProvinciaNome(talent, query) {
+  const siglaMatch = safeArray(talent.data?.province_lavoro).find(sigla => {
+    const nome = provinciaNome(sigla)
+    return nome ? nome.toLowerCase().includes(query) : sigla.toLowerCase().includes(query)
+  })
+  return siglaMatch ? (provinciaNome(siglaMatch) || siglaMatch) : null
+}
+
 /** Cerca la foto profilo in più campi in ordine di priorità. */
 function getFotoUrl(data) {
   return data?.foto_busto_url || data?.documenti?.foto?.url || data?.foto_url || null
@@ -1501,6 +1515,8 @@ export function TalentsSection({ handleApiResponse }) {
   const [filterAltezzaMax, setFilterAltezzaMax] = useState('')
   const [filterTaglia,   setFilterTaglia]   = useState('')
   const [showMoreFilters, setShowMoreFilters] = useState(false)
+  const [cittaDropdownOpen, setCittaDropdownOpen] = useState(false)
+  const cittaFilterRef = useRef(null)
   const [page,           setPage]           = useState(1)
   const [selectedReview, setSelectedReview] = useState(null)
   const [selectedScheda, setSelectedScheda] = useState(null)
@@ -1539,6 +1555,21 @@ export function TalentsSection({ handleApiResponse }) {
   const pendingProfiles = useMemo(() =>
     profiles.filter(p => p.status === 'PENDING_REVIEW'),
   [profiles])
+
+  const availableProvinceOptions = useMemo(() =>
+    Array.from(new Set(items.flatMap(l => safeArray(l.data?.province_lavoro))))
+      .map(sigla => PROVINCE_ALFA.find(p => p.sigla === sigla))
+      .filter(Boolean)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'it'))
+  , [items])
+
+  useEffect(() => {
+    const onClickOutside = e => {
+      if (cittaFilterRef.current && !cittaFilterRef.current.contains(e.target)) setCittaDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
 
   const filtered = useMemo(() => {
     let list = [...items]
@@ -1646,7 +1677,15 @@ export function TalentsSection({ handleApiResponse }) {
           </div>
         </td>
         <td style={{ color:'#8888A0', fontSize:12 }}>{l.data?.email}</td>
-        <td>{l.data?.citta ?? '—'}</td>
+        <td>
+          {filterCitta.trim() ? (
+            <span style={{ background:'#630E33', color:'#fff', borderRadius:4, padding:'2px 6px', fontSize:11 }}>
+              📍 {matchingProvinciaNome(l, filterCitta.trim().toLowerCase()) ?? ''}
+            </span>
+          ) : (
+            provinciaNome(safeArray(l.data?.province_lavoro)[0]) ?? ''
+          )}
+        </td>
         <td><ScoreBar score={l.data?.score} /></td>
         <td>
           {photoExp.status === 'expired' && (
@@ -1725,7 +1764,43 @@ export function TalentsSection({ handleApiResponse }) {
           <option value="DESC">Score ↓</option>
           <option value="ASC">Score ↑</option>
         </select>
-        <input type="search" placeholder="Città…" value={filterCitta} onChange={e => setFilterCitta(e.target.value)} autoComplete="off" name="talent-citta-no-autofill" style={{ ...FILTER_INPUT, minWidth:180 }} />
+        <div ref={cittaFilterRef} style={{ position:'relative', minWidth:180 }}>
+          <input
+            type="text"
+            placeholder="Città…"
+            value={filterCitta}
+            onChange={e => {
+              const val = e.target.value
+              setFilterCitta(val)
+              setCittaDropdownOpen(!!val.trim())
+            }}
+            onFocus={() => setCittaDropdownOpen(!!filterCitta.trim())}
+            autoComplete="off"
+            name="talent-citta-no-autofill"
+            style={{ ...FILTER_INPUT, minWidth:180, width:'100%' }}
+          />
+          {cittaDropdownOpen && filterCitta.trim() && (
+            <div style={{
+              position:'absolute', top:'100%', left:0, right:0, zIndex:1000,
+              background:'#fff', border:`1px solid ${COLORS.border}`, borderRadius:6,
+              maxHeight:200, overflowY:'auto', marginTop:2, boxShadow:'0 4px 12px rgba(0,0,0,0.1)',
+            }}>
+              {availableProvinceOptions
+                .filter(p => p.nome.toLowerCase().includes(filterCitta.trim().toLowerCase()))
+                .map(p => (
+                  <div
+                    key={p.sigla}
+                    onClick={() => { setFilterCitta(p.nome); setCittaDropdownOpen(false) }}
+                    style={{ padding:'8px 12px', fontSize:12, cursor:'pointer', color:COLORS.text }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                  >
+                    {p.nome}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
           {LINGUE_FISSE.map(l => {
             const active = filterLingue.includes(l.value)
