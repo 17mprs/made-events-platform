@@ -1527,7 +1527,7 @@ export function TalentsSection({ handleApiResponse }) {
   useEffect(() => { setPage(1) }, [filterStatus, search, sortScore, filterCitta, filterLingue, filterDisp, filterEsp, filterAltezzaMin, filterAltezzaMax, filterTaglia])
 
   const cittaOptions = useMemo(() =>
-    Array.from(new Set(items.map(l => l.data?.citta).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    Array.from(new Set(items.flatMap(l => safeArray(l.data?.province_lavoro)).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
   [items])
 
   const profileByEmail = useMemo(() => {
@@ -1553,7 +1553,7 @@ export function TalentsSection({ handleApiResponse }) {
         (l.data?.email ?? '').toLowerCase().includes(q)
       )
     }
-    if (filterCitta) list = list.filter(l => l.data?.citta === filterCitta)
+    if (filterCitta) list = list.filter(l => safeArray(l.data?.province_lavoro).includes(filterCitta))
     if (filterLingue.length > 0) {
       list = list.filter(l => filterLingue.some(campo => {
         const v = l.data?.[campo]

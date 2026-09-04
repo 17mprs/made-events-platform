@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { applicationApi, talentApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
-import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT } from './shared'
+import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray } from './shared'
 import { COLORS } from '../../styles/theme'
 import { ContractPreviewModal } from '../admin/EventiPage'
 
@@ -102,7 +102,7 @@ function Vista1({ apps, talentMap, eventMap, actionLoading, onApprove, onReject,
       const q = filterCitta.trim().toLowerCase()
       list = list.filter(a => {
         const t = talentMap[a.data?.talent_profile_id]
-        return (t?.data?.citta ?? '').toLowerCase().includes(q)
+        return safeArray(t?.data?.province_lavoro).some(p => p.toLowerCase().includes(q))
       })
     }
     if (filterMese !== 'ALL') {
@@ -321,7 +321,7 @@ function StoricoTab({ appsAll, loadingAll }) {
     if (filterAnno !== 'ALL')   list = list.filter(a => a.created_at && String(new Date(a.created_at).getFullYear()) === filterAnno)
     if (filterCitta.trim()) {
       const q = filterCitta.trim().toLowerCase()
-      list = list.filter(a => (a.talent_snapshot?.citta ?? '').toLowerCase().includes(q))
+      list = list.filter(a => safeArray(a.talent_snapshot?.province_lavoro).some(p => p.toLowerCase().includes(q)))
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
