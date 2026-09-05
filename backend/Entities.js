@@ -495,6 +495,7 @@ function handleApplicationList(payload, auth) {
   var filters  = {};
 
   if (payload.shift_id) filters.shift_id = payload.shift_id;
+  if (payload.talent_profile_id) filters.talent_profile_id = payload.talent_profile_id;
 
   // USER vede solo le proprie candidature
   if (auth.role === ROLES.USER) {
