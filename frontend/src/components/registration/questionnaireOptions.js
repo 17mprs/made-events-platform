@@ -109,3 +109,12 @@ export const FOTO_FIELDS = {
   foto_intera: { label: 'Foto figura intera',             accept: 'image/jpeg,image/png', maxMB: 5, required: true,  hint: 'Sfondo neutro, outfit professionale.' },
   foto_extra:  { label: 'Foto aggiuntiva',                accept: 'image/jpeg,image/png', maxMB: 5, required: false, hint: 'Opzionale.' },
 }
+
+// Aspect ratio fisso derivato dalle dimensioni reali delle celle del template
+// PDF (FOTO_BUSTO/FOTO_INTERA, vedi TalentCard.js insertPhotoAtPlaceholder_).
+// Condiviso tra registrazione (Section7) e area riservata (UserPortal) così
+// il crop resta identico in entrambi i flussi.
+export const FOTO_CROP_ASPECT = {
+  foto_busto:  255 / 510,
+  foto_intera: 213 / 510,
+}

@@ -20,7 +20,7 @@ import { Section3Fields } from '../components/registration/sections/Section3'
 import { Section4Fields } from '../components/registration/sections/Section4'
 import { Section5Fields } from '../components/registration/sections/Section5'
 import { Section6Fields } from '../components/registration/sections/Section6'
-import { FOTO_FIELDS, CRITERI_NON_ACCETTAZIONE } from '../components/registration/questionnaireOptions'
+import { FOTO_FIELDS, CRITERI_NON_ACCETTAZIONE, FOTO_CROP_ASPECT } from '../components/registration/questionnaireOptions'
 
 // Mirror di driveThumbUrl() in pages/admin/shared.jsx — i link foto sono
 // share link Drive (drive.google.com/file/d/<id>/view), non utilizzabili
@@ -540,12 +540,7 @@ function SectionCard({ sec, form, onChange }) {
 // Sezione 7 — Foto Profilo: stessi FOTO_FIELDS/criteri del questionario, ma
 // l'upload va su document.upload (endpoint per talent già approvati) invece
 // di talent.uploadRegistrationDoc (endpoint pubblico pre-approvazione).
-// Aspect ratio fisso per i placeholder inseriti nel PDF scheda talent
-// (dimensioni reali celle template, vedi TalentCard.js insertPhotoAtPlaceholder_).
-const FOTO_CROP_ASPECT = {
-  foto_busto:  255 / 510,
-  foto_intera: 213 / 510,
-}
+// FOTO_CROP_ASPECT condiviso con Section7.jsx via questionnaireOptions.
 
 function FotoProfiloCard({ sec, form, onChange, talentProfileId, handleApiResponse }) {
   const { filled, total } = sec.completeness(form)

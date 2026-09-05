@@ -5,8 +5,9 @@ import React, { useState } from 'react'
 import { COLORS } from '../../../styles/theme'
 import FileUpload from '../FileUpload'
 import SectionShell from '../SectionShell'
+import CropModal from '../CropModal'
 import { talentApi, getErrorMessage } from '../../../api/client'
-import { CRITERI_NON_ACCETTAZIONE, FOTO_FIELDS } from '../questionnaireOptions'
+import { CRITERI_NON_ACCETTAZIONE, FOTO_FIELDS, FOTO_CROP_ASPECT } from '../questionnaireOptions'
 
 const TEMPLATE_IMAGES = {
   foto_busto:  '/assets/template-mezzo-busto.webp',
@@ -18,12 +19,13 @@ export default function Section7({ data, onChange, leadId, email, onNext, onBack
   const [uploadErrors, setUploadErrors] = useState({})
   const [formErrors,   setFormErrors]   = useState({})
   const [enlargedTemplate, setEnlargedTemplate] = useState(null)
+  const [cropModal, setCropModal] = useState({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
 
   function setUpState(key, state) {
     setUploadState(prev => ({ ...prev, [key]: state }))
   }
 
-  async function handleFile(fieldKey, { base64, filename, mimeType }) {
+  async function uploadFile(fieldKey, base64, filename, mimeType) {
     setUpState(fieldKey, 'uploading')
     setUploadErrors(prev => ({ ...prev, [fieldKey]: null }))
     try {
@@ -47,6 +49,27 @@ export default function Section7({ data, onChange, leadId, email, onNext, onBack
       setUpState(fieldKey, 'error')
       setUploadErrors(prev => ({ ...prev, [fieldKey]: 'Errore imprevisto durante il caricamento.' }))
     }
+  }
+
+  function handleFile(fieldKey, { file, base64, filename, mimeType }) {
+    const aspect = FOTO_CROP_ASPECT[fieldKey]
+    if (aspect) {
+      setCropModal({ isOpen: true, file, aspect, fieldKey, filename })
+      return
+    }
+    uploadFile(fieldKey, base64, filename, mimeType)
+  }
+
+  function handleCropConfirm(base64DataUrl) {
+    const { fieldKey, filename } = cropModal
+    setCropModal({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
+    const base64 = base64DataUrl.split(',')[1]
+    const croppedFilename = filename.replace(/\.\w+$/, '') + '.jpg'
+    uploadFile(fieldKey, base64, croppedFilename, 'image/jpeg')
+  }
+
+  function handleCropCancel() {
+    setCropModal({ isOpen: false, file: null, aspect: null, fieldKey: null, filename: null })
   }
 
   function handleClear(fieldKey) {
@@ -155,6 +178,14 @@ export default function Section7({ data, onChange, leadId, email, onNext, onBack
           />
         </div>
       )}
+
+      <CropModal
+        isOpen={cropModal.isOpen}
+        imageFile={cropModal.file}
+        aspect={cropModal.aspect}
+        onConfirm={handleCropConfirm}
+        onCancel={handleCropCancel}
+      />
     </SectionShell>
   )
 }
