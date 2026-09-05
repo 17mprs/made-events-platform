@@ -1292,6 +1292,41 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     return { pendingApps, approvedApps, appliedIds }
   }, [applications])
 
+  // allTalents (prop) è troncato alla prima pagina APPROVED (vedi handleTalentList
+  // lato backend, che pagina PRIMA di filtrare per status) — per le tab Attesa/
+  // Approvati, che elencano application su talent già approvati, il profilo può
+  // mancare da talentMap anche se il talent è regolarmente approvato. Fetch
+  // esplicito dei profili mancanti per entity_id, in batch, per completare la map.
+  const [fetchedTalents, setFetchedTalents] = useState({})
+  const fetchAttemptedRef = useRef(new Set())
+
+  useEffect(() => {
+    const missingIds = Array.from(new Set(
+      [...pendingApps, ...approvedApps]
+        .map(a => a.data?.talent_profile_id)
+        .filter(id => id && !talentMap[id] && !fetchAttemptedRef.current.has(id))
+    ))
+    if (missingIds.length === 0) return
+    missingIds.forEach(id => fetchAttemptedRef.current.add(id))
+
+    let cancelled = false
+    Promise.all(missingIds.map(id =>
+      talentApi.get(id).then(r => ({ id, res: handleApiResponse(r) }))
+    )).then(results => {
+      if (cancelled) return
+      setFetchedTalents(prev => {
+        const next = { ...prev }
+        results.forEach(({ id, res }) => {
+          if (res.success && res.data?.talent) next[id] = res.data.talent
+        })
+        return next
+      })
+    })
+    return () => { cancelled = true }
+  }, [pendingApps, approvedApps, talentMap, handleApiResponse])
+
+  const mergedTalentMap = useMemo(() => ({ ...talentMap, ...fetchedTalents }), [talentMap, fetchedTalents])
+
   // TAB A — talent APPROVED non ancora candidati, filtrati per requisiti evento + match %
   const potenziali = useMemo(() => {
     const luogo = (d.luogo ?? '').toUpperCase()
@@ -1570,7 +1605,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {pendingApps.map(a => (
-                  <TRow key={a.entity_id} t={talentMap[a.data?.talent_profile_id]} app={a} matchPct={computeMatchPct(d, talentMap[a.data?.talent_profile_id]?.data ?? {})}>
+                  <TRow key={a.entity_id} t={mergedTalentMap[a.data?.talent_profile_id]} app={a} matchPct={computeMatchPct(d, mergedTalentMap[a.data?.talent_profile_id]?.data ?? {})}>
                     <button
                       onClick={() => handleApprove(a.entity_id)}
                       disabled={!!(actionLoading)}
@@ -1597,7 +1632,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {approvedApps.map(a => {
-                  const t = talentMap[a.data?.talent_profile_id]
+                  const t = mergedTalentMap[a.data?.talent_profile_id]
                   const ctBusy = actionLoading === a.entity_id + '_ct'
                   const mcBusy = markingCompleted === a.entity_id
                   return (
