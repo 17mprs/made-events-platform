@@ -793,6 +793,21 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
     return m
   }, [])
 
+  // Split eventi attivi per zona — provincia evento (evt.data.provincia) vs
+  // province_lavoro del talent — per evidenziare i match geografici in cima.
+  const [showExtraProvinciaEventi, setShowExtraProvinciaEventi] = useState(false)
+  const { eventiInZona, eventiExtraProvincia } = useMemo(() => {
+    const provs = safeArray(d.province_lavoro)
+    const inZona = []
+    const extra  = []
+    activeEvents.forEach(evt => {
+      const ep = evt.data?.provincia
+      if (ep && provs.includes(ep)) inZona.push(evt)
+      else extra.push(evt)
+    })
+    return { eventiInZona: inZona, eventiExtraProvincia: extra }
+  }, [activeEvents, d.province_lavoro])
+
   const loadStorico = useCallback(async () => {
     if (history !== null || historyLoading) return
     setHistoryLoading(true)
@@ -823,6 +838,34 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   ) : null
 
   const grid2 = items => <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px 16px' }}>{items}</div>
+
+  const renderEventoConvocaCard = (evt) => {
+    const ed = evt.data ?? {}
+    const req = Number(ed.hostess_richieste) || 0
+    const conf = Number(ed.hostess_confermate ?? 0)
+    const pct = req > 0 ? Math.round((conf / req) * 100) : 0
+    const satColor = pct >= 100 ? '#EF4444' : pct >= 80 ? '#F97316' : '#10B981'
+    const dataStr = ed.data_evento ? new Date(ed.data_evento).toLocaleDateString('it-IT') : '—'
+    return (
+      <div key={evt.entity_id} style={{ border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+        <div style={{ flex:1, minWidth:150 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:COLORS.text, marginBottom:2 }}>{ed.titolo ?? '—'}</div>
+          <div style={{ fontSize:11, color:COLORS.textSecondary }}>{dataStr} · {ed.citta ?? ed.location ?? '—'}</div>
+          {req > 0 && (
+            <div style={{ fontSize:11, marginTop:4 }}>
+              <span style={{ color:satColor, fontWeight:600 }}>{conf}/{req}</span>
+              <span style={{ color:COLORS.textSecondary }}> ({pct}%) </span>
+              <span style={{ fontSize:9, background:`${satColor}22`, color:satColor, padding:'1px 6px', borderRadius:8, fontWeight:700 }}>{evt.status}</span>
+            </div>
+          )}
+        </div>
+        <button onClick={() => openConvoca(evt)}
+          style={{ background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, padding:'7px 14px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap' }}>
+          Convoca →
+        </button>
+      </div>
+    )
+  }
 
   // Fallback su forme legacy per profili approvati prima del fix BUG7 —
   // stessa catena di getFotoUrl() usata per l'avatar in lista.
@@ -1348,35 +1391,42 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
               {activeEvents.length === 0 ? (
                 <div style={{ fontSize:12, color:COLORS.textSecondary }}>Nessun evento LIVE o PLANNING al momento.</div>
               ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {activeEvents.map(evt => {
-                    const ed = evt.data ?? {}
-                    const req = Number(ed.hostess_richieste) || 0
-                    const conf = Number(ed.hostess_confermate ?? 0)
-                    const pct = req > 0 ? Math.round((conf / req) * 100) : 0
-                    const satColor = pct >= 100 ? '#EF4444' : pct >= 80 ? '#F97316' : '#10B981'
-                    const dataStr = ed.data_evento ? new Date(ed.data_evento).toLocaleDateString('it-IT') : '—'
-                    return (
-                      <div key={evt.entity_id} style={{ border:`1px solid ${COLORS.border}`, borderRadius:8, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                        <div style={{ flex:1, minWidth:150 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color:COLORS.text, marginBottom:2 }}>{ed.titolo ?? '—'}</div>
-                          <div style={{ fontSize:11, color:COLORS.textSecondary }}>{dataStr} · {ed.citta ?? ed.location ?? '—'}</div>
-                          {req > 0 && (
-                            <div style={{ fontSize:11, marginTop:4 }}>
-                              <span style={{ color:satColor, fontWeight:600 }}>{conf}/{req}</span>
-                              <span style={{ color:COLORS.textSecondary }}> ({pct}%) </span>
-                              <span style={{ fontSize:9, background:`${satColor}22`, color:satColor, padding:'1px 6px', borderRadius:8, fontWeight:700 }}>{evt.status}</span>
-                            </div>
-                          )}
+                <>
+                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>
+                    In zona
+                  </div>
+                  {eventiInZona.length === 0 ? (
+                    <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:10 }}>Nessun evento in zona al momento.</div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                      {eventiInZona.map(evt => renderEventoConvocaCard(evt))}
+                    </div>
+                  )}
+
+                  {eventiExtraProvincia.length > 0 && (
+                    <div style={{ marginTop:14 }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowExtraProvinciaEventi(v => !v)}
+                        style={{ background:'none', border:'none', color:'#630E33', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif', padding:0, marginBottom: showExtraProvinciaEventi ? 10 : 0 }}
+                      >
+                        {showExtraProvinciaEventi
+                          ? '← Nascondi extra provincia'
+                          : `Mostra altri eventi → (${eventiExtraProvincia.length} extra provincia)`}
+                      </button>
+                      {showExtraProvinciaEventi && (
+                        <div>
+                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:8 }}>
+                            Extra provincia
+                          </div>
+                          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                            {eventiExtraProvincia.map(evt => renderEventoConvocaCard(evt))}
+                          </div>
                         </div>
-                        <button onClick={() => openConvoca(evt)}
-                          style={{ background:COLORS.accent, color:'#fff', border:'none', borderRadius:6, padding:'7px 14px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Montserrat,sans-serif', whiteSpace:'nowrap' }}>
-                          Convoca →
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}

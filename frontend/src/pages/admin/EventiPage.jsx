@@ -1257,6 +1257,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const [contractData,    setContractData]    = useState(null)
   const [markingCompleted, setMarkingCompleted] = useState(null)
   const [profileModal,    setProfileModal]    = useState(null) // { t, matchPct } | null
+  const [showExtraProvincia, setShowExtraProvincia] = useState(false)
 
   const loadApps = useCallback(async () => {
     setLoading(true)
@@ -1332,6 +1333,21 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
       .map(t => ({ ...t, _matchPct: computeMatchPct(d, t.data ?? {}) }))
       .sort((a, b) => b._matchPct - a._matchPct || (Number(b.data?.score) || 0) - (Number(a.data?.score) || 0))
   }, [allTalents, appliedIds, d])
+
+  // Split potenziali per zona — provincia evento (d.provincia) vs province_lavoro
+  // del talent — per evidenziare i match geografici in cima.
+  const { potenzialiInZona, potenzialiExtraProvincia } = useMemo(() => {
+    const provincia = d.provincia
+    if (!provincia) return { potenzialiInZona: potenziali, potenzialiExtraProvincia: [] }
+    const inZona = []
+    const extra  = []
+    potenziali.forEach(t => {
+      const provs = t.data?.province_lavoro ?? t.data?.province_operativita ?? []
+      if (provs.includes(provincia)) inZona.push(t)
+      else extra.push(t)
+    })
+    return { potenzialiInZona: inZona, potenzialiExtraProvincia: extra }
+  }, [potenziali, d.provincia])
 
   const handleInvite = async (talentId) => {
     setActionLoading(talentId)
@@ -1489,19 +1505,62 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                 Nessun talent compatibile con i requisiti di questo evento.
               </div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                {potenziali.map(t => (
-                  <TRow key={t.entity_id} t={t} matchPct={t._matchPct}>
+              <>
+                <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:MUTED, marginBottom:8 }}>
+                  In zona
+                </div>
+                {potenzialiInZona.length === 0 ? (
+                  <div style={{ color:MUTED, fontSize:12, marginBottom:10 }}>Nessun talent in zona.</div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    {potenzialiInZona.map(t => (
+                      <TRow key={t.entity_id} t={t} matchPct={t._matchPct}>
+                        <button
+                          onClick={() => actionLoading !== t.entity_id && handleInvite(t.entity_id)}
+                          disabled={actionLoading === t.entity_id}
+                          style={{ ...BTN('#630E33'), color:'#E8B4BC', opacity: actionLoading === t.entity_id ? 0.5 : 1 }}
+                        >
+                          {actionLoading === t.entity_id ? '…' : 'Invita'}
+                        </button>
+                      </TRow>
+                    ))}
+                  </div>
+                )}
+
+                {potenzialiExtraProvincia.length > 0 && (
+                  <div style={{ marginTop:14 }}>
                     <button
-                      onClick={() => actionLoading !== t.entity_id && handleInvite(t.entity_id)}
-                      disabled={actionLoading === t.entity_id}
-                      style={{ ...BTN('#630E33'), color:'#E8B4BC', opacity: actionLoading === t.entity_id ? 0.5 : 1 }}
+                      type="button"
+                      onClick={() => setShowExtraProvincia(v => !v)}
+                      style={{ background:'none', border:'none', color:'#E8B4BC', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif', padding:0, marginBottom: showExtraProvincia ? 10 : 0 }}
                     >
-                      {actionLoading === t.entity_id ? '…' : 'Invita'}
+                      {showExtraProvincia
+                        ? '← Nascondi extra provincia'
+                        : `Mostra altri talent → (${potenzialiExtraProvincia.length} extra provincia)`}
                     </button>
-                  </TRow>
-                ))}
-              </div>
+                    {showExtraProvincia && (
+                      <div>
+                        <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:MUTED, marginBottom:8 }}>
+                          Extra provincia
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                          {potenzialiExtraProvincia.map(t => (
+                            <TRow key={t.entity_id} t={t} matchPct={t._matchPct}>
+                              <button
+                                onClick={() => actionLoading !== t.entity_id && handleInvite(t.entity_id)}
+                                disabled={actionLoading === t.entity_id}
+                                style={{ ...BTN('#630E33'), color:'#E8B4BC', opacity: actionLoading === t.entity_id ? 0.5 : 1 }}
+                              >
+                                {actionLoading === t.entity_id ? '…' : 'Invita'}
+                              </button>
+                            </TRow>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )
           ) : tab === 'attesa' ? (
             pendingApps.length === 0 ? (
