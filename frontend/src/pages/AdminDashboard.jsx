@@ -7,7 +7,7 @@ import Layout from '../components/Layout'
 import Card from '../components/Card'
 import { ADMIN_SIDEBAR } from './admin/shared'
 import { LeadsSection }          from './admin/LeadPage'
-import { TalentsSection, PendingApprovalSection } from './admin/TalentPage'
+import { TalentsSection } from './admin/TalentPage'
 import adminStore from '../store/adminStore'
 
 // ---------------------------------------------------------------------------
@@ -125,22 +125,6 @@ export default function AdminDashboard() {
       {/* Lead Talent section */}
       <SectionTitle>Lead Talent</SectionTitle>
       <LeadsSection handleApiResponse={handleApiResponse} pageSize={5} />
-
-      {/* Talent da approvare */}
-      <SectionTitle>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-          Talent da approvare
-          {stats?.pendingTalent > 0 && (
-            <span style={{
-              fontSize: 11, fontWeight: 700, background: '#EF4444', color: '#fff',
-              borderRadius: 12, padding: '2px 10px', lineHeight: 1,
-            }}>
-              {stats.pendingTalent} nuov{stats.pendingTalent !== 1 ? 'i' : 'o'}
-            </span>
-          )}
-        </span>
-      </SectionTitle>
-      <PendingApprovalSection handleApiResponse={handleApiResponse} />
 
       {/* Profili Talent section */}
       <SectionTitle>Profili Talent</SectionTitle>

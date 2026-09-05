@@ -878,7 +878,9 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   const renderPhoto = p => isDriveUrl(p.url) ? (
     <div style={{ position:'relative', width:120, height:150 }}>
       <img src={driveThumbUrl(p.url, 260)} alt={p.label}
-        style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, display:'block' }} />
+        style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, display:'block', cursor:'zoom-in', transition:'transform 0.2s ease' }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }} />
       <a href={p.url} target="_blank" rel="noreferrer"
         style={{ position:'absolute', bottom:4, left:4, right:4, textAlign:'center', fontSize:10, fontWeight:600, color:'#fff', background:'rgba(0,0,0,0.55)', borderRadius:4, padding:'2px 0', textDecoration:'none' }}>
         Apri foto →
@@ -886,7 +888,9 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
     </div>
   ) : (
     <img src={p.url} alt={p.label} onClick={() => setLightboxUrl(p.url)}
-      style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, cursor:'zoom-in', display:'block' }} />
+      style={{ width:120, height:150, objectFit:'cover', borderRadius:6, border:`1px solid ${COLORS.border}`, cursor:'zoom-in', display:'block', transition:'transform 0.2s ease' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }} />
   )
 
   const maskedIban = useMemo(() => {
@@ -1715,7 +1719,15 @@ export function TalentsSection({ handleApiResponse }) {
     const hasPending    = linkedProfile?.status === 'PENDING_REVIEW'
     return (
       <tr key={l.entity_id}>
-        <td><TalentAvatar nome={l.data?.nome} fotoUrl={getFotoUrl(l.data)} size={36} /></td>
+        <td>
+          <div
+            style={{ display:'inline-block', transition:'transform 0.2s ease', cursor:'zoom-in' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+          >
+            <TalentAvatar nome={l.data?.nome} fotoUrl={getFotoUrl(l.data)} size={52} />
+          </div>
+        </td>
         <td>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
             {l.data?.nome} {l.data?.cognome}
