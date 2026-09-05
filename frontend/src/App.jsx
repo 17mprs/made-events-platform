@@ -10,6 +10,7 @@ import TalentPage         from './pages/admin/TalentPage'
 import EventiPage         from './pages/admin/EventiPage'
 import ClientiPage        from './pages/admin/ClientiPage'
 import CandidaturePage    from './pages/admin/CandidaturePage'
+import TestFotoPage       from './pages/admin/TestFotoPage'
 import UserPortal         from './pages/UserPortal'
 import ClientPortal       from './pages/ClientPortal'
 import RegisterUser       from './pages/RegisterUser'
@@ -108,6 +109,11 @@ export default function App() {
       <Route
         path="/admin/candidature"
         element={<RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN']}><CandidaturePage /></RequireAuth>}
+      />
+      {/* Route diagnostica, non in nav — vedi TestFotoPage.jsx per il perché niente token hardcoded */}
+      <Route
+        path="/admin/test-foto"
+        element={<RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN']}><TestFotoPage /></RequireAuth>}
       />
 
       <Route
