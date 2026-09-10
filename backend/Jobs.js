@@ -846,7 +846,12 @@ function logJobError_(jobName, err) {
       if (adminEmail) {
         GmailApp.sendEmail(adminEmail,
           '[Made Event] ALERT: Job ' + jobName + ' fallito 3 volte',
-          'Il job ' + jobName + ' ha fallito ' + count + ' volte consecutive.\n\nUltimo errore: ' + msg
+          'Il job ' + jobName + ' ha fallito ' + count + ' volte consecutive.\n\nUltimo errore: ' + msg,
+          {
+            name:    EMAIL_CONFIG.FROM_NAME,
+            replyTo: EMAIL_CONFIG.REPLY_TO,
+            from:    'madeeventssrls@gmail.com'
+          }
         );
       }
     } catch (e) {}

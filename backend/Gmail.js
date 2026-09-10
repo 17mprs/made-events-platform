@@ -38,7 +38,8 @@ function sendEmail_(to, subject, bodyHtml, bodyText) {
     GmailApp.sendEmail(to, EMAIL_CONFIG.SUBJECT_PREFIX + subject, bodyText || stripHtml_(bodyHtml), {
       htmlBody: bodyHtml,
       name:     EMAIL_CONFIG.FROM_NAME,
-      replyTo:  EMAIL_CONFIG.REPLY_TO
+      replyTo:  EMAIL_CONFIG.REPLY_TO,
+      from:     'madeeventssrls@gmail.com'
     });
 
     Logger.log('[GMAIL] Email inviata a: ' + to + ' | subject: ' + subject);
