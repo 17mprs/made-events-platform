@@ -75,15 +75,71 @@ function buildNewsletterHtml(tier, eventi, destinatario) {
 
   var unsubUrl = baseUrl + '/unsubscribe?email=' + encodeURIComponent(email);
 
+  // TIER1-only: mese/anno invece di data completa (indirizzo/dettagli oscurati)
+  var monthsCap_ = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                     'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  function formatMonthYear_(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return monthsCap_[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  // TIER1-only: estrae il tipo via (Via/Piazza/Corso/...) dal primo token
+  // dell'indirizzo, oscurando il resto (numero civico, nome via, CAP).
+  // Include forme abbreviate comuni (C.so, V.le, P.za, ...) normalizzate
+  // alla forma estesa canonica.
+  var VIA_TYPE_MAP_ = {
+    'via': 'Via',
+    'viale': 'Viale', 'v.le': 'Viale', 'vle': 'Viale',
+    'piazza': 'Piazza', 'p.za': 'Piazza', 'p.zza': 'Piazza', 'pza': 'Piazza', 'pzza': 'Piazza',
+    'corso': 'Corso', 'c.so': 'Corso', 'cso': 'Corso',
+    'largo': 'Largo',
+    'vicolo': 'Vicolo', 'v.co': 'Vicolo',
+    'vico': 'Vico',
+    'strada': 'Strada', 's.da': 'Strada', 'sda': 'Strada',
+    'piazzale': 'Piazzale', 'ple': 'Piazzale',
+    'lungotevere': 'Lungotevere',
+    'lungarno': 'Lungarno',
+    'contrada': 'Contrada',
+    'boulevard': 'Boulevard',
+    'galleria': 'Galleria',
+    'borgo': 'Borgo',
+    'rione': 'Rione',
+    'salita': 'Salita',
+    'calata': 'Calata',
+    'rampa': 'Rampa',
+    'traversa': 'Traversa',
+    'passaggio': 'Passaggio',
+    'calle': 'Calle',
+  };
+  function extractViaType_(luogo) {
+    if (!luogo) return '';
+    var firstWord = String(luogo).trim().split(/[\s,]+/)[0];
+    return VIA_TYPE_MAP_[firstWord.toLowerCase()] || '';
+  }
+
   // ── Event cards ──────────────────────────────────────────────────────────
   var cardsHtml = eventi.map(function(ev) {
     var imgUrl     = ev.foto_copertina_url || ev.foto_url || '';
-    var dataFmt    = ev.data_inizio ? formatDate_(ev.data_inizio) : '';
+    var dataFmt    = ev.data_inizio
+      ? (isTier1 ? formatMonthYear_(ev.data_inizio) : formatDate_(ev.data_inizio))
+      : '';
     var localita   = (ev.luogo ? ev.luogo : '') + (ev.luogo && ev.citta ? ', ' : '') + (ev.citta || '');
+    var localitaDisplay = isTier1
+      ? (ev.citta
+          ? String(ev.citta).toUpperCase() + ' — ' + (extractViaType_(ev.luogo) ? extractViaType_(ev.luogo) + ' ' : '') + '••••••••'
+          : (localita ? '••••••••' : ''))
+      : localita;
 
     // TIER2-only: eventi COMPLETED non sono più candidabili — niente CTA di
     // candidatura, badge grigio al posto del colore brand.
     var isConcluso = !isTier1 && ev.status === 'COMPLETED';
+
+    // TIER1-only: nota sotto la card, sotto data/indirizzo oscurati
+    var lockNote = isTier1
+      ? '<p style="margin:8px 0 0;font-size:12px;font-style:italic;color:#AAAAAA;">Completa il profilo per vedere tutti i dettagli &rarr;</p>'
+      : '';
 
     var cardCtaUrl, cardCtaLabel;
     if (isTier1) {
@@ -128,8 +184,9 @@ function buildNewsletterHtml(tier, eventi, destinatario) {
       badgeHtml,
       '<p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#2E2E2E;line-height:1.3;">' + titleHtml + '</p>',
       dataFmt   ? '<p style="margin:0 0 3px;font-size:12px;color:#6B6B6B;">&#128197; ' + escapeHtml_(dataFmt) + '</p>' : '',
-      localita  ? '<p style="margin:0 0 3px;font-size:12px;color:#6B6B6B;">&#128205; ' + escapeHtml_(localita)  + '</p>' : '',
+      localitaDisplay ? '<p style="margin:0 0 3px;font-size:12px;color:#6B6B6B;">&#128205; ' + escapeHtml_(localitaDisplay) + '</p>' : '',
       detailBlock,
+      lockNote,
       '</td></tr>',
       '<tr><td style="padding:0 24px 20px;">',
       isConcluso
@@ -357,6 +414,61 @@ function getNewsletterPreview(tier) {
       eventi:      eventi.length,
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// HANDLER — invio manuale newsletter a un singolo destinatario (admin, test)
+// ---------------------------------------------------------------------------
+
+function handleNewsletterSendTier1ToOne(payload) {
+  var valid = requireFields(payload, ['email']);
+  if (valid) return valid;
+  var email = String(payload.email).toLowerCase().trim();
+
+  var lead = findLeadByEmail_(email);
+  if (!lead || String(lead.deleted).toLowerCase() === 'true') {
+    return errorResponse('SYS_002', 'Lead non trovato per questa email');
+  }
+  if (lead.status !== ENTITY_STATUS.LEAD_TALENT.PARTIAL &&
+      lead.status !== ENTITY_STATUS.LEAD_TALENT.COMPLETED_PENDING_APPROVAL) {
+    return errorResponse('WF_005', 'Questo lead non è idoneo per TIER1 (status attuale: ' + lead.status + ')');
+  }
+
+  var eventi = getEventiPerNewsletter_();
+  var html = buildNewsletterHtml('TIER1', eventi, {
+    nome:       lead.data.nome || '',
+    email:      lead.data.email,
+    lead_token: lead.data.lead_token || ''
+  });
+  var ok = sendEmail_(lead.data.email, 'Nuove opportunità di lavoro — Completa il tuo profilo', html);
+  if (!ok) return errorResponse('SYS_001', 'Invio email fallito');
+
+  return successResponse({ sent: true, to: lead.data.email });
+}
+
+function handleNewsletterSendTier2ToOne(payload) {
+  var valid = requireFields(payload, ['email']);
+  if (valid) return valid;
+  var email = String(payload.email).toLowerCase().trim();
+
+  var lead = findLeadByEmail_(email);
+  if (!lead || String(lead.deleted).toLowerCase() === 'true') {
+    return errorResponse('SYS_002', 'Talent non trovato per questa email');
+  }
+  if (lead.status !== ENTITY_STATUS.LEAD_TALENT.APPROVED) {
+    return errorResponse('WF_005', 'Questo talent non è APPROVED (status attuale: ' + lead.status + ')');
+  }
+
+  var eventi = getEventiPerNewsletter_();
+  var html = buildNewsletterHtml('TIER2', eventi, {
+    nome:      lead.data.nome || '',
+    email:     lead.data.email,
+    entity_id: lead.entity_id
+  });
+  var ok = sendEmail_(lead.data.email, 'Nuove opportunità di lavoro — Made Events', html);
+  if (!ok) return errorResponse('SYS_001', 'Invio email fallito');
+
+  return successResponse({ sent: true, to: lead.data.email });
 }
 
 // ---------------------------------------------------------------------------

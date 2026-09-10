@@ -1,6 +1,6 @@
 // === USER PORTAL — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   eventApi, applicationApi, assignmentApi, talentApi, documentApi, shiftApi,
@@ -1021,11 +1021,67 @@ function MyProfile({ handleApiResponse }) {
 }
 
 // ---------------------------------------------------------------------------
+// CTA INLINE — sezione bloccata (profilo non approvato)
+// ---------------------------------------------------------------------------
+
+function SectionLockedCTA({ kind, lead, profile }) {
+  const navigate = useNavigate()
+  const nome = kind === 'partial' ? (lead?.nome || '') : (profile?.data?.nome || '')
+  const greeting = nome ? `Ciao ${nome},` : ''
+
+  const copy = {
+    none: {
+      text: 'Completa la tua registrazione per accedere alle offerte di lavoro e candidarti agli eventi.',
+      cta: { label: 'COMPLETA LA REGISTRAZIONE', onClick: () => navigate('/registrazione') },
+    },
+    partial: {
+      text: `${greeting} hai lasciato la registrazione a metà. Riprendi da dove eri rimasto per accedere alle offerte di lavoro.`,
+      cta: { label: 'RIPRENDI', onClick: () => navigate(`/registrazione/completa?token=${lead?.lead_token}`) },
+    },
+    pending: {
+      text: `${greeting} il tuo profilo è in fase di revisione. Ti contatteremo appena approvato!`,
+      cta: null,
+    },
+  }[kind]
+
+  return (
+    <div style={{ textAlign:'center', padding:'48px 24px', background:COLORS.accentLight, borderRadius:'8px' }}>
+      <p style={{ fontSize:'14px', color:COLORS.text, lineHeight:1.8, maxWidth:'420px', margin: copy.cta ? '0 auto 24px' : '0 auto' }}>
+        {copy.text}
+      </p>
+      {copy.cta && <Button onClick={copy.cta.onClick}>{copy.cta.label}</Button>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // MAIN
 // ---------------------------------------------------------------------------
 
 export default function UserPortal() {
   const { handleApiResponse } = useAuth()
+  const [gate, setGate] = useState({ loading: true, kind: 'ok', lead: null, profile: null })
+
+  useEffect(() => {
+    (async () => {
+      const res = handleApiResponse(await talentApi.list())
+      const items = res.data?.items || []
+      if (items.length > 0) {
+        const p = items[0]
+        setGate({ loading: false, kind: p.status === 'APPROVED' ? 'ok' : 'pending', profile: p, lead: null })
+      } else if (res.data?.lead) {
+        setGate({ loading: false, kind: 'partial', lead: res.data.lead, profile: null })
+      } else {
+        setGate({ loading: false, kind: 'none', lead: null, profile: null })
+      }
+    })()
+  }, [handleApiResponse])
+
+  const gated = (Comp) => {
+    if (gate.loading) return <div className="spinner" />
+    if (gate.kind === 'ok') return <Comp handleApiResponse={handleApiResponse} />
+    return <SectionLockedCTA kind={gate.kind} lead={gate.lead} profile={gate.profile} />
+  }
 
   return (
     <Layout sidebarItems={SIDEBAR_ITEMS}>
@@ -1033,17 +1089,17 @@ export default function UserPortal() {
 
       <div id="events">
         <SectionTitle>Offerte di Lavoro</SectionTitle>
-        <AvailableEvents handleApiResponse={handleApiResponse} />
+        {gated(AvailableEvents)}
       </div>
 
       <div id="applications">
         <SectionTitle>Le Mie Candidature</SectionTitle>
-        <MyApplications handleApiResponse={handleApiResponse} />
+        {gated(MyApplications)}
       </div>
 
       <div id="assignments">
         <SectionTitle>I Miei Turni</SectionTitle>
-        <MyAssignments handleApiResponse={handleApiResponse} />
+        {gated(MyAssignments)}
       </div>
 
       <div id="profile">

@@ -728,7 +728,13 @@ function handleTalentList(payload, auth) {
   // USER vede solo il proprio profilo talent
   if (auth.role === ROLES.USER) {
     var myProfile = findTalentProfileByUserId_(auth.user_id, tenantId);
-    if (!myProfile) return successResponse({ items: [], total: 0, page: 1, limit: 50, pages: 0 });
+    if (!myProfile) {
+      var lead = findLeadByEmail_(String(auth.email).toLowerCase());
+      var leadInfo = (lead && lead.status === ENTITY_STATUS.LEAD_TALENT.PARTIAL)
+        ? { status: lead.status, lead_token: lead.data.lead_token, nome: lead.data.nome || '' }
+        : null;
+      return successResponse({ items: [], total: 0, page: 1, limit: 50, pages: 0, lead: leadInfo });
+    }
     return successResponse({ items: [talentToPublic(myProfile, auth.role)], total: 1, page: 1, limit: 50, pages: 1 });
   }
 

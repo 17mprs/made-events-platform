@@ -1,0 +1,351 @@
+<!-- MADE EVENTS — Form Registrazione WordPress v4 -->
+<!-- Incolla questo codice in un blocco HTML di WordPress -->
+
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  .me-wrap {
+    background: #f5f5f3;
+    min-height: 100vh;
+    padding: 40px 16px;
+    font-family: 'Montserrat', sans-serif;
+    box-sizing: border-box;
+  }
+  .me-wrap * { box-sizing: border-box; }
+
+  .me-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .me-logo-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .me-logo-icon {
+    width: 28px;
+    height: 28px;
+    background: #630E33;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .me-logo-text {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    color: #1a1a1a;
+    text-transform: uppercase;
+  }
+  .me-page-title {
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: 3px;
+    color: #1a1a1a;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+  .me-page-sub {
+    font-size: 13px;
+    font-weight: 300;
+    color: #888;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .me-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    padding: 32px 28px;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .me-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .me-field { margin-bottom: 20px; }
+  .me-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: #3a3a3a;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .me-label span { color: #630E33; }
+  .me-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 2px;
+    font-size: 14px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 300;
+    color: #1a1a1a;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .me-input::placeholder { color: #bbb; font-weight: 300; }
+  .me-input:focus { border-color: #630E33; }
+  .me-input.err { border-color: #c0392b; }
+
+  .me-privacy-box {
+    border: 1px solid #d0d0d0;
+    border-radius: 2px;
+    padding: 14px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .me-privacy-box input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    accent-color: #630E33;
+    cursor: pointer;
+  }
+  .me-privacy-box label {
+    font-size: 12px;
+    font-weight: 300;
+    color: #555;
+    line-height: 1.6;
+    cursor: pointer;
+  }
+  .me-privacy-box label a { color: #630E33; font-weight: 500; }
+  .me-privacy-box.err { border-color: #c0392b; }
+
+  .me-err {
+    font-size: 10px;
+    color: #c0392b;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+    display: none;
+    font-weight: 400;
+  }
+  .me-err.show { display: block; }
+
+  .me-btn {
+    width: 100%;
+    background: #630E33 !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    border: none !important;
+    border-radius: 2px;
+    padding: 16px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: block;
+  }
+  .me-btn:hover { background: #8F1040 !important; }
+  .me-btn:disabled { background: #bbb !important; cursor: not-allowed; }
+
+  .me-success {
+    text-align: center;
+    padding: 32px 20px;
+    display: none;
+  }
+  .me-success-check {
+    width: 56px;
+    height: 56px;
+    background: #f0f8f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 24px;
+  }
+  .me-success h3 {
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #1a1a1a;
+    margin: 0 0 12px;
+  }
+  .me-success p {
+    font-size: 13px;
+    font-weight: 300;
+    color: #777;
+    line-height: 1.7;
+    margin: 0 0 8px;
+  }
+  .me-success small {
+    font-size: 11px;
+    color: #aaa;
+    display: block;
+    margin-top: 16px;
+  }
+
+  @media (max-width: 480px) {
+    .me-row { grid-template-columns: 1fr; gap: 0; }
+    .me-card { padding: 24px 16px; }
+    .me-wrap { padding: 24px 12px; }
+  }
+</style>
+
+<div class="me-wrap">
+  <div class="me-header">
+    <div class="me-logo-line">
+      <div class="me-logo-icon">+</div>
+      <span class="me-logo-text">Made Events</span>
+    </div>
+    <h2 class="me-page-title">Candidatura Talent</h2>
+    <p class="me-page-sub">Inserisci i tuoi dati — riceverai un'email<br>con il link per completare il profilo.</p>
+  </div>
+
+  <div class="me-card">
+    <div id="me-form-section">
+
+      <div class="me-row">
+        <div class="me-field">
+          <label class="me-label" for="me-nome">Nome <span>*</span></label>
+          <input class="me-input" type="text" id="me-nome" autocomplete="given-name">
+          <div class="me-err" id="err-nome">Campo obbligatorio</div>
+        </div>
+        <div class="me-field">
+          <label class="me-label" for="me-cognome">Cognome <span>*</span></label>
+          <input class="me-input" type="text" id="me-cognome" autocomplete="family-name">
+          <div class="me-err" id="err-cognome">Campo obbligatorio</div>
+        </div>
+      </div>
+
+      <div class="me-field">
+        <label class="me-label" for="me-email">Email <span>*</span></label>
+        <input class="me-input" type="email" id="me-email" autocomplete="email">
+        <div class="me-err" id="err-email">Inserisci un'email valida</div>
+      </div>
+
+      <div class="me-field">
+        <label class="me-label" for="me-telefono">Telefono <span>*</span></label>
+        <input class="me-input" type="tel" id="me-telefono" autocomplete="tel">
+        <div class="me-err" id="err-telefono">Campo obbligatorio</div>
+      </div>
+
+      <div class="me-field">
+        <label class="me-label" for="me-citta">Città di residenza <span>*</span></label>
+        <input class="me-input" type="text" id="me-citta" placeholder="es. Roma" autocomplete="address-level2">
+        <div class="me-err" id="err-citta">Campo obbligatorio</div>
+      </div>
+
+      <div class="me-privacy-box" id="privacy-box">
+        <input type="checkbox" id="me-privacy">
+        <label for="me-privacy">
+          Dichiaro di aver letto e accetto il trattamento dei miei dati personali ai sensi del
+          <a href="https://www.madeevents.it/privacy-policy" target="_blank">Regolamento UE 2016/679 (GDPR)</a>
+          per le finalità di selezione del personale. <span style="color:#630E33">*</span>
+        </label>
+      </div>
+      <div class="me-err" id="err-privacy" style="margin-top:-14px;margin-bottom:16px">Devi accettare la privacy policy</div>
+
+      <button class="me-btn" id="me-submit" onclick="meSubmit()">Continua →</button>
+
+    </div>
+
+    <div class="me-success" id="me-success">
+      <div class="me-success-check">✓</div>
+      <h3>Quasi fatto!</h3>
+      <p>Ti abbiamo inviato un'email con il link<br>per completare il tuo profilo.</p>
+      <p>Controlla la casella di posta e la cartella spam.</p>
+      <small>Email inviata da <strong>noreply@madeevents.it</strong></small>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxx22bM7g-QPdhh_fqSy1mwhKQdh8zg6f3IgK2ah8P8F_cSEOtaKM_l66G2gs9CKm3i/exec';
+
+  function showErr(id, show) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('show', show);
+  }
+  function setErr(id, hasErr) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('err', hasErr);
+  }
+
+  window.meSubmit = function() {
+    var nome     = document.getElementById('me-nome').value.trim();
+    var cognome  = document.getElementById('me-cognome').value.trim();
+    var email    = document.getElementById('me-email').value.trim();
+    var telefono = document.getElementById('me-telefono').value.trim();
+    var citta    = document.getElementById('me-citta').value.trim();
+    var privacy  = document.getElementById('me-privacy').checked;
+    var valid    = true;
+
+    setErr('me-nome', !nome);       showErr('err-nome', !nome);       if (!nome) valid = false;
+    setErr('me-cognome', !cognome); showErr('err-cognome', !cognome); if (!cognome) valid = false;
+
+    var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    setErr('me-email', !emailOk);   showErr('err-email', !emailOk);   if (!emailOk) valid = false;
+
+    setErr('me-telefono', !telefono); showErr('err-telefono', !telefono); if (!telefono) valid = false;
+    setErr('me-citta', !citta);       showErr('err-citta', !citta);       if (!citta) valid = false;
+
+    document.getElementById('privacy-box').classList.toggle('err', !privacy);
+    showErr('err-privacy', !privacy);
+    if (!privacy) valid = false;
+
+    if (!valid) return;
+
+    var btn = document.getElementById('me-submit');
+    btn.disabled = true;
+    btn.textContent = 'Invio in corso...';
+
+    var payload = JSON.stringify({
+      action: 'talent.registerStep1',
+      payload: {
+        nome: nome,
+        cognome: cognome,
+        email: email.toLowerCase(),
+        telefono: telefono,
+        citta: citta,
+        gdpr_consent: true
+      }
+    });
+
+    var controller = new AbortController();
+    var timer = setTimeout(function() { controller.abort(); }, 45000);
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload,
+      signal: controller.signal
+    }).then(function(res) {
+      clearTimeout(timer);
+      return res.json();
+    }).then(function(data) {
+      document.getElementById('me-form-section').style.display = 'none';
+      document.getElementById('me-success').style.display = 'block';
+    }).catch(function() {
+      clearTimeout(timer);
+      document.getElementById('me-form-section').style.display = 'none';
+      document.getElementById('me-success').style.display = 'block';
+    });
+  };
+})();
+</script>

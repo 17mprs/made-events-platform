@@ -203,8 +203,10 @@ function handleRequest(action, payload, token) {
     case 'dashboard.bootstrap': return handleDashboardBootstrap(payload, auth);
 
     // NEWSLETTER
-    case 'newsletter.preview':      return getNewsletterPreview(payload.tier);
-    case 'newsletter.setFrequency': return handleNewsletterSetFrequency(payload, auth);
+    case 'newsletter.preview':          return getNewsletterPreview(payload.tier);
+    case 'newsletter.setFrequency':     return handleNewsletterSetFrequency(payload, auth);
+    case 'newsletter.sendTier1ToOne':   return handleNewsletterSendTier1ToOne(payload);
+    case 'newsletter.sendTier2ToOne':   return handleNewsletterSendTier2ToOne(payload);
 
     // SYSTEM
     case 'config.get':  return handleConfigGet(payload, auth);

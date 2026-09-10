@@ -248,6 +248,8 @@ export const emailApi = {
 }
 
 export const newsletterApi = {
-  preview:      (tier)    => gasPost('newsletter.preview',      { tier },    t()),
-  setFrequency: (payload) => gasPost('newsletter.setFrequency', payload,     t()),
+  preview:        (tier)    => gasPost('newsletter.preview',        { tier },    t()),
+  setFrequency:   (payload) => gasPost('newsletter.setFrequency',   payload,     t()),
+  sendTier1ToOne: (email)   => gasPost('newsletter.sendTier1ToOne', { email },   t()),
+  sendTier2ToOne: (email)   => gasPost('newsletter.sendTier2ToOne', { email },   t()),
 }

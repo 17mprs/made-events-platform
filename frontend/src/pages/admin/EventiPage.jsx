@@ -2117,7 +2117,10 @@ function NewsletterSettingsModal({ currentSettings, onSave, onClose }) {
 
 function NewsletterPanel({ onPreview, onOpenSettings }) {
   const ACCENT = COLORS.accent
-  const [loading, setLoading] = useState(null)   // 'TIER1' | 'TIER2' | null
+  const [loading, setLoading] = useState(null)       // 'TIER1' | 'TIER2' | null
+  const [testEmail, setTestEmail] = useState('')
+  const [sending, setSending] = useState(null)        // 'TIER1' | 'TIER2' | null
+  const [sendResult, setSendResult] = useState(null)  // { ok, message }
 
   async function handlePreview(tier) {
     setLoading(tier)
@@ -2126,42 +2129,92 @@ function NewsletterPanel({ onPreview, onOpenSettings }) {
     onPreview(tier, res)
   }
 
+  async function handleSendToOne(tier) {
+    if (!testEmail.trim()) return
+    setSending(tier)
+    setSendResult(null)
+    const action = tier === 'TIER1' ? newsletterApi.sendTier1ToOne : newsletterApi.sendTier2ToOne
+    const res = await action(testEmail.trim())
+    setSending(null)
+    setSendResult(
+      res.success
+        ? { ok: true, message: `Email inviata a ${res.data.to}` }
+        : { ok: false, message: getErrorMessage(res.error) }
+    )
+  }
+
   return (
     <div style={{
-      display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+      display:'flex', flexDirection:'column', gap:10,
       padding:'12px 16px', marginBottom:20, borderRadius:6,
       background:'#FDF6F7', border:`1px solid ${ACCENT}22`,
     }}>
-      <span style={{ fontSize:11, fontWeight:700, letterSpacing:2, color:ACCENT, textTransform:'uppercase', marginRight:4 }}>
-        Newsletter
-      </span>
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <span style={{ fontSize:11, fontWeight:700, letterSpacing:2, color:ACCENT, textTransform:'uppercase', marginRight:4 }}>
+          Newsletter
+        </span>
 
-      <button
-        onClick={() => handlePreview('TIER1')} disabled={loading !== null}
-        style={{
-          padding:'6px 14px', border:`1px solid ${ACCENT}`, borderRadius:4,
-          background: loading === 'TIER1' ? ACCENT : '#fff', color: loading === 'TIER1' ? '#fff' : ACCENT,
-          fontSize:12, fontWeight:600, cursor: loading ? 'default' : 'pointer', letterSpacing:0.5,
-        }}
-      >{loading === 'TIER1' ? 'Carico…' : 'Preview TIER1'}</button>
+        <button
+          onClick={() => handlePreview('TIER1')} disabled={loading !== null}
+          style={{
+            padding:'6px 14px', border:`1px solid ${ACCENT}`, borderRadius:4,
+            background: loading === 'TIER1' ? ACCENT : '#fff', color: loading === 'TIER1' ? '#fff' : ACCENT,
+            fontSize:12, fontWeight:600, cursor: loading ? 'default' : 'pointer', letterSpacing:0.5,
+          }}
+        >{loading === 'TIER1' ? 'Carico…' : 'Preview TIER1'}</button>
 
-      <button
-        onClick={() => handlePreview('TIER2')} disabled={loading !== null}
-        style={{
-          padding:'6px 14px', border:`1px solid ${ACCENT}`, borderRadius:4,
-          background: loading === 'TIER2' ? ACCENT : '#fff', color: loading === 'TIER2' ? '#fff' : ACCENT,
-          fontSize:12, fontWeight:600, cursor: loading ? 'default' : 'pointer', letterSpacing:0.5,
-        }}
-      >{loading === 'TIER2' ? 'Carico…' : 'Preview TIER2'}</button>
+        <button
+          onClick={() => handlePreview('TIER2')} disabled={loading !== null}
+          style={{
+            padding:'6px 14px', border:`1px solid ${ACCENT}`, borderRadius:4,
+            background: loading === 'TIER2' ? ACCENT : '#fff', color: loading === 'TIER2' ? '#fff' : ACCENT,
+            fontSize:12, fontWeight:600, cursor: loading ? 'default' : 'pointer', letterSpacing:0.5,
+          }}
+        >{loading === 'TIER2' ? 'Carico…' : 'Preview TIER2'}</button>
 
-      <button
-        onClick={onOpenSettings}
-        title="Impostazioni frequenza"
-        style={{
-          marginLeft:'auto', padding:'6px 12px', border:`1px solid #ddd`, borderRadius:4,
-          background:'none', fontSize:12, color:'#666', cursor:'pointer',
-        }}
-      >⚙ Frequenza</button>
+        <button
+          onClick={onOpenSettings}
+          title="Impostazioni frequenza"
+          style={{
+            marginLeft:'auto', padding:'6px 12px', border:`1px solid #ddd`, borderRadius:4,
+            background:'none', fontSize:12, color:'#666', cursor:'pointer',
+          }}
+        >⚙ Frequenza</button>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+        <input
+          type="email"
+          value={testEmail}
+          onChange={e => setTestEmail(e.target.value)}
+          placeholder="email destinatario di test"
+          style={{ padding:'6px 10px', border:'1px solid #ddd', borderRadius:4, fontSize:12, minWidth:220 }}
+        />
+        <button
+          onClick={() => handleSendToOne('TIER1')}
+          disabled={!testEmail.trim() || sending !== null}
+          style={{
+            padding:'6px 12px', border:`1px solid ${ACCENT}`, borderRadius:4,
+            background:'#fff', color:ACCENT, fontSize:12, fontWeight:600,
+            cursor: sending ? 'default' : 'pointer',
+          }}
+        >{sending === 'TIER1' ? 'Invio…' : 'Invia TIER1 a questo contatto'}</button>
+        <button
+          onClick={() => handleSendToOne('TIER2')}
+          disabled={!testEmail.trim() || sending !== null}
+          style={{
+            padding:'6px 12px', border:`1px solid ${ACCENT}`, borderRadius:4,
+            background:'#fff', color:ACCENT, fontSize:12, fontWeight:600,
+            cursor: sending ? 'default' : 'pointer',
+          }}
+        >{sending === 'TIER2' ? 'Invio…' : 'Invia TIER2 a questo contatto'}</button>
+
+        {sendResult && (
+          <span style={{ fontSize:12, fontWeight:600, color: sendResult.ok ? '#2E7D32' : '#C62828' }}>
+            {sendResult.ok ? '✓ ' : '✕ '}{sendResult.message}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

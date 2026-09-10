@@ -29,3 +29,8 @@ npm-debug.log*
 backend/.clasprc.json
 .clasprc.json
 .gstack/
+.vercel
+.env*
+
+# Claude Code local settings (may contain credentials from approved commands)
+.claude/
