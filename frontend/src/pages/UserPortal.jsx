@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  eventApi, applicationApi, assignmentApi, talentApi, documentApi,
+  eventApi, applicationApi, assignmentApi, talentApi, documentApi, shiftApi,
   getErrorMessage,
 } from '../api/client'
 import { COLORS, COMPONENT_STYLES, LETTER_SPACING } from '../styles/theme'
@@ -51,7 +51,7 @@ function SectionTitle({ children, id }) {
 // OFFERTE DI LAVORO (EVENTI APERTI)
 // ---------------------------------------------------------------------------
 
-function EventDetailDrawer({ event, onClose, onApply, applying, alreadyApplied }) {
+function EventDetailDrawer({ event, shifts = [], onClose, onApply, applying, alreadyApplied }) {
   const ed = event?.data ?? {}
   const [msg, setMsg] = useState('')
 
@@ -87,6 +87,37 @@ function EventDetailDrawer({ event, onClose, onApply, applying, alreadyApplied }
           {ed.abbigliamento_richiesto && <Row label="Dress code" val={ed.abbigliamento_richiesto} />}
           {ed.hostess_richieste && <Row label="Figure richieste" val={ed.hostess_richieste} />}
         </div>
+
+        {shifts.length > 0 && (
+          <div>
+            <div style={{ fontSize:'12px', fontWeight:600, color:COLORS.textSecondary, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>
+              Turni
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+              {shifts.map(shift => {
+                const sd = shift.data ?? {}
+                let dataLabel = sd.data || ''
+                const parsed = sd.data ? new Date(sd.data) : null
+                if (parsed && !isNaN(parsed.getTime())) {
+                  dataLabel = parsed.toLocaleDateString('it-IT', { dateStyle: 'medium' })
+                }
+                return (
+                  <div key={shift.entity_id} style={{ border:`1px solid ${COLORS.border}`, borderRadius:'6px', padding:'10px 12px' }}>
+                    {sd.ruolo && (
+                      <div style={{ fontSize:'13px', fontWeight:600, marginBottom:'2px' }}>{sd.ruolo}</div>
+                    )}
+                    <div style={{ fontSize:'12px', color:COLORS.text }}>
+                      {dataLabel && <span>{dataLabel}</span>}
+                      {(sd.orario_inizio || sd.orario_fine) && (
+                        <span>{dataLabel ? ' · ' : ''}{sd.orario_inizio || '?'} – {sd.orario_fine || '?'}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {ed.descrizione && (
           <div>
@@ -134,6 +165,7 @@ function AvailableEvents({ handleApiResponse }) {
   const [applying, setApplying] = useState(null)
   const [myApps,   setMyApps]   = useState([])
   const [selected, setSelected] = useState(null)
+  const [selectedShifts, setSelectedShifts] = useState([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -197,7 +229,13 @@ function AvailableEvents({ handleApiResponse }) {
                 )}
                 <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
                   <button
-                    onClick={() => setSelected(ev)}
+                    onClick={() => {
+                      setSelected(ev)
+                      setSelectedShifts([])
+                      shiftApi.list({ event_id: ev.entity_id })
+                        .then(res => setSelectedShifts(res?.data?.items || []))
+                        .catch(() => setSelectedShifts([]))
+                    }}
                     style={{
                       flex:1, padding:'7px 12px', fontSize:'12px', fontWeight:500,
                       border:`1px solid ${COLORS.border}`, borderRadius:'4px',
@@ -239,6 +277,7 @@ function AvailableEvents({ handleApiResponse }) {
       {selected && (
         <EventDetailDrawer
           event={selected}
+          shifts={selectedShifts}
           onClose={() => setSelected(null)}
           onApply={apply}
           applying={applying === selected.entity_id}

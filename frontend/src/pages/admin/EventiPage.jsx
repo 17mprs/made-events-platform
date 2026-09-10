@@ -1248,6 +1248,14 @@ function ShiftSection({ eventId, handleApiResponse }) {
 // TALENT EVENT DRAWER — 3 tab: Potenziali / In Attesa / Approvati
 // ---------------------------------------------------------------------------
 
+const APPLICATION_STATUS_RANK = {
+  REJECTED: 0, WITHDRAWN: 0,
+  PENDING: 1, INVITED: 1,
+  DOCS_REQUESTED: 2,
+  DOCS_RECEIVED: 3,
+  APPROVED: 4,
+}
+
 function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, initialTab = 'potenziali' }) {
   const d = event.data ?? {}
   const [tab,           setTab]           = useState(initialTab)
@@ -1280,11 +1288,25 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
 
   // Split applications by status + collect applied IDs
   const { pendingApps, approvedApps, appliedIds } = useMemo(() => {
+    // Dedup: un talent può avere più APPLICATION sullo stesso evento (una per shift/turno).
+    // Tieni solo quella con lo status più avanzato nel workflow.
+    const byTalent = new Map()
+    applications.forEach(a => {
+      const tid = a.data?.talent_profile_id
+      if (!tid) return
+      const existing = byTalent.get(tid)
+      const rank = APPLICATION_STATUS_RANK[a.status] ?? 0
+      if (!existing || rank > (APPLICATION_STATUS_RANK[existing.status] ?? 0)) {
+        byTalent.set(tid, a)
+      }
+    })
+    const deduped = Array.from(byTalent.values())
+
     const pendingApps  = []
     const approvedApps = []
     const appliedIds   = new Set()
-    applications.forEach(a => {
-      if (a.data?.talent_profile_id) appliedIds.add(a.data.talent_profile_id)
+    deduped.forEach(a => {
+      appliedIds.add(a.data.talent_profile_id)
       const s = a.status
       if (s === 'PENDING' || s === 'INVITED') pendingApps.push(a)
       else if (s === 'APPROVED')              approvedApps.push(a)

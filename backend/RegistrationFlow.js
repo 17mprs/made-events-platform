@@ -439,53 +439,88 @@ function handleGetLead(payload) {
   }
 
   var token = String(payload.lead_token).trim();
-  var all   = getAllRows('Entities');
 
-  for (var i = 0; i < all.length; i++) {
-    var e = all[i];
-    if (e.type !== 'LEAD_TALENT') continue;
-    var d = parseJSON(e.data);
-    if (String(d.lead_token) === token) {
-      // Aggiorna ultimo_accesso
-      try {
-        updateEntityData(e.entity_id, { ultimo_accesso: new Date().toISOString() }, null, null);
-      } catch (err) {}
-
-      // Restituisce i campi del form salvati (no dati sensibili come lead_token, password, ecc.)
-      var savedData = {};
-      var CAMPI_PUBBLICI = [
-        'genere',
-        'nascita_nazione','nascita_regione','nascita_provincia','nascita_citta','nascita_paese',
-        'residenza_nazione','residenza_regione','residenza_provincia','residenza_citta','residenza_paese',
-        'domicilio_coincide','domicilio_provincia','instagram','facebook',
-        'altezza','taglia_tshirt','taglia_pantalone','taglia_gonna','numero_scarpe',
-        'piercing_visibili','tatuaggi_visibili','tatuaggi_dove',
-        'patente_tipologie','automunita','province_lavoro',
-        'disponibilita_trasferte','disponibilita_weekend','disponibilita_serali',
-        'lingua_inglese','inglese_certificato','lingua_francese','lingua_spagnolo','lingua_tedesco','altre_lingue',
-        'titolo_studio','titolo_studio_indirizzo','professione_attuale','tipologie_esperienza','anni_esperienza_settore',
-        'dotazione_personale',
-        'codice_fiscale','partita_iva','iban','disponibile_chiamata','disponibile_ritenuta',
-        'doc_identita_url','doc_cf_url','foto_busto_url','foto_intera_url','foto_extra_url',
-        'cv_url','attestato_haccp_url','attestato_sicurezza_url',
-      ];
-      for (var j = 0; j < CAMPI_PUBBLICI.length; j++) {
-        var campo = CAMPI_PUBBLICI[j];
-        if (d[campo] !== undefined) savedData[campo] = d[campo];
-      }
-
-      return successResponse({
-        lead_id:            e.entity_id,
-        nome:               d.nome    || '',
-        email:              d.email   || '',
-        step_completed:     parseInt(d.step_completed)     || 1,
-        sezione_completata: parseInt(d.sezione_completata) || 0,
-        saved_data:         savedData
-      });
-    }
+  var sheet  = getSheet('Entities');
+  var finder = sheet.createTextFinder(token).matchEntireCell(false);
+  var found  = finder.findAll();
+  if (!found || found.length === 0) {
+    return errorResponse('SYS_002', 'Link non valido o scaduto');
   }
 
-  return errorResponse('SYS_002', 'Link non valido o scaduto');
+  // Prendi la prima riga che contiene il token nel campo data
+  var targetRow = null;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+  var dataColIdx    = headers.indexOf('data');
+  var typeColIdx    = headers.indexOf('type');
+  var deletedColIdx = headers.indexOf('deleted');
+
+  for (var fi = 0; fi < found.length; fi++) {
+    var cell    = found[fi];
+    var rowIdx  = cell.getRow();
+    var rowValues = sheet.getRange(rowIdx, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    // Verifica: colonna data (non altro campo), type=LEAD_TALENT, non deleted
+    if (cell.getColumn() !== dataColIdx + 1) continue;
+    if (String(rowValues[typeColIdx]) !== 'LEAD_TALENT') continue;
+    if (String(rowValues[deletedColIdx]).toLowerCase() === 'true') continue;
+
+    targetRow = rowValues;
+    break;
+  }
+
+  if (!targetRow) {
+    return errorResponse('SYS_002', 'Link non valido o scaduto');
+  }
+
+  var e = {};
+  for (var h = 0; h < headers.length; h++) {
+    e[headers[h]] = targetRow[h];
+  }
+  var d = parseJSON(e.data);
+  if (!d || !d.lead_token) {
+    Logger.log('[GET_LEAD] parseJSON fallito su riga trovata per token: ' + token);
+    return errorResponse('SYS_002', 'Link non valido o scaduto');
+  }
+
+  if (true) {  // wrapper per mantenere indentazione
+    // Aggiorna ultimo_accesso
+    try {
+      updateEntityData(e.entity_id, { ultimo_accesso: new Date().toISOString() }, null, null);
+    } catch (err) {}
+
+    // Restituisce i campi del form salvati (no dati sensibili come lead_token, password, ecc.)
+    var savedData = {};
+    var CAMPI_PUBBLICI = [
+      'genere',
+      'nascita_nazione','nascita_regione','nascita_provincia','nascita_citta','nascita_paese',
+      'residenza_nazione','residenza_regione','residenza_provincia','residenza_citta','residenza_paese',
+      'domicilio_coincide','domicilio_provincia','instagram','facebook',
+      'altezza','taglia_tshirt','taglia_pantalone','taglia_gonna','numero_scarpe',
+      'piercing_visibili','tatuaggi_visibili','tatuaggi_dove',
+      'patente_tipologie','automunita','province_lavoro',
+      'disponibilita_trasferte','disponibilita_weekend','disponibilita_serali',
+      'lingua_inglese','inglese_certificato','lingua_francese','lingua_spagnolo','lingua_tedesco','altre_lingue',
+      'titolo_studio','titolo_studio_indirizzo','professione_attuale','tipologie_esperienza','anni_esperienza_settore',
+      'dotazione_personale',
+      'codice_fiscale','partita_iva','iban','disponibile_chiamata','disponibile_ritenuta',
+      'doc_identita_url','doc_cf_url','foto_busto_url','foto_intera_url','foto_extra_url',
+      'cv_url','attestato_haccp_url','attestato_sicurezza_url',
+    ];
+    for (var j = 0; j < CAMPI_PUBBLICI.length; j++) {
+      var campo = CAMPI_PUBBLICI[j];
+      if (d[campo] !== undefined) savedData[campo] = d[campo];
+    }
+
+    return successResponse({
+      lead_id:            e.entity_id,
+      nome:               d.nome    || '',
+      email:              d.email   || '',
+      step_completed:     parseInt(d.step_completed)     || 1,
+      sezione_completata: parseInt(d.sezione_completata) || 0,
+      saved_data:         savedData
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
