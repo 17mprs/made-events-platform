@@ -820,12 +820,14 @@ function handleTalentUpdateProfile(payload, auth) {
   if (auth.role === ROLES.USER) {
     var pendingUpdates = {};
     for (var k in updates) { pendingUpdates[k] = updates[k]; }
-    updates.pending_data = pendingUpdates;
-    updates.pending_submitted_at = new Date().toISOString();
-    updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
+    var pendingOnly = {
+      pending_data: pendingUpdates,
+      pending_submitted_at: new Date().toISOString()
+    };
+    updateEntityData(payload.entity_id, pendingOnly, auth.tenant_id, auth.user_id);
     updateRow('Entities', payload.entity_id, { status: ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW });
     entity.status = ENTITY_STATUS.TALENT_PROFILE.PENDING_REVIEW;
-    entity.data = Object.assign({}, entity.data, updates);
+    entity.data = Object.assign({}, entity.data, pendingOnly);
     return successResponse({ talent: talentToPublic(entity, auth.role), pending: true });
   }
 
