@@ -34,3 +34,6 @@ backend/.clasprc.json
 
 # Claude Code local settings (may contain credentials from approved commands)
 .claude/
+
+# Audit scratch (never commit)
+_audit/

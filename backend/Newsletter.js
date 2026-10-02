@@ -17,19 +17,12 @@
 
 function getEventiPerNewsletter_() {
   var all    = getAllRows('Entities');
-  var cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 90);
 
   var eventi = all.filter(function(e) {
     if (String(e.deleted).toLowerCase() === 'true') return false;
     if (e.type !== 'EVENT') return false;
     var s = e.status;
-    if (s === ENTITY_STATUS.EVENT.LIVE || s === ENTITY_STATUS.EVENT.PLANNING) return true;
-    if (s === ENTITY_STATUS.EVENT.COMPLETED) {
-      var d = parseJSON(e.data);
-      return d.data_fine && new Date(d.data_fine) >= cutoff;
-    }
-    return false;
+    return s === ENTITY_STATUS.EVENT.LIVE || s === ENTITY_STATUS.EVENT.PLANNING;
   }).map(function(e) {
     var d = parseJSON(e.data);
     return {

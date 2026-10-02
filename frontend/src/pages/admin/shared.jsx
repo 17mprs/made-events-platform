@@ -38,6 +38,8 @@ export const ADMIN_SIDEBAR = [
   { label:'Clienti',        to:'/admin/clienti' },
   { label:'Eventi',         to:'/admin/eventi' },
   { label:'Candidature',    to:'/admin/candidature' },
+  { type:'section', label:'Sistema', roles:['SUPER_ADMIN'] },
+  { label:'Debug',          to:'/admin/debug', roles:['SUPER_ADMIN'] },
 ]
 
 // ---------------------------------------------------------------------------

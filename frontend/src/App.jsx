@@ -11,6 +11,7 @@ import EventiPage         from './pages/admin/EventiPage'
 import ClientiPage        from './pages/admin/ClientiPage'
 import CandidaturePage    from './pages/admin/CandidaturePage'
 import TestFotoPage       from './pages/admin/TestFotoPage'
+import DebugPage          from './pages/admin/DebugPage'
 import UserPortal         from './pages/UserPortal'
 import ClientPortal       from './pages/ClientPortal'
 import RegisterUser       from './pages/RegisterUser'
@@ -114,6 +115,11 @@ export default function App() {
       <Route
         path="/admin/test-foto"
         element={<RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN']}><TestFotoPage /></RequireAuth>}
+      />
+      {/* Debug tools — voce sidebar filtrata per ruolo, visibile solo a SUPER_ADMIN */}
+      <Route
+        path="/admin/debug"
+        element={<RequireAuth allowedRoles={['SUPER_ADMIN']}><DebugPage /></RequireAuth>}
       />
 
       <Route

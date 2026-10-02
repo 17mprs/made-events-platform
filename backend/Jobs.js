@@ -705,9 +705,13 @@ function jobMonthlyArchive() {
  * e invia solleciti via email in base all'inattività dall'ultimo accesso.
  *
  * Livelli di sollecito (idempotenti — un solo invio per livello per lead):
- *   Livello 1: ultimo_accesso > 24h  → primo promemoria
- *   Livello 2: ultimo_accesso > 72h  → secondo sollecito
- *   Livello 3: ultimo_accesso > 7gg  → sollecito finale
+ *   Livello 1: inattività > 24h  → primo promemoria
+ *   Livello 2: inattività > 72h  → secondo sollecito
+ *   Livello 3: inattività > 7gg  → sollecito finale
+ * Inattività = ora - (solleciti_ripartono_da || ultimo_accesso || registration_started_at || created_at).
+ * solleciti_ripartono_da viene scritto da lead.importLegacy/lead.resetSolleciti
+ * per far ripartire il countdown senza toccare ultimo_accesso (riservato alle
+ * interazioni reali del talent — Step2, upload doc, apertura link).
  *
  * Idempotenza: ogni livello viene inviato una sola volta grazie ai flag
  * sollecito_1_inviato / sollecito_2_inviato / sollecito_finale_inviato
@@ -743,8 +747,9 @@ function jobRegistrationSolleciti() {
         // Salta se non c'è email
         if (!d.email) { stats.skip++; return; }
 
-        // Tempo di riferimento: ultimo_accesso se disponibile, altrimenti data creazione
-        var refTimeStr = d.ultimo_accesso || d.registration_started_at || lead.created_at;
+        // Tempo di riferimento: solleciti_ripartono_da (reset esplicito da import/reset
+        // legacy) ha priorità su ultimo_accesso, poi data creazione.
+        var refTimeStr = d.solleciti_ripartono_da || d.ultimo_accesso || d.registration_started_at || lead.created_at;
         if (!refTimeStr) { stats.skip++; return; }
         var refTime = new Date(refTimeStr).getTime();
         if (isNaN(refTime)) { stats.skip++; return; }
@@ -849,8 +854,7 @@ function logJobError_(jobName, err) {
           'Il job ' + jobName + ' ha fallito ' + count + ' volte consecutive.\n\nUltimo errore: ' + msg,
           {
             name:    EMAIL_CONFIG.FROM_NAME,
-            replyTo: EMAIL_CONFIG.REPLY_TO,
-            from:    'madeeventssrls@gmail.com'
+            replyTo: EMAIL_CONFIG.REPLY_TO
           }
         );
       }

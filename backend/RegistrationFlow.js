@@ -58,26 +58,12 @@ function handleRegisterStep1(payload) {
   var tenantId = getDefaultTenantId_();
   if (!tenantId) return errorResponse('SYS_001', 'Configurazione sistema non completata.');
 
-  var now = new Date();
-  var leadToken = Utilities.getUuid();
+  var leadData = buildLeadTalentBaseData_(
+    payload.nome.trim(), payload.cognome.trim(), emailLower, payload.telefono.trim(), payload.citta || ''
+  );
+  var leadToken = leadData.lead_token;
 
-  var entity = createEntity('LEAD_TALENT', ENTITY_STATUS.LEAD_TALENT.PARTIAL, {
-    nome:              payload.nome.trim(),
-    cognome:           payload.cognome.trim(),
-    email:             emailLower,
-    telefono:          payload.telefono.trim(),
-    citta:             payload.citta || '',
-    step_completed:    1,
-    sezione_completata: 0,
-    lead_token:        leadToken,
-    gdpr_consent:      true,
-    gdpr_timestamp:    now.toISOString(),
-    stato_profilo:     'da_compilare',
-    score:             0,
-    ranking:           'D',
-    registration_started_at: now.toISOString(),
-    registration_completed_at: ''
-  }, tenantId, null);
+  var entity = createEntity('LEAD_TALENT', ENTITY_STATUS.LEAD_TALENT.PARTIAL, leadData, tenantId, null);
 
   try {
     var frontendUrl = getFrontendUrl();
@@ -620,7 +606,7 @@ function handleLeadSolicit(payload, auth) {
 // INVIO EMAIL SOLLECITO — chiamato da Jobs.js
 // ---------------------------------------------------------------------------
 
-function inviaEmailSollecito(leadId) {
+function inviaEmailSollecito(leadId, apologyText) {
   var entity = getEntityById(leadId, null);
   if (!entity || entity.type !== 'LEAD_TALENT') return false;
 
@@ -647,7 +633,7 @@ function inviaEmailSollecito(leadId) {
   try {
     var frontendUrl = getFrontendUrl();
     var completionUrl = frontendUrl + '/registrazione/completa?token=' + (d.lead_token || '');
-    sendSollecitoEmail(d.email, d.nome, completionUrl, completati, mancanti);
+    sendSollecitoEmail(d.email, d.nome, completionUrl, completati, mancanti, apologyText);
     updateEntityData(leadId, { ultimo_sollecito: new Date().toISOString() }, entity.tenant_id, null);
     return true;
   } catch (e) {
@@ -659,6 +645,36 @@ function inviaEmailSollecito(leadId) {
 // ---------------------------------------------------------------------------
 // HELPERS PRIVATI
 // ---------------------------------------------------------------------------
+
+/**
+ * Costruisce il `data` di un LEAD_TALENT appena creato (step_completed:1,
+ * stato_profilo 'da_compilare'). Usata da handleRegisterStep1 (registrazione
+ * reale) e da handleLeadImportLegacy (import bulk) — stessa struttura, per
+ * non duplicare la lista campi tra i due punti di creazione.
+ * opts.gdprConsent / opts.gdprTimestamp permettono di preservare un consenso
+ * GDPR originale (import legacy) invece di generarne uno nuovo.
+ */
+function buildLeadTalentBaseData_(nome, cognome, email, telefono, citta, opts) {
+  opts = opts || {};
+  var now = new Date();
+  return {
+    nome:              nome,
+    cognome:           cognome,
+    email:             email,
+    telefono:          telefono,
+    citta:             citta || '',
+    step_completed:    1,
+    sezione_completata: 0,
+    lead_token:        Utilities.getUuid(),
+    gdpr_consent:      opts.gdprConsent !== undefined ? opts.gdprConsent : true,
+    gdpr_timestamp:    opts.gdprTimestamp || now.toISOString(),
+    stato_profilo:     'da_compilare',
+    score:             0,
+    ranking:           'D',
+    registration_started_at: now.toISOString(),
+    registration_completed_at: ''
+  };
+}
 
 function findLeadByEmail_(emailLower) {
   var all = getAllRows('Entities');

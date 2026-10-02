@@ -5,7 +5,7 @@
 // sostituire GAS_ENDPOINT con l'URL fornito da GAS
 // (es. https://script.google.com/macros/s/AKfycby.../exec)
 
-export const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyCosawZ1j9WclKX_EY10Gnl3_rmaZfvQ_sGuTrNLur2Hpz_2sfIdGpgqa8S3re0rjfUg/exec'
+export const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbywK-f8EOav2gS7MKNlLRT38eVe9h4SH827Zv91kFp7l0A4LEg2s13IJXwvwNns_UKA-g/exec'
 
 // ---------------------------------------------------------------------------
 // CORE FETCH
@@ -208,6 +208,8 @@ export const applicationApi = {
   reject:         (entity_id, nota_rifiuto = '') =>
                     gasPost('application.reject',       { entity_id, nota_rifiuto }, t()),
   withdraw:       (entity_id)              => gasPost('application.withdraw',     { entity_id }, t()),
+  revoke:         (entity_id)              => gasPost('application.revoke',       { entity_id }, t()),
+  assignShift:    (entity_id, shift_id)    => gasPost('application.assignShift',  { entity_id, shift_id }, t()),
   list:           (payload = {})           => gasPost('application.list',         payload, t()),
   listAll:        ()                       => gasPost('application.listAll',      {},       t()),
   updateStatus:   (entity_id, new_status)  => gasPost('application.updateStatus', { entity_id, new_status }, t()),
@@ -252,4 +254,25 @@ export const newsletterApi = {
   setFrequency:   (payload) => gasPost('newsletter.setFrequency',   payload,     t()),
   sendTier1ToOne: (email)   => gasPost('newsletter.sendTier1ToOne', { email },   t()),
   sendTier2ToOne: (email)   => gasPost('newsletter.sendTier2ToOne', { email },   t()),
+}
+
+// Solo /admin/debug (SUPER_ADMIN) — whitelist esplicita di action, niente
+// escape hatch generico per chiamare action arbitrarie dal frontend.
+const DEBUG_BACKFILL_ACTIONS = [
+  'talent.backfillFromLead',
+  'event.backfillSaturation',
+  'event.backfillMissingAssignments',
+  'event.backfillAssignmentShiftIds',
+]
+
+export const debugApi = {
+  matchBreakdown: (payload) => gasPost('debug.matchBreakdown', payload, t()),
+  inspectEntity:  (payload) => gasPost('debug.inspectEntity',  payload, t()),
+  runBackfill:    (action, dryRun) => {
+    if (!DEBUG_BACKFILL_ACTIONS.includes(action)) {
+      return Promise.resolve({ success: false, error: { code: 'VAL_002', message: 'Backfill non consentito: ' + action } })
+    }
+    return gasPost(action, { dryRun }, t())
+  },
+  BACKFILL_ACTIONS: DEBUG_BACKFILL_ACTIONS,
 }

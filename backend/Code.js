@@ -159,6 +159,8 @@ function handleRequest(action, payload, token) {
     case 'application.submit':       return handleApplicationSubmit(payload, auth);
     case 'application.invite':       return handleApplicationInvite(payload, auth);
     case 'application.approve':            return handleApplicationApprove(payload, auth);
+    case 'application.revoke':             return handleApplicationRevoke(payload, auth);
+    case 'application.assignShift':        return handleApplicationAssignShift(payload, auth);
     case 'application.reject':             return handleApplicationReject(payload, auth);
     case 'application.withdraw':           return handleApplicationWithdraw(payload, auth);
     case 'application.list':               return handleApplicationList(payload, auth);
@@ -189,6 +191,10 @@ function handleRequest(action, payload, token) {
     case 'lead.solicit':    return handleLeadSolicit(payload, auth);
     case 'lead.softDelete': return handleLeadSoftDelete(payload, auth);
 
+    // LEGACY IMPORT (recupero talent vecchio DB, 2026-09)
+    case 'lead.importLegacy':   return handleLeadImportLegacy(payload, auth);
+    case 'lead.resetSolleciti': return handleLeadResetSolleciti(payload, auth);
+
     // CONTRACT
     case 'contract.generate': return handleContractGenerate(payload, auth);
 
@@ -214,6 +220,13 @@ function handleRequest(action, payload, token) {
 
     // BACKFILL (BUG7)
     case 'talent.backfillFromLead': return handleTalentBackfillFromLead(payload, auth);
+    case 'event.backfillSaturation': return handleEventBackfillSaturation(payload, auth);
+    case 'event.backfillMissingAssignments': return handleEventBackfillMissingAssignments(payload, auth);
+    case 'event.backfillAssignmentShiftIds': return handleEventBackfillAssignmentShiftIds(payload, auth);
+
+    // DEBUG TOOLS (SUPER_ADMIN only — pagina /admin/debug)
+    case 'debug.matchBreakdown': return handleDebugMatchBreakdown(payload, auth);
+    case 'debug.inspectEntity':  return handleDebugInspectEntity(payload, auth);
 
     default:
       return errorResponse('VAL_002', 'Action "' + action + '" non riconosciuta');

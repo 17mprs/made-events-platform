@@ -12,6 +12,7 @@ import Input from '../../components/Input'
 import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray, showToast, driveThumbUrl } from './shared'
 import { LINGUE_FISSE, DISPONIBILITA_TIPI } from '../../components/registration/questionnaireOptions'
 import CittaProvinciaSelect from '../../components/shared/CittaProvinciaSelect'
+import { calculateEventMatch as computeMatchPct } from 'virtual:match-score'
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -972,86 +973,6 @@ export function ContractPreviewModal({ talent, event, onClose }) {
 // MATCH SCORE (front-end, mirrors backend calculateEventMatch, zero latency)
 // ---------------------------------------------------------------------------
 
-function computeMatchPct(ed, td) {
-  if (!ed || !td) return 50
-  let score = 0, maxScore = 0
-
-  // HARD: sesso (15)
-  if (ed.sesso_richiesto && ed.sesso_richiesto !== 'Indifferente') {
-    maxScore += 15
-    if ((td.genere || td.sesso) === ed.sesso_richiesto) score += 15
-    else return 0
-  }
-  // HARD: altezza (10)
-  if (ed.altezza_minima) {
-    maxScore += 10
-    if (Number(td.altezza) >= Number(ed.altezza_minima)) score += 10
-    else return 0
-  }
-  // HARD: taglia (10)
-  if (ed.taglia_richiesta && ed.taglia_richiesta !== 'Indifferente' && ed.taglia_richiesta !== '') {
-    maxScore += 10
-    if ((td.taglia_pantalone || td.taglia) === ed.taglia_richiesta) score += 10
-    else return 0
-  }
-  // HARD: lingue (15)
-  const lingueRichieste = ed.lingue_richieste ?? []
-  if (lingueRichieste.length > 0) {
-    maxScore += 15
-    const tLingue = [
-      td.lingua_inglese, td.lingua_francese, td.lingua_spagnolo, td.lingua_tedesco,
-      ...(safeArray(td.altre_lingue).map(l => (typeof l === 'object' && l) ? (l.nome || '') : '')),
-      ...(safeArray(td.lingue).map(l => typeof l === 'string' ? l : (l?.nome || ''))),
-    ].filter(Boolean).map(l => l.toLowerCase())
-    const hasAll = lingueRichieste.every(r => tLingue.some(tl => tl.includes(r.toLowerCase())))
-    if (hasAll) score += 15
-    else return 0
-  }
-
-  // SOFT: esperienza (12/5)
-  if (Number(ed.anni_esperienza_minimi) > 0) {
-    maxScore += 12
-    if (parseEsperienza(td.anni_esperienza_settore) >= Number(ed.anni_esperienza_minimi)) score += 12
-    else score += 5
-  }
-  // SOFT: provincia (10/3)
-  if (ed.provincia) {
-    maxScore += 10
-    const provs = td.province_lavoro ?? td.province_operativita ?? []
-    if (provs.includes(ed.provincia)) score += 10; else score += 3
-  }
-  // SOFT: automunita (8/2)
-  if (ed.automunita === 'Sì') {
-    maxScore += 8
-    if (td.automunita === 'Sì') score += 8; else score += 2
-  }
-  // SOFT: trasferte (8/2)
-  if (ed.richiede_trasferte) {
-    maxScore += 8
-    if (td.disponibilita_trasferte === 'Sì') score += 8; else score += 2
-  }
-  // SOFT: weekend (6)
-  if (ed.richiede_weekend) {
-    maxScore += 6
-    if (td.disponibilita_weekend === 'Sì') score += 6
-  }
-  // SOFT: ruoli (10/3)
-  const ruoli = ed.ruoli_richiesti ?? []
-  if (ruoli.length > 0) {
-    maxScore += 10
-    const tip = td.tipologie_esperienza ?? []
-    if (ruoli.some(r => tip.includes(r))) score += 10; else score += 3
-  }
-  // Bonus: ha lavorato con noi (10)
-  if (ed.priorita_lavorato_con_noi) {
-    const eventiMade = (Number(td.eventi_crm_completati) || 0) + (Number(td.eventi_precrm) || 0)
-    if (eventiMade > 0) { maxScore += 10; score += 10 }
-  }
-
-  if (maxScore === 0) return 50
-  return Math.round((score / maxScore) * 100)
-}
-
 // ---------------------------------------------------------------------------
 // SHIFT SECTION — turni multipli per evento
 // ---------------------------------------------------------------------------
@@ -1156,15 +1077,21 @@ function ShiftSection({ eventId, handleApiResponse }) {
             <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
               {shifts.map(s => {
                 const sd = s.data ?? {}
+                const postiConfermati  = sd.posti_confermati ?? 0
+                const postiDisponibili = sd.posti_disponibili ?? 0
+                const postiPieno = postiConfermati >= postiDisponibili
                 return (
                   <div key={s.entity_id} style={{ background:'#1A1A24', borderRadius:7, padding:'9px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:12, fontWeight:600, color:TEXT }}>
                         {fmtShiftDate(sd.data)}&nbsp;·&nbsp;{sd.orario_inizio || '—'} → {sd.orario_fine || '—'}
                       </div>
-                      <div style={{ fontSize:11, color:MUTED, marginTop:2 }}>
-                        {sd.ruolo || '—'}&nbsp;·&nbsp;{sd.posti_confermati ?? 0}/{sd.posti_disponibili ?? 0} posti
-                        {sd.dress_code && <span>&nbsp;·&nbsp;{sd.dress_code}</span>}
+                      <div style={{ fontSize:11, color:MUTED, marginTop:2, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span>{sd.ruolo || '—'}</span>
+                        <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:8, background: postiPieno ? '#7F1D1D' : '#166534', color: postiPieno ? '#FCA5A5' : '#86EFAC', letterSpacing:'0.5px' }}>
+                          {postiConfermati}/{postiDisponibili} posti
+                        </span>
+                        {sd.dress_code && <span>·&nbsp;{sd.dress_code}</span>}
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
@@ -1266,6 +1193,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const [markingCompleted, setMarkingCompleted] = useState(null)
   const [profileModal,    setProfileModal]    = useState(null) // { t, matchPct } | null
   const [showExtraProvincia, setShowExtraProvincia] = useState(false)
+  const [shifts,        setShifts]        = useState([])
 
   const loadApps = useCallback(async () => {
     setLoading(true)
@@ -1274,7 +1202,24 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     if (res.success) setApplications(res.data?.items ?? [])
   }, [event.entity_id, handleApiResponse])
 
+  const loadShifts = useCallback(async () => {
+    const res = handleApiResponse(await shiftApi.list({ event_id: event.entity_id }))
+    if (res.success) setShifts(res.data?.items ?? [])
+  }, [event.entity_id, handleApiResponse])
+
   useEffect(() => { loadApps() }, [loadApps])
+  useEffect(() => { loadShifts() }, [loadShifts])
+
+  const handleAssignShift = async (appId, shiftId) => {
+    setActionLoading(appId + '_as')
+    const res = handleApiResponse(await applicationApi.assignShift(appId, shiftId))
+    setActionLoading(null)
+    if (res.success) {
+      await Promise.all([loadApps(), loadShifts()])
+    } else {
+      alert(getErrorMessage(res.error))
+    }
+  }
 
   // Sync tab when initialTab prop changes (e.g. click on saturation count)
   useEffect(() => { setTab(initialTab) }, [initialTab])
@@ -1441,6 +1386,15 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     }
   }
 
+  const handleRevoke = async (appId) => {
+    if (!window.confirm('Sei sicuro di voler annullare?')) return
+    setActionLoading(appId + '_rv')
+    const res = handleApiResponse(await applicationApi.revoke(appId))
+    setActionLoading(null)
+    if (res.success) loadApps()
+    else alert(getErrorMessage(res.error))
+  }
+
   const handleMarkCompleted = async (applicationId) => {
     if (!window.confirm('Confermi che questo evento è stato completato per questo talent?')) return
     setMarkingCompleted(applicationId)
@@ -1461,12 +1415,21 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const BG = '#0E0E16'; const BD = '#2A2A3A'; const TEXT = '#E8E8F0'; const MUTED = '#8888A0'
 
   // Mini talent row component (defined inline to use closure vars)
-  const TRow = ({ t, app, matchPct, children }) => {
+  const TRow = ({ t, app, matchPct, children, dangerAction }) => {
+    const [rowHovered, setRowHovered] = useState(false)
     const td   = t?.data ?? app?.data ?? {}
     const nome = td.nome ? `${td.nome} ${td.cognome ?? ''}`.trim() : (app?.data?.talent_name ?? '—')
     const badgeColor = matchPct >= 80 ? '#16A34A' : matchPct >= 60 ? '#D97706' : '#6B7280'
     return (
-      <div style={{ background:'#1A1A24', borderRadius:8, padding:'12px 14px', display:'flex', gap:12, alignItems:'center' }}>
+      <div
+        onMouseEnter={dangerAction ? () => setRowHovered(true) : undefined}
+        onMouseLeave={dangerAction ? () => setRowHovered(false) : undefined}
+        style={{
+          background: dangerAction && rowHovered ? 'rgba(229,62,62,0.08)' : '#1A1A24',
+          borderRadius:8, padding:'12px 14px', display:'flex', gap:12, alignItems:'center',
+          transition:'background 0.15s',
+        }}
+      >
         <TalentAvatar nome={nome} fotoUrl={td.foto_busto_url} size={40} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:13, fontWeight:600, color:TEXT, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
@@ -1493,6 +1456,22 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
             </button>
           )}
           {children}
+          {dangerAction && (
+            <button
+              onClick={dangerAction.onClick}
+              disabled={dangerAction.busy}
+              style={{
+                ...BTN('#e53e3e'), color:'#e53e3e',
+                opacity: rowHovered ? (dangerAction.busy ? 0.6 : 1) : 0,
+                pointerEvents: rowHovered ? 'auto' : 'none',
+                transition:'opacity 0.15s',
+                cursor: dangerAction.busy ? 'wait' : 'pointer',
+              }}
+              title="Annulla turno"
+            >
+              {dangerAction.busy ? '…' : '✕'}
+            </button>
+          )}
         </div>
       </div>
     )
@@ -1657,8 +1636,31 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                   const t = mergedTalentMap[a.data?.talent_profile_id]
                   const ctBusy = actionLoading === a.entity_id + '_ct'
                   const mcBusy = markingCompleted === a.entity_id
+                  const rvBusy = actionLoading === a.entity_id + '_rv'
+                  const asBusy = actionLoading === a.entity_id + '_as'
                   return (
-                    <TRow key={a.entity_id} t={t} app={a} matchPct={computeMatchPct(d, t?.data ?? {})}>
+                    <TRow
+                      key={a.entity_id} t={t} app={a} matchPct={computeMatchPct(d, t?.data ?? {})}
+                      dangerAction={{ onClick: () => handleRevoke(a.entity_id), busy: rvBusy }}
+                    >
+                      <select
+                        value={a.data?.shift_id || ''}
+                        disabled={asBusy}
+                        onChange={e => handleAssignShift(a.entity_id, e.target.value)}
+                        style={{ ...BTN('#6b7280'), color: a.data?.shift_id ? TEXT : MUTED, background:'#1A1A24', maxWidth:170, opacity: asBusy ? 0.6 : 1 }}
+                        title="Assegna turno"
+                      >
+                        <option value="">— Nessun turno —</option>
+                        {shifts.map(s => {
+                          const sd = s.data ?? {}
+                          const dataFmt = sd.data ? new Date(sd.data).toLocaleDateString('it-IT', { day:'2-digit', month:'short' }) : '—'
+                          return (
+                            <option key={s.entity_id} value={s.entity_id}>
+                              {dataFmt} {sd.orario_inizio}→{sd.orario_fine} · {sd.ruolo} ({sd.posti_confermati ?? 0}/{sd.posti_disponibili ?? 0} posti)
+                            </option>
+                          )
+                        })}
+                      </select>
                       <button
                         disabled={ctBusy}
                         onClick={() => handleContractGenerate(a.data?.talent_profile_id, a.entity_id)}

@@ -19,6 +19,16 @@ var EMAIL_CONFIG = {
   SUBJECT_PREFIX: '[MADE EVENTS] '
 };
 
+// Paragrafo di scuse per i talent del vecchio DB la cui registrazione non è
+// arrivata a destinazione (import legacy 2026-09) — usato sia dall'invito
+// iniziale (lead.importLegacy) sia dal reset solleciti (lead.resetSolleciti).
+// {nome} viene sostituito col nome del talent prima dell'invio.
+var LEGACY_APOLOGY_TEXT =
+  'Ciao {nome}, nelle scorse settimane ti sei candidata/o come talent Made Events, ' +
+  'ma per un problema tecnico la tua registrazione non è stata completata correttamente. ' +
+  'Ci scusiamo per il disagio. I tuoi dati sono al sicuro: per completare il profilo e ' +
+  'iniziare a ricevere proposte per i nostri eventi ti basta un clic.';
+
 // ---------------------------------------------------------------------------
 // SEND HELPER (unico punto di invio)
 // ---------------------------------------------------------------------------
@@ -38,8 +48,7 @@ function sendEmail_(to, subject, bodyHtml, bodyText) {
     GmailApp.sendEmail(to, EMAIL_CONFIG.SUBJECT_PREFIX + subject, bodyText || stripHtml_(bodyHtml), {
       htmlBody: bodyHtml,
       name:     EMAIL_CONFIG.FROM_NAME,
-      replyTo:  EMAIL_CONFIG.REPLY_TO,
-      from:     'madeeventssrls@gmail.com'
+      replyTo:  EMAIL_CONFIG.REPLY_TO
     });
 
     Logger.log('[GMAIL] Email inviata a: ' + to + ' | subject: ' + subject);
@@ -436,7 +445,7 @@ function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
 // TEMPLATE 11 — Sollecito completamento registrazione
 // ---------------------------------------------------------------------------
 
-function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
+function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti, apologyText) {
   var completatiHtml = completati.map(function(s) {
     return '<li style="margin:4px 0;font-size:13px;color:#2E7D32;">✓ ' + escapeHtml_(s) + '</li>';
   }).join('');
@@ -445,7 +454,12 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
     return '<li style="margin:4px 0;font-size:13px;color:#C62828;">— ' + escapeHtml_(s) + '</li>';
   }).join('');
 
+  var apologyHtml = apologyText
+    ? '<p style="margin:0 0 20px;padding:12px 16px;background:#FFF8E1;border-radius:6px;font-size:13px;color:#6B5B00;">' + escapeHtml_(apologyText) + '</p>'
+    : '';
+
   var body = [
+    apologyHtml,
     '<p style="margin:0 0 20px;">',
     'Stai completando la tua iscrizione a MADE EVENTS. Riprendi da dove ti eri fermata!',
     '</p>',
@@ -457,8 +471,24 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti) {
 
   var html = buildEmailTemplate('Hai lasciato la registrazione a metà', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-  var text = 'Ciao ' + nome + ',\n\nHai lasciato la registrazione incompleta.\nRiprendi qui: ' + completionUrl + '\n\nManca ancora: ' + mancanti.join(', ') + '\n\n— MADE EVENTS';
+  var text = (apologyText ? apologyText + '\n\n' : '') + 'Ciao ' + nome + ',\n\nHai lasciato la registrazione incompleta.\nRiprendi qui: ' + completionUrl + '\n\nManca ancora: ' + mancanti.join(', ') + '\n\n— MADE EVENTS';
   return sendEmail_(to, 'Completa la tua iscrizione — ' + (mancanti.length ? mancanti.length + ' sezioni mancanti' : 'quasi pronta!'), html, text);
+}
+
+// ---------------------------------------------------------------------------
+// QUOTA HELPER — usato da lead.importLegacy / lead.resetSolleciti per non
+// sforare il limite giornaliero GmailApp inviando un lotto troppo grande.
+// Non scende mai sotto un margine di 20 mail.
+// ---------------------------------------------------------------------------
+
+function checkEmailQuota_(desiredCount) {
+  var remaining = MailApp.getRemainingDailyQuota();
+  var sendable = Math.max(0, remaining - 20);
+  return {
+    remaining: remaining,
+    limit:     Math.min(desiredCount, sendable),
+    capped:    sendable < desiredCount
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -549,9 +579,9 @@ function sendConvocazioneEmail(to, nome, titoloEvento, dataEvento, luogoEvento, 
  * @param {string} nome       nome completo del talent
  * @param {object} eventData  dati evento (titolo, luogo, citta, compenso...)
  * @param {object} shiftData  dati turno (data, orario_inizio, orario_fine, ruolo, meeting_point...)
- * @param {string} portaleUrl URL completo dell'area riservata con token di accesso automatico
+ * @param {string} eventLink  URL diretto alla scheda evento (con token di accesso automatico se disponibile)
  */
-function sendApplicationApprovedEmail(to, nome, eventData, shiftData, portaleUrl) {
+function sendApplicationApprovedEmail(to, nome, eventData, shiftData, eventLink) {
   eventData = eventData || {};
   shiftData = shiftData || {};
   var dataFormatted   = formatDate_(shiftData.data);
@@ -568,6 +598,8 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, portaleUrl
     luogoFormatted ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">📍 ' + escapeHtml_(luogoFormatted) + '</p>' : '',
     '</div>',
 
+    '<p style="margin:0 0 16px;">Se sei disponibile, ti chiediamo di confermare la tua partecipazione accedendo alla piattaforma.</p>',
+
     (shiftData.ruolo || orarioFormatted || shiftData.meeting_point) ? (
       '<div style="background:#F5F5F5;border-radius:8px;padding:20px;margin:0 0 20px;">' +
       '<p style="margin:0 0 10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#6B6B6B;font-weight:bold;">Dettagli turno</p>' +
@@ -577,10 +609,10 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, portaleUrl
       '</div>'
     ) : '',
 
-    buildEmailButton_('Accedi alla tua area riservata', portaleUrl),
+    buildEmailButton_('CONFERMA LA TUA PARTECIPAZIONE', eventLink),
   ].join('');
 
-  var html = buildEmailTemplate('Sei stato selezionato! 🎉', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var html = buildEmailTemplate('Sei stato selezionato — conferma la tua disponibilità', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = [
     'Ciao ' + nome + ',',
@@ -590,12 +622,13 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, portaleUrl
     luogoFormatted ? 'Luogo: '  + luogoFormatted : '',
     orarioFormatted ? 'Orario: ' + orarioFormatted : '',
     '',
-    'Accedi alla tua area riservata: ' + portaleUrl,
+    'Se sei disponibile, ti chiediamo di confermare la tua partecipazione accedendo alla piattaforma.',
+    'Conferma la tua partecipazione: ' + eventLink,
     '',
     '— MADE EVENTS'
   ].filter(Boolean).join('\n');
 
-  return sendEmail_(to, 'Sei stato selezionato per ' + (eventData.titolo || 'un evento'), html, text);
+  return sendEmail_(to, 'Sei stato selezionato per ' + (eventData.titolo || 'un evento') + ' — conferma la tua disponibilità', html, text);
 }
 
 // ---------------------------------------------------------------------------

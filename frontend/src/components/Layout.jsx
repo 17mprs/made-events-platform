@@ -169,11 +169,13 @@ function NavLink({ to, children }) {
 
 export function Sidebar({ items, open }) {
   const location = useLocation()
+  const { role } = useAuth()
+  const visibleItems = items.filter(item => !item.roles || item.roles.includes(role))
 
   return (
     <aside className={`sidebar${open ? ' open' : ''}`}>
       <nav style={{ paddingLeft: 24 }}>
-        {items.map((item, i) => {
+        {visibleItems.map((item, i) => {
           if (item.type === 'section') {
             return (
               <div

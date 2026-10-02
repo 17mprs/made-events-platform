@@ -39,7 +39,8 @@ var STATE_TRANSITIONS = {
     PENDING:        ['APPROVED', 'REJECTED', 'WITHDRAWN', 'DOCS_REQUESTED'],
     DOCS_REQUESTED: ['DOCS_RECEIVED', 'REJECTED'],
     DOCS_RECEIVED:  ['APPROVED', 'REJECTED'],
-    // APPROVED, REJECTED, WITHDRAWN: terminali
+    APPROVED:       ['PENDING'], // annulla turno: revoca approvazione
+    // REJECTED, WITHDRAWN: terminali
   },
   ASSIGNMENT: {
     CONFIRMED:   ['CHECKED_IN',  'CANCELLED', 'NO_SHOW'],
@@ -134,11 +135,22 @@ function runSideEffects_(entityType, oldStatus, newStatus, entity, auth) {
     case 'APPLICATION:APPROVED':
       return sideEffect_ApplicationApproved_(entity, auth);
 
+    // APPLICATION APPROVED → PENDING (annulla turno) → cancella ASSIGNMENT collegato
+    case 'APPLICATION:PENDING':
+      if (oldStatus === ENTITY_STATUS.APPLICATION.APPROVED) {
+        return sideEffect_ApplicationRevoked_(entity, auth);
+      }
+      return null;
+
     // LEAD_TALENT APPROVED → crea USER + TALENT_PROFILE (delegato a SpecialActions)
     // Gestito direttamente in handleTalentApprove per avere accesso ai payload extra.
 
     // ASSIGNMENT CHECKED_OUT → calcola timesheet (fatto in SpecialActions.checkout)
     // Non serve qui perché checkout aggiorna già i dati prima di chiamare questa funzione.
+
+    // ASSIGNMENT CANCELLED → libera il posto, ricalcola SHIFT + EVENT saturazione
+    case 'ASSIGNMENT:CANCELLED':
+      return sideEffect_AssignmentCancelled_(entity, auth);
 
     default:
       return null; // nessun side effect per questa transizione
@@ -172,8 +184,15 @@ function sideEffect_ApplicationApproved_(application, auth) {
     reminder_2h_sent:   false
   }, auth.tenant_id, auth.user_id);
 
-  // Aggiorna posti_confermati sullo shift
-  checkShiftFullness_(appData.shift_id, auth.tenant_id);
+  // Aggiorna posti_confermati sullo shift. Candidatura diretta a evento
+  // (shift_id vuoto): checkShiftFullness_ non fa nulla senza uno shift,
+  // quindi ricalcola la saturazione dell'evento direttamente — altrimenti
+  // confirmed_count resta 0 per ogni nuova approvazione senza turno.
+  if (appData.shift_id) {
+    checkShiftFullness_(appData.shift_id, auth.tenant_id);
+  } else if (appData.event_id) {
+    checkEventSaturation_(appData.event_id, auth.tenant_id);
+  }
 
   // Log obbligatorio PRD: creazione assignment
   logAssignmentCreated(
@@ -189,19 +208,21 @@ function sideEffect_ApplicationApproved_(application, auth) {
       var shift = getEntityById(appData.shift_id, auth.tenant_id);
       var event = getEntityById(appData.event_id, auth.tenant_id);
       if (shift) {
-        var portaleUrl = getFrontendUrl() + '/portale';
+        var token = '';
         if (talentProfile.data.user_id) {
           var talentUser = getRowById('Users', talentProfile.data.user_id);
           if (talentUser) {
-            portaleUrl = getFrontendUrl() + '/portale?token=' + encodeURIComponent(generateToken_(talentUser));
+            token = generateToken_(talentUser);
           }
         }
+        var eventLink = getFrontendUrl() + '/portale' +
+          (token ? '?token=' + encodeURIComponent(token) : '');
         sendApplicationApprovedEmail(
           talentProfile.data.email_contatto,
           (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
           event ? event.data : {},
           shift.data,
-          portaleUrl
+          eventLink
         );
       }
     }
@@ -210,6 +231,40 @@ function sideEffect_ApplicationApproved_(application, auth) {
   }
 
   return successResponse({ assignment_id: assignment.entity_id });
+}
+
+// ---------------------------------------------------------------------------
+// SIDE EFFECT: APPLICATION REVOKED (annulla turno, APPROVED → PENDING)
+// ---------------------------------------------------------------------------
+
+function sideEffect_ApplicationRevoked_(application, auth) {
+  var appData = application.data;
+
+  var assignment = findAssignment_(appData.shift_id, appData.talent_profile_id, auth.tenant_id);
+  if (assignment) {
+    transitionEntityStatus('ASSIGNMENT', assignment, ENTITY_STATUS.ASSIGNMENT.CANCELLED, auth);
+  }
+
+  return successResponse({ application_id: application.entity_id });
+}
+
+// ---------------------------------------------------------------------------
+// SIDE EFFECT: ASSIGNMENT CANCELLED
+// ---------------------------------------------------------------------------
+
+function sideEffect_AssignmentCancelled_(assignment, auth) {
+  // Stesso gap di sideEffect_ApplicationApproved_: se l'ASSIGNMENT non ha
+  // shift_id (candidatura diretta a evento), checkShiftFullness_ non fa
+  // nulla — risali all'evento via application_id per ricalcolare comunque.
+  if (assignment.data.shift_id) {
+    checkShiftFullness_(assignment.data.shift_id, auth.tenant_id);
+  } else if (assignment.data.application_id) {
+    var app = getEntityById(assignment.data.application_id, auth.tenant_id);
+    if (app && app.data.event_id) {
+      checkEventSaturation_(app.data.event_id, auth.tenant_id);
+    }
+  }
+  return successResponse({ shift_id: assignment.data.shift_id });
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +314,64 @@ function checkShiftFullness_(shiftId, tenantId) {
       updateRow('Entities', shiftId, { status: ENTITY_STATUS.SHIFT.OPEN });
     }
   }
+
+  if (shift.data.event_id) {
+    checkEventSaturation_(shift.data.event_id, tenantId);
+  }
+}
+
+/**
+ * Ricalcola confirmed_count sull'EVENT: somma degli ASSIGNMENT attivi
+ * su tutti gli SHIFT dell'evento. Chiamata da checkShiftFullness_ per
+ * tenere sincronizzato il badge saturazione ("X/Y") nella card evento.
+ */
+function checkEventSaturation_(eventId, tenantId) {
+  var activeStatuses = [
+    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
+    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
+    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
+    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
+    ENTITY_STATUS.ASSIGNMENT.PAID
+  ];
+
+  var all = getAllRows('Entities');
+
+  var shiftIds = {};
+  for (var i = 0; i < all.length; i++) {
+    var s = all[i];
+    if (s.type !== 'SHIFT') continue;
+    if (String(s.tenant_id) !== String(tenantId)) continue;
+    if (String(s.deleted).toLowerCase() === 'true') continue;
+    var sd = parseJSON(s.data);
+    if (String(sd.event_id) === String(eventId)) shiftIds[s.entity_id] = true;
+  }
+
+  // Fallback: ASSIGNMENT con shift_id vuoto — risali via application_id
+  // all'APPLICATION per recuperare l'event_id (ASSIGNMENT.data non ha event_id).
+  var applicationIds = {};
+  for (var k = 0; k < all.length; k++) {
+    var p = all[k];
+    if (p.type !== 'APPLICATION') continue;
+    if (String(p.tenant_id) !== String(tenantId)) continue;
+    if (String(p.deleted).toLowerCase() === 'true') continue;
+    var pd = parseJSON(p.data);
+    if (String(pd.event_id) === String(eventId)) applicationIds[p.entity_id] = true;
+  }
+
+  var count = 0;
+  for (var j = 0; j < all.length; j++) {
+    var a = all[j];
+    if (a.type !== 'ASSIGNMENT') continue;
+    if (String(a.tenant_id) !== String(tenantId)) continue;
+    if (String(a.deleted).toLowerCase() === 'true') continue;
+    var ad = parseJSON(a.data);
+    if (!shiftIds[ad.shift_id]) {
+      if (!applicationIds[ad.application_id]) continue;
+    }
+    if (activeStatuses.indexOf(a.status) !== -1) count++;
+  }
+
+  updateEntityData(eventId, { confirmed_count: count }, tenantId, 'system');
 }
 
 // ---------------------------------------------------------------------------
@@ -489,6 +602,99 @@ function handleApplicationApprove(payload, auth) {
   }
 }
 
+/**
+ * "Annulla turno" — revoca una candidatura già APPROVATA e riporta il
+ * talent in IN_ATTESA (PENDING). Cancella l'ASSIGNMENT collegato e
+ * ricalcola saturazione SHIFT + EVENT (side effect APPLICATION:PENDING).
+ */
+function handleApplicationRevoke(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var application = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!application || application.type !== 'APPLICATION') {
+    return errorResponse('SYS_002', 'Candidatura non trovata');
+  }
+  if (application.status !== ENTITY_STATUS.APPLICATION.APPROVED) {
+    return errorResponse('WF_002',
+      'La candidatura deve essere APPROVED per essere annullata. Stato attuale: ' + application.status);
+  }
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    var freshApp = getEntityById(payload.entity_id, auth.tenant_id);
+    if (!isTransitionAllowed_('APPLICATION', freshApp.status, ENTITY_STATUS.APPLICATION.PENDING)) {
+      return errorResponse('WF_002', 'Transizione PENDING non consentita dallo stato: ' + freshApp.status);
+    }
+
+    return transitionEntityStatus('APPLICATION', freshApp, ENTITY_STATUS.APPLICATION.PENDING, auth);
+
+  } catch (e) {
+    return errorResponse('SYS_001', 'Impossibile acquisire lock: ' + e.message);
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+/**
+ * Assegna (o rimuove, con shift_id = '') il turno di una candidatura già
+ * APPROVATA — copre il caso "candidatura diretta a evento" dove shift_id
+ * è vuoto in fase di submit. Aggiorna anche l'ASSIGNMENT collegato e
+ * ricalcola saturazione SHIFT (vecchio+nuovo) + EVENT.
+ */
+function handleApplicationAssignShift(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var application = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!application || application.type !== 'APPLICATION') {
+    return errorResponse('SYS_002', 'Candidatura non trovata');
+  }
+  if (application.status !== ENTITY_STATUS.APPLICATION.APPROVED) {
+    return errorResponse('WF_002',
+      'La candidatura deve essere APPROVED per assegnare un turno. Stato attuale: ' + application.status);
+  }
+
+  var newShiftId = payload.shift_id || '';
+  if (newShiftId) {
+    var shift = getEntityById(newShiftId, auth.tenant_id);
+    if (!shift || shift.type !== 'SHIFT') {
+      return errorResponse('SYS_002', 'Turno non trovato');
+    }
+    if (String(shift.data.event_id) !== String(application.data.event_id)) {
+      return errorResponse('VAL_002', 'Il turno selezionato non appartiene a questo evento');
+    }
+  }
+
+  var oldShiftId = application.data.shift_id || '';
+
+  updateEntityData(application.entity_id, { shift_id: newShiftId }, auth.tenant_id, auth.user_id);
+
+  var assignment = findAssignmentByApplicationId_(application.entity_id, auth.tenant_id);
+  if (assignment) {
+    updateEntityData(assignment.entity_id, { shift_id: newShiftId }, auth.tenant_id, auth.user_id);
+  } else if (newShiftId) {
+    assignment = createEntity('ASSIGNMENT', ENTITY_STATUS.ASSIGNMENT.CONFIRMED, {
+      shift_id:           newShiftId,
+      talent_profile_id:  application.data.talent_profile_id,
+      application_id:     application.entity_id,
+      note_admin:         '',
+      checkin:            {},
+      checkout:           {},
+      timesheet:          {},
+      reminder_24h_sent:  false,
+      reminder_2h_sent:   false
+    }, auth.tenant_id, auth.user_id);
+  }
+
+  if (oldShiftId && oldShiftId !== newShiftId) checkShiftFullness_(oldShiftId, auth.tenant_id);
+  if (newShiftId) checkShiftFullness_(newShiftId, auth.tenant_id);
+
+  return successResponse({ application_id: application.entity_id, shift_id: newShiftId });
+}
+
 function handleApplicationReject(payload, auth) {
   var valid = requireFields(payload, ['entity_id']);
   if (valid) return valid;
@@ -662,6 +868,30 @@ function findAssignment_(shiftId, talentProfileId, tenantId) {
   return null;
 }
 
+function findAssignmentByApplicationId_(applicationId, tenantId) {
+  var all = getAllRows('Entities');
+  var activeStatuses = [
+    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
+    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
+    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
+    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
+    ENTITY_STATUS.ASSIGNMENT.PAID
+  ];
+  for (var i = 0; i < all.length; i++) {
+    var e = all[i];
+    if (e.type !== 'ASSIGNMENT') continue;
+    if (tenantId && String(e.tenant_id) !== String(tenantId)) continue;
+    if (String(e.deleted).toLowerCase() === 'true') continue;
+    if (activeStatuses.indexOf(e.status) === -1) continue;
+    var d = parseJSON(e.data);
+    if (String(d.application_id) === String(applicationId)) {
+      e.data = d;
+      return e;
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // BACKFILL — recupera i dati del questionario persi dai TALENT_PROFILE
 // approvati prima del fix del mapping LEAD → TALENT_PROFILE (BUG7).
@@ -732,6 +962,255 @@ function handleTalentBackfillFromLead(payload, auth) {
   return successResponse({
     dry_run: dryRun,
     profiles_updated: report.length,
+    details: report
+  });
+}
+
+// ---------------------------------------------------------------------------
+// BACKFILL — ricalcola confirmed_count sugli EVENT esistenti, creati prima
+// del fix saturazione evento (checkEventSaturation_ non esisteva ancora).
+// Azione admin 'event.backfillSaturation'. Default dry-run: passa
+// { dryRun: false } esplicitamente per scrivere davvero.
+// ---------------------------------------------------------------------------
+
+function handleEventBackfillSaturation(payload, auth) {
+  var dryRun = payload.dryRun !== false; // default true — serve dryRun:false esplicito per scrivere
+
+  var all = getAllRows('Entities');
+  var report = [];
+
+  for (var i = 0; i < all.length; i++) {
+    var e = all[i];
+    if (e.type !== 'EVENT') continue;
+    if (String(e.deleted).toLowerCase() === 'true') continue;
+    if (auth.tenant_id && String(e.tenant_id) !== String(auth.tenant_id)) continue;
+
+    var before = Number(parseJSON(e.data).confirmed_count) || 0;
+
+    if (!dryRun) {
+      checkEventSaturation_(e.entity_id, e.tenant_id);
+    }
+
+    var after = dryRun ? before : Number(parseJSON(getEntityById(e.entity_id, e.tenant_id).data).confirmed_count) || 0;
+
+    if (dryRun) {
+      // In dry-run non scriviamo: calcola cosa DIVENTEREBBE senza salvare,
+      // riusando la stessa logica di conteggio di checkEventSaturation_.
+      after = countActiveAssignmentsForEvent_(e.entity_id, e.tenant_id);
+    }
+
+    if (before !== after) {
+      report.push({ entity_id: e.entity_id, titolo: parseJSON(e.data).titolo || '', before: before, after: after });
+    }
+  }
+
+  return successResponse({
+    dry_run: dryRun,
+    events_changed: report.length,
+    details: report
+  });
+}
+
+// Stessa logica di conteggio di checkEventSaturation_, senza scrivere —
+// usata dal backfill in dry-run per mostrare cosa cambierebbe.
+function countActiveAssignmentsForEvent_(eventId, tenantId) {
+  var activeStatuses = [
+    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
+    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
+    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
+    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
+    ENTITY_STATUS.ASSIGNMENT.PAID
+  ];
+
+  var all = getAllRows('Entities');
+
+  var shiftIds = {};
+  for (var i = 0; i < all.length; i++) {
+    var s = all[i];
+    if (s.type !== 'SHIFT') continue;
+    if (String(s.tenant_id) !== String(tenantId)) continue;
+    if (String(s.deleted).toLowerCase() === 'true') continue;
+    var sd = parseJSON(s.data);
+    if (String(sd.event_id) === String(eventId)) shiftIds[s.entity_id] = true;
+  }
+
+  var count = 0;
+  for (var j = 0; j < all.length; j++) {
+    var a = all[j];
+    if (a.type !== 'ASSIGNMENT') continue;
+    if (String(a.tenant_id) !== String(tenantId)) continue;
+    if (String(a.deleted).toLowerCase() === 'true') continue;
+    var ad = parseJSON(a.data);
+    if (!shiftIds[ad.shift_id]) continue;
+    if (activeStatuses.indexOf(a.status) !== -1) count++;
+  }
+
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// BACKFILL — crea gli ASSIGNMENT mancanti per APPLICATION già APPROVED,
+// approvate prima che sideEffect_ApplicationApproved_ creasse sempre un
+// ASSIGNMENT (root cause saturazione bloccata a 0 per candidature vecchie).
+// Azione admin 'event.backfillMissingAssignments'. Default dry-run: passa
+// { dryRun: false } esplicitamente per scrivere davvero.
+// ---------------------------------------------------------------------------
+
+function handleEventBackfillMissingAssignments(payload, auth) {
+  var dryRun = payload.dryRun !== false; // default true — serve dryRun:false esplicito per scrivere
+
+  var all = getAllRows('Entities');
+  var report = [];
+  var touchedEvents = {};
+
+  for (var i = 0; i < all.length; i++) {
+    var app = all[i];
+    if (app.type !== 'APPLICATION') continue;
+    if (app.status !== ENTITY_STATUS.APPLICATION.APPROVED) continue;
+    if (String(app.deleted).toLowerCase() === 'true') continue;
+    if (auth.tenant_id && String(app.tenant_id) !== String(auth.tenant_id)) continue;
+
+    var appData = parseJSON(app.data);
+    var existing = findAssignmentByApplicationId_(app.entity_id, app.tenant_id);
+    if (existing) continue; // già a posto, non è nel gap
+
+    report.push({
+      application_id:     app.entity_id,
+      event_id:            appData.event_id || '',
+      talent_profile_id:   appData.talent_profile_id || '',
+      shift_id:            appData.shift_id || ''
+    });
+
+    if (!dryRun) {
+      var assignment = createEntity('ASSIGNMENT', ENTITY_STATUS.ASSIGNMENT.CONFIRMED, {
+        shift_id:           appData.shift_id || '',
+        talent_profile_id:  appData.talent_profile_id,
+        application_id:     app.entity_id,
+        note_admin:         '',
+        checkin:            {},
+        checkout:           {},
+        timesheet:          {},
+        reminder_24h_sent:  false,
+        reminder_2h_sent:   false
+      }, app.tenant_id, auth.user_id);
+
+      report[report.length - 1].assignment_id = assignment.entity_id;
+
+      if (appData.shift_id) {
+        checkShiftFullness_(appData.shift_id, app.tenant_id); // cascata anche a checkEventSaturation_
+      } else if (appData.event_id) {
+        touchedEvents[appData.event_id + '::' + app.tenant_id] = true;
+      }
+    }
+  }
+
+  if (!dryRun) {
+    for (var key in touchedEvents) {
+      var parts = key.split('::');
+      checkEventSaturation_(parts[0], parts[1]);
+    }
+  }
+
+  return successResponse({
+    dry_run: dryRun,
+    assignments_created: dryRun ? 0 : report.length,
+    gaps_found: report.length,
+    details: report
+  });
+}
+
+// ---------------------------------------------------------------------------
+// BACKFILL — assegna shift_id agli ASSIGNMENT che ne sono privi (candidature
+// dirette a evento, mai passate da uno SHIFT). Risolve l'evento via
+// application_id → APPLICATION.data.event_id, poi sceglie il primo SHIFT
+// dell'evento con posti disponibili (fallback: il primo in assoluto).
+// NOTA: APPLICATION/ASSIGNMENT non hanno un campo ruolo — non esiste dato
+// su cui fare un vero match "tipo ruolo compatibile", quindi il criterio
+// si riduce a disponibilità posti sul turno.
+// Azione admin 'event.backfillAssignmentShiftIds'. Default dry-run: passa
+// { dryRun: false } esplicitamente per scrivere davvero.
+// ---------------------------------------------------------------------------
+
+function handleEventBackfillAssignmentShiftIds(payload, auth) {
+  var dryRun = payload.dryRun !== false; // default true — serve dryRun:false esplicito per scrivere
+
+  var all = getAllRows('Entities');
+  var report = [];
+  var touchedEvents = {};
+
+  var applicationsById = {};
+  for (var i = 0; i < all.length; i++) {
+    var p = all[i];
+    if (p.type !== 'APPLICATION') continue;
+    if (String(p.deleted).toLowerCase() === 'true') continue;
+    applicationsById[p.entity_id] = p;
+  }
+
+  var shiftsByEvent = {};
+  for (var j = 0; j < all.length; j++) {
+    var s = all[j];
+    if (s.type !== 'SHIFT') continue;
+    if (String(s.deleted).toLowerCase() === 'true') continue;
+    var sd = parseJSON(s.data);
+    if (!sd.event_id) continue;
+    var key = sd.event_id + '::' + s.tenant_id;
+    if (!shiftsByEvent[key]) shiftsByEvent[key] = [];
+    shiftsByEvent[key].push({ entity_id: s.entity_id, data: sd });
+  }
+
+  for (var k = 0; k < all.length; k++) {
+    var a = all[k];
+    if (a.type !== 'ASSIGNMENT') continue;
+    if (String(a.deleted).toLowerCase() === 'true') continue;
+    if (auth.tenant_id && String(a.tenant_id) !== String(auth.tenant_id)) continue;
+
+    var ad = parseJSON(a.data);
+    if (ad.shift_id) continue; // già valorizzato, non è nel gap
+
+    var app = applicationsById[ad.application_id];
+    if (!app) continue; // nessuna APPLICATION collegata, non risolvibile
+    var appData = parseJSON(app.data);
+    if (!appData.event_id) continue; // nessun event_id risolvibile
+
+    var candidates = shiftsByEvent[appData.event_id + '::' + a.tenant_id] || [];
+    if (candidates.length === 0) continue; // nessun turno per l'evento
+
+    var chosen = null;
+    for (var m = 0; m < candidates.length; m++) {
+      var c = candidates[m];
+      var postiDisp = Number(c.data.posti_disponibili) || 0;
+      var postiConf = Number(c.data.posti_confermati) || 0;
+      if (postiConf < postiDisp) { chosen = c; break; }
+    }
+    if (!chosen) chosen = candidates[0];
+
+    report.push({
+      assignment_id:      a.entity_id,
+      application_id:     ad.application_id,
+      event_id:            appData.event_id,
+      shift_id_assegnato:  chosen.entity_id
+    });
+
+    if (!dryRun) {
+      updateEntityData(a.entity_id, { shift_id: chosen.entity_id }, a.tenant_id, 'system');
+      logError_('WORKFLOWS', 'event.backfillAssignmentShiftIds',
+        'backfill assignment_id=' + a.entity_id + ' | shift_id_assegnato=' + chosen.entity_id,
+        '', 'system', a.tenant_id);
+      touchedEvents[appData.event_id + '::' + a.tenant_id] = true;
+    }
+  }
+
+  if (!dryRun) {
+    for (var key2 in touchedEvents) {
+      var parts = key2.split('::');
+      checkEventSaturation_(parts[0], parts[1]);
+    }
+  }
+
+  return successResponse({
+    dry_run: dryRun,
+    assignments_updated: dryRun ? 0 : report.length,
+    gaps_found: report.length,
     details: report
   });
 }

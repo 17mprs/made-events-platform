@@ -1062,3 +1062,128 @@ function findClienteCompany_(userId, tenantId) {
   }
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// DEBUG TOOLS — solo SUPER_ADMIN (pagina /admin/debug). Niente masking:
+// dump raw per diagnosi, non da esporre a ruoli inferiori.
+// ---------------------------------------------------------------------------
+
+/**
+ * Cerca un TALENT_PROFILE tramite l'email dell'utente collegato (Users.email
+ * → user_id → findTalentProfileByUserId_), con fallback su un eventuale
+ * campo email diretto nel profilo (non tutti i profili lo popolano).
+ */
+function findTalentProfileByEmail_(email, tenantId) {
+  var emailLower = String(email || '').toLowerCase().trim();
+  if (!emailLower) return null;
+
+  var users = getAllRows('Users');
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].email).toLowerCase().trim() === emailLower) {
+      var byUser = findTalentProfileByUserId_(users[i].user_id, tenantId);
+      if (byUser) return byUser;
+      break;
+    }
+  }
+
+  var all = getAllRows('Entities');
+  for (var j = 0; j < all.length; j++) {
+    var e = all[j];
+    if (e.type !== 'TALENT_PROFILE') continue;
+    if (tenantId && String(e.tenant_id) !== String(tenantId)) continue;
+    var d = parseJSON(e.data);
+    if (String(d.email || '').toLowerCase().trim() === emailLower) {
+      e.data = d;
+      return e;
+    }
+  }
+  return null;
+}
+
+function handleDebugMatchBreakdown(payload, auth) {
+  if (!auth || auth.role !== ROLES.SUPER_ADMIN) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+  if (!payload.event_id) {
+    return errorResponse('VAL_001', 'Campo obbligatorio mancante: event_id');
+  }
+  if (!payload.talent_profile_id && !payload.email) {
+    return errorResponse('VAL_001', 'Serve talent_profile_id oppure email');
+  }
+
+  var evento = getEntityById(payload.event_id, auth.tenant_id);
+  if (!evento || evento.type !== 'EVENT') {
+    return errorResponse('SYS_002', 'Evento non trovato', 'event_id');
+  }
+
+  var talent = null;
+  if (payload.talent_profile_id) {
+    talent = getEntityById(payload.talent_profile_id, auth.tenant_id);
+    if (talent && talent.type !== 'TALENT_PROFILE') talent = null;
+    if (!talent) return errorResponse('SYS_002', 'Talent non trovato per talent_profile_id', 'talent_profile_id');
+  } else {
+    talent = findTalentProfileByEmail_(payload.email, auth.tenant_id);
+    if (!talent) return errorResponse('SYS_002', 'Nessun TALENT_PROFILE risolvibile per questa email (né via Users.email→user_id, né via campo email diretto sul profilo)', 'email');
+  }
+
+  var breakdown = calculateEventMatchBreakdown(evento, talent);
+  var legacyScore = calculateEventMatch(evento, talent);
+
+  return successResponse({
+    event: { entity_id: evento.entity_id, titolo: evento.data.titolo || '', data: evento.data },
+    talent: { entity_id: talent.entity_id, nome: talent.data.nome || '', cognome: talent.data.cognome || '', data: talent.data },
+    breakdown: breakdown,
+    consistent: breakdown.percentage === legacyScore
+  });
+}
+
+function handleDebugInspectEntity(payload, auth) {
+  if (!auth || auth.role !== ROLES.SUPER_ADMIN) {
+    return errorResponse('AUTH_003', 'Permesso negato');
+  }
+
+  var results = [];
+  var queryDescription = '';
+
+  if (payload.entity_id) {
+    queryDescription = 'entity_id=' + payload.entity_id;
+    var rows = queryRows('Entities', { entity_id: payload.entity_id }, true);
+    results = rows;
+  } else if (payload.type) {
+    queryDescription = 'type=' + payload.type + (payload.field ? (' ' + payload.field + '=' + payload.value) : '');
+    var candidates = queryRows('Entities', { type: payload.type }, true);
+    var limit = Math.min(parseInt(payload.limit) || 50, 50);
+    for (var i = 0; i < candidates.length && results.length < limit; i++) {
+      var c = candidates[i];
+      if (payload.field) {
+        var d = parseJSON(c.data);
+        if (String(d[payload.field]) !== String(payload.value)) continue;
+      }
+      results.push(c);
+    }
+  } else {
+    return errorResponse('VAL_001', 'Serve entity_id oppure type (+ field/value opzionali)');
+  }
+
+  var items = results.map(function(r) {
+    return {
+      entity_id:  r.entity_id,
+      tenant_id:  r.tenant_id,
+      type:       r.type,
+      status:     r.status,
+      data:       parseJSON(r.data),
+      created_by: r.created_by,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      deleted:    String(r.deleted).toLowerCase() === 'true'
+    };
+  });
+
+  logActivity({
+    level: 'INFO', module: 'DEBUG_TOOL', action: 'debug.inspectEntity',
+    user_id: auth.user_id, tenant_id: auth.tenant_id,
+    note: 'query=' + queryDescription + ' | risultati=' + items.length
+  });
+
+  return successResponse({ items: items, total: items.length });
+}
