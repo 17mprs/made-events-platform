@@ -258,3 +258,86 @@ function handleLogView(payload, auth) {
 
   return successResponse(paginateResults(rows, payload.page, payload.limit));
 }
+
+// ---------------------------------------------------------------------------
+// AUDIT LOGIN BLOCCATI — SOLA LETTURA (eseguire dall'editor GAS)
+// Nessuna scrittura, nessuna mail. Output nel Log di esecuzione.
+// ---------------------------------------------------------------------------
+
+/**
+ * Analisi pura (testabile): events = [{ts:Number, type:String, email:String}],
+ * userEmails = set {email:true}. Ritorna { stuck[], top[], noUser{events,emails} }.
+ * "Bloccato" = >=3 LOGIN_FAILED consecutivi dopo l'ultimo LOGIN riuscito (o senza alcun LOGIN).
+ */
+function analyzeLoginFailures_(events, userEmails) {
+  var by = {};
+  events.forEach(function(e) {
+    if (!e.email) return;
+    (by[e.email] = by[e.email] || []).push(e);
+  });
+  var stuck = [], all = [];
+  var noUserEvents = 0, noUserEmails = 0;
+  Object.keys(by).forEach(function(email) {
+    var evs = by[email].sort(function(a, b) { return a.ts - b.ts; });
+    var totalFail = 0, sinceLogin = 0, lastAttempt = 0, hadLogin = false;
+    evs.forEach(function(e) {
+      if (e.type === 'LOGIN') { sinceLogin = 0; hadLogin = true; }
+      else if (e.type === 'LOGIN_FAILED') { totalFail++; sinceLogin++; lastAttempt = e.ts; }
+    });
+    if (!totalFail) return;
+    var exists = !!userEmails[email];
+    all.push({ email: email, fails: totalFail, user: exists });
+    if (!exists) { noUserEvents += totalFail; noUserEmails++; }
+    if (sinceLogin >= 3) stuck.push({ email: email, fails: sinceLogin, lastAttempt: lastAttempt, user: exists, hadLogin: hadLogin });
+  });
+  stuck.sort(function(a, b) { return b.fails - a.fails; });
+  all.sort(function(a, b) { return b.fails - a.fails; });
+  return { stuck: stuck, top: all.slice(0, 10), noUser: { events: noUserEvents, emails: noUserEmails }, totalEmails: all.length };
+}
+
+function auditStuckLogins() {
+  var sheet = getSheet('AccessLog');
+  var vals = sheet.getDataRange().getValues();
+  if (vals.length < 2) { Logger.log('AccessLog vuoto'); return; }
+  var h = vals[0].map(function(x) { return String(x).trim(); });
+  var cTs = h.indexOf('timestamp'), cType = h.indexOf('event_type'), cEmail = h.indexOf('email');
+
+  var events = [];
+  for (var i = 1; i < vals.length; i++) {
+    var t = vals[i][cType];
+    if (t !== 'LOGIN' && t !== 'LOGIN_FAILED') continue;
+    var ts = vals[i][cTs] instanceof Date ? vals[i][cTs].getTime() : new Date(vals[i][cTs]).getTime();
+    events.push({ ts: isNaN(ts) ? 0 : ts, type: t, email: String(vals[i][cEmail] || '').toLowerCase().trim() });
+  }
+
+  var users = getAllRows('Users');
+  var userByEmail = {};
+  users.forEach(function(u) { userByEmail[String(u.email).toLowerCase().trim()] = u; });
+  var profByEmail = {};
+  getAllRows('Entities').forEach(function(r) {
+    if (r.type !== 'TALENT_PROFILE') return;
+    var d = parseJSON(r.data) || {};
+    var em = String(d.email || d.email_contatto || '').toLowerCase().trim();
+    if (em) profByEmail[em] = { status: r.status, credentials_sent: d.credentials_sent };
+  });
+
+  var res = analyzeLoginFailures_(events, userByEmail);
+  var fmt = function(ts) { return ts ? Utilities.formatDate(new Date(ts), 'Europe/Rome', 'yyyy-MM-dd HH:mm') : ''; };
+
+  Logger.log('=== AUDIT LOGIN — righe AccessLog: ' + (vals.length - 1) + ' | eventi LOGIN/LOGIN_FAILED: ' + events.length +
+    ' | prima riga: ' + fmt(events.length ? Math.min.apply(null, events.map(function(e) { return e.ts; })) : 0) + ' ===');
+
+  Logger.log('--- 1) Email con >=3 LOGIN_FAILED e nessun LOGIN riuscito dopo: ' + res.stuck.length);
+  Logger.log('email | fallimenti | ultimo tentativo | USER esiste | status USER | profilo | credentials_sent | già loggato in passato');
+  res.stuck.forEach(function(s) {
+    var u = userByEmail[s.email], p = profByEmail[s.email];
+    Logger.log([s.email, s.fails, fmt(s.lastAttempt), s.user ? 'sì' : 'NO', u ? u.status : '-',
+      p ? p.status : '-', p ? (p.credentials_sent === undefined ? 'n/d' : p.credentials_sent) : '-', s.hadLogin ? 'sì' : 'mai'].join(' | '));
+  });
+
+  Logger.log('--- 2) Prime 10 email per fallimenti totali');
+  res.top.forEach(function(t) { Logger.log(t.fails + '  ' + t.email + (t.user ? '' : '  (senza USER)')); });
+
+  Logger.log('--- 3) LOGIN_FAILED su email SENZA USER (digitazione errata o scan): ' + res.noUser.events +
+    ' eventi su ' + res.noUser.emails + ' email distinte (su ' + res.totalEmails + ' email con almeno un fallimento)');
+}
