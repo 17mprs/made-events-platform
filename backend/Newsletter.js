@@ -261,7 +261,7 @@ function jobNewsletterTier1() {
           email:      d.email,
           lead_token: d.lead_token || '',
         });
-        if (sendEmail_(d.email, 'Nuove opportunità di lavoro — Completa il tuo profilo', html)) {
+        if (sendEmail_(d.email, 'Nuove opportunità di lavoro — Completa il tuo profilo', html).ok) {
           stats.sent++;
         }
       } catch (e) {
@@ -322,7 +322,7 @@ function jobNewsletterTier2() {
           email:     d.email,
           entity_id: lead.entity_id,
         });
-        if (sendEmail_(d.email, 'Nuove opportunità di lavoro — Made Events', html)) {
+        if (sendEmail_(d.email, 'Nuove opportunità di lavoro — Made Events', html).ok) {
           stats.sent++;
         }
       } catch (e) {
@@ -433,7 +433,7 @@ function handleNewsletterSendTier1ToOne(payload) {
     email:      lead.data.email,
     lead_token: lead.data.lead_token || ''
   });
-  var ok = sendEmail_(lead.data.email, 'Nuove opportunità di lavoro — Completa il tuo profilo', html);
+  var ok = sendEmail_(lead.data.email, 'Nuove opportunità di lavoro — Completa il tuo profilo', html).ok;
   if (!ok) return errorResponse('SYS_001', 'Invio email fallito');
 
   return successResponse({ sent: true, to: lead.data.email });
@@ -458,7 +458,7 @@ function handleNewsletterSendTier2ToOne(payload) {
     email:     lead.data.email,
     entity_id: lead.entity_id
   });
-  var ok = sendEmail_(lead.data.email, 'Nuove opportunità di lavoro — Made Events', html);
+  var ok = sendEmail_(lead.data.email, 'Nuove opportunità di lavoro — Made Events', html).ok;
   if (!ok) return errorResponse('SYS_001', 'Invio email fallito');
 
   return successResponse({ sent: true, to: lead.data.email });

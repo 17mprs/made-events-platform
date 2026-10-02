@@ -67,7 +67,9 @@ var SHEET_HEADERS = {
   ],
   ErrorLog: [
     'error_id', 'timestamp', 'level', 'module', 'message',
-    'stack', 'user_id', 'tenant_id', 'action'
+    'stack', 'user_id', 'tenant_id', 'action',
+    'severity', 'entity_type', 'entity_id', 'actor', 'input',
+    'deployment_id', 'fingerprint', 'alert_sent', 'alert_sent_at'
   ],
   DeployLog: [
     'deploy_id', 'timestamp', 'version', 'note', 'deployed_by'

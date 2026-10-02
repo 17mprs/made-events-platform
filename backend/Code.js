@@ -124,6 +124,7 @@ function handleRequest(action, payload, token) {
     // TALENT
     case 'talent.approve':           return handleTalentApprove(payload, auth);
     case 'talent.reject':            return handleTalentReject(payload, auth);
+    case 'talent.resendCredentials': return handleTalentResendCredentials(payload, auth);
     case 'talent.list':              return handleTalentList(payload, auth);
     case 'talent.get':               return handleTalentGet(payload, auth);
     case 'talent.updateProfile':     return handleTalentUpdateProfile(payload, auth);
@@ -275,20 +276,116 @@ function jsonResponse_(obj) {
 // ERROR LOG HELPER (usato dal router e dai moduli)
 // ---------------------------------------------------------------------------
 
-function logError_(module, action, message, stack, userId, tenantId) {
+// Colonne aggiunte in fondo a ErrorLog (le 9 originali restano intatte).
+var ERRORLOG_EXTRA_COLUMNS = [
+  'severity', 'entity_type', 'entity_id', 'actor', 'input',
+  'deployment_id', 'fingerprint', 'alert_sent', 'alert_sent_at'
+];
+
+var DEPLOYMENT_ID = 'AKfycbywK-f8EOav2gS7MKNlLRT38eVe9h4SH827Zv91kFp7l0A4LEg2s13IJXwvwNns_UKA-g';
+
+/**
+ * Punto unico di scrittura errori. Due forme:
+ *   logError_({ severity, module, action, entity_type, entity_id, actor,
+ *               message, stack, input, user_id, tenant_id })      // preferita
+ *   logError_(module, action, message, stack, userId, tenantId)   // legacy (severity ERROR)
+ * severity: INFO | WARN | ERROR. Solo ERROR genera alert (alert_sent=FALSE).
+ * Non lancia mai: un fallimento del log non deve rompere il flusso chiamante.
+ */
+function logError_(ctxOrModule, action, message, stack, userId, tenantId) {
   try {
+    var ctx = (ctxOrModule && typeof ctxOrModule === 'object')
+      ? ctxOrModule
+      : { module: ctxOrModule, action: action, message: message, stack: stack, user_id: userId, tenant_id: tenantId };
+
+    var severity = String(ctx.severity || 'ERROR').toUpperCase();
+    if (severity !== 'INFO' && severity !== 'WARN' && severity !== 'ERROR') severity = 'ERROR';
+    var msg = String(ctx.message || '');
+    var act = String(ctx.action || '');
+    var actor = ctx.actor || ctx.user_id || '';
+
+    ensureErrorLogColumns_();
     appendRow_('ErrorLog', {
-      error_id:  Utilities.getUuid(),
-      timestamp: new Date(),
-      level:     'ERROR',
-      module:    module || '',
-      message:   message || '',
-      stack:     (stack || '').substring(0, 500),
-      user_id:   userId  || '',
-      tenant_id: tenantId || '',
-      action:    action  || ''
+      error_id:      Utilities.getUuid(),
+      timestamp:     new Date(),
+      level:         severity,
+      module:        ctx.module || '',
+      message:       msg.substring(0, 2000),
+      stack:         String(ctx.stack || '').substring(0, 4000),
+      user_id:       ctx.user_id || actor || '',
+      tenant_id:     ctx.tenant_id || '',
+      action:        act,
+      severity:      severity,
+      entity_type:   ctx.entity_type || '',
+      entity_id:     ctx.entity_id || '',
+      actor:         actor,
+      input:         ctx.input !== undefined ? sanitizeForLog_(ctx.input) : '',
+      deployment_id: DEPLOYMENT_ID,
+      fingerprint:   errorFingerprint_(act, msg),
+      alert_sent:    severity === 'ERROR' ? false : '',
+      alert_sent_at: ''
     });
   } catch (e) {
     Logger.log('ErrorLog write failed: ' + e.message);
+  }
+}
+
+/** Aggiunge in fondo a ErrorLog le colonne mancanti (idempotente, cache per esecuzione). */
+var _errorLogColsOk = false;
+function ensureErrorLogColumns_() {
+  if (_errorLogColsOk) return;
+  var sheet = getSheet('ErrorLog');
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+  var missing = ERRORLOG_EXTRA_COLUMNS.filter(function(c) { return headers.indexOf(c) === -1; });
+  if (missing.length) {
+    sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]);
+  }
+  _errorLogColsOk = true;
+}
+
+/** Hash stabile action+messaggio (uuid/numeri normalizzati) per dedup alert. */
+function errorFingerprint_(action, message) {
+  var norm = String(message || '')
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>')
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>')
+    .replace(/\d+/g, '#')
+    .substring(0, 200);
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(action || '') + '|' + norm);
+  return digest.map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('').substring(0, 12);
+}
+
+/** Maschera un indirizzo email per i log: m***@gmail.com */
+function maskEmail_(email) {
+  var s = String(email || '');
+  var at = s.indexOf('@');
+  if (at < 1) return s ? '***' : '';
+  return s.charAt(0) + '***' + s.substring(at);
+}
+
+/**
+ * Serializza un input per il log SENZA PII/segreti: chiavi sensibili oscurate,
+ * email mascherate, stringhe troncate, profondità limitata.
+ */
+function sanitizeForLog_(value) {
+  var SENSITIVE = /pass|pwd|token|secret|hash|authorization|cookie|iban|codice_fiscale|\bcf\b|email|mail|telefono|phone|cellulare|nome|cognome|indirizzo|file_base64|data_nascita/i;
+  function walk(v, depth) {
+    if (v === null || v === undefined) return v;
+    if (typeof v === 'string') {
+      return v.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, function(m) { return maskEmail_(m); }).substring(0, 200);
+    }
+    if (typeof v !== 'object') return v;
+    if (depth >= 3) return '[...]';
+    if (Array.isArray(v)) return v.slice(0, 10).map(function(x) { return walk(x, depth + 1); });
+    var out = {};
+    Object.keys(v).slice(0, 30).forEach(function(k) {
+      out[k] = SENSITIVE.test(k) ? '[redacted]' : walk(v[k], depth + 1);
+    });
+    return out;
+  }
+  try {
+    return JSON.stringify(walk(value, 0)).substring(0, 1000);
+  } catch (e) {
+    return '[unserializable]';
   }
 }

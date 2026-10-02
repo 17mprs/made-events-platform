@@ -473,7 +473,9 @@ function handleGetLead(payload) {
     // Aggiorna ultimo_accesso
     try {
       updateEntityData(e.entity_id, { ultimo_accesso: new Date().toISOString() }, null, null);
-    } catch (err) {}
+    } catch (err) {
+      logError_({ severity: 'WARN', module: 'REGISTRATION_FLOW', action: 'talent.getLead.ultimoAccesso', entity_type: 'LEAD_TALENT', entity_id: e.entity_id, message: 'Aggiornamento ultimo_accesso fallito: ' + err.message, stack: err.stack });
+    }
 
     // Restituisce i campi del form salvati (no dati sensibili come lead_token, password, ecc.)
     var savedData = {};

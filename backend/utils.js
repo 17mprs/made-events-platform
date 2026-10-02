@@ -26,6 +26,7 @@ var PERMISSION_MATRIX = {
   'talent.registerStep3': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'Y', CLIENTE:'N' },
   'talent.approve':       { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'talent.reject':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'talent.resendCredentials': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'talent.list':          { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
   'talent.get':           { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
   'talent.updateProfile': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },

@@ -528,5 +528,5 @@ function sendPasswordResetEmail_(email, token) {
     'Clicca il link per impostare una nuova password (valido 1 ora):\n\n' +
     resetUrl + '\n\n' +
     'Se non hai richiesto il recupero password, ignora questa email.';
-  sendEmail_(email, 'Recupera la tua password - MADE EVENTS', html, text);
+  return sendEmail_(email, 'Recupera la tua password - MADE EVENTS', html, text, { mailType: 'PASSWORD_RESET', priority: true });
 }

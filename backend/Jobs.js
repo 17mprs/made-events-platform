@@ -84,7 +84,24 @@ function setupAllTriggers() {
     .atHour(10)
     .create();
 
+  // credentialsWatchdog: ogni ora
+  ScriptApp.newTrigger('jobCheckMissingCredentials')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
   Logger.log('[JOBS] Tutti i trigger installati correttamente.');
+}
+
+/**
+ * Installa SOLO il watchdog credenziali (ogni ora), senza toccare gli altri trigger.
+ */
+function setupCredentialsWatchdogTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'jobCheckMissingCredentials') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('jobCheckMissingCredentials').timeBased().everyHours(1).create();
+  Logger.log('[JOBS] Trigger jobCheckMissingCredentials (ogni ora) installato.');
 }
 
 /**
@@ -351,7 +368,9 @@ function jobDocumentExpiry() {
                 if (data.email_contatto) {
                   sendDocumentExpiryEmail(data.email_contatto, data.nome || '', tipo, 0);
                 }
-              } catch (e) {}
+              } catch (e) {
+                logError_({ severity: 'ERROR', module: 'JOBS', action: 'jobDocumentExpiry.notify', entity_type: 'TALENT_PROFILE', entity_id: p.entity_id, message: 'Notifica documento scaduto fallita: ' + e.message, stack: e.stack, actor: 'system' });
+              }
 
             } else if (giorniMancanti >= 0 && giorniMancanti <= 30 && doc.status !== 'expiring_soon') {
               // Documento in scadenza entro 30 giorni
@@ -364,7 +383,9 @@ function jobDocumentExpiry() {
                 if (data.email_contatto) {
                   sendDocumentExpiryEmail(data.email_contatto, data.nome || '', tipo, giorniMancanti);
                 }
-              } catch (e) {}
+              } catch (e) {
+                logError_({ severity: 'ERROR', module: 'JOBS', action: 'jobDocumentExpiry.notify', entity_type: 'TALENT_PROFILE', entity_id: p.entity_id, message: 'Notifica documento in scadenza fallita: ' + e.message, stack: e.stack, actor: 'system' });
+              }
             }
           }
 
@@ -439,7 +460,7 @@ function sendBirthdateReminderEmails() {
           ].join('');
           var html = buildEmailTemplate('Completa il tuo profilo', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-          var ok = sendEmail_(email, 'Completa il tuo profilo MADE EVENTS — data di nascita mancante', html);
+          var ok = sendEmail_(email, 'Completa il tuo profilo MADE EVENTS — data di nascita mancante', html).ok;
           if (ok) {
             updateEntityData(p.entity_id, { data_nascita_reminder_sent_at: new Date().toISOString() }, tenantId, 'system');
             stats.sent++;
@@ -530,7 +551,7 @@ function sendPhotoReuploadRequest() {
           ].join('');
           var html = buildEmailTemplate('Aggiorna le tue foto', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-          var ok = sendEmail_(email, 'Aggiorna le tue foto su MADE EVENTS — nuovo sistema di ritaglio', html);
+          var ok = sendEmail_(email, 'Aggiorna le tue foto su MADE EVENTS — nuovo sistema di ritaglio', html).ok;
           if (ok) {
             updateEntityData(p.entity_id, { foto_reupload_requested_at: new Date().toISOString() }, tenantId, 'system');
             stats.sent++;
@@ -602,7 +623,9 @@ function jobDailyMaintenance() {
       stats.errorsLast24h = errorRows.filter(function(r) {
         return r.timestamp && new Date(r.timestamp) > yesterday;
       }).length;
-    } catch (e) {}
+    } catch (e) {
+      logError_({ severity: 'WARN', module: 'JOBS', action: 'daily.maintenance.errorCount', message: 'Conteggio ErrorLog 24h fallito: ' + e.message, stack: e.stack, actor: 'system' });
+    }
 
     // Log riepilogo nel DeployLog (usato come sistema log)
     logActivity({
@@ -858,7 +881,9 @@ function logJobError_(jobName, err) {
           }
         );
       }
-    } catch (e) {}
+    } catch (e) {
+      logError_({ severity: 'ERROR', module: 'JOBS', action: 'job.alertAdmin', message: 'Alert admin job "' + jobName + '" fallito: ' + e.message, stack: e.stack, actor: 'system' });
+    }
     props.setProperty(key, '0'); // reset dopo alert
   }
 }
@@ -912,4 +937,113 @@ function getAdminEmailGlobal_() {
     if (u.role === ROLES.SUPER_ADMIN) return u.email;
   }
   return null;
+}
+
+
+// ---------------------------------------------------------------------------
+// WATCHDOG CREDENZIALI (ogni ora)
+// TALENT_PROFILE APPROVED con credentials_sent === false da oltre 30 minuti:
+// rigenera la password temporanea e ritenta l'invio. Dopo 1 invio iniziale +
+// 3 retry falliti scrive UN errore ERROR (credentials_escalated) e smette.
+// Agisce SOLO su credentials_sent === false esplicito: i profili storici senza
+// il flag non vengono toccati (si recuperano a mano con "Reinvia accesso").
+// ---------------------------------------------------------------------------
+
+var CREDENTIALS_WATCHDOG_MIN_AGE_MS = 30 * 60 * 1000;
+var CREDENTIALS_WATCHDOG_MAX_RETRIES = 3;
+var CREDENTIALS_WATCHDOG_BATCH = 10;
+
+function jobCheckMissingCredentials() {
+  var jobName = 'jobCheckMissingCredentials';
+  try {
+    logJobStart_(jobName);
+    var stats = checkMissingCredentials_();
+    logJobEnd_(jobName, stats);
+  } catch (e) {
+    logJobError_(jobName, e);
+  }
+}
+
+function checkMissingCredentials_() {
+  var stats = { pending: 0, retried: 0, recovered: 0, escalated: 0, skipped: 0 };
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) { stats.skipped = -1; return stats; }
+  try {
+    var now = Date.now();
+    var rows = getAllRows('Entities').filter(function(r) {
+      return r.type === 'TALENT_PROFILE' && r.status === ENTITY_STATUS.TALENT_PROFILE.APPROVED;
+    });
+
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var d = parseJSON(r.data) || {};
+      if (d.credentials_sent !== false) continue;
+      stats.pending++;
+
+      var last = new Date(d.credentials_last_attempt_at || r.updated_at || r.created_at).getTime();
+      if (isNaN(last) || now - last < CREDENTIALS_WATCHDOG_MIN_AGE_MS) { stats.skipped++; continue; }
+
+      var attempts = parseInt(d.credentials_attempts, 10) || 0;
+      if (attempts >= 1 + CREDENTIALS_WATCHDOG_MAX_RETRIES) {
+        if (!d.credentials_escalated) {
+          logError_({
+            severity: 'ERROR', module: 'JOBS', action: 'credentials.watchdog.exhausted',
+            entity_type: 'TALENT_PROFILE', entity_id: r.entity_id, actor: 'system', tenant_id: r.tenant_id,
+            message: 'Credenziali non inviate dopo ' + attempts + ' tentativi (ultimo errore: ' + (d.credentials_last_error || 'n/d') + ')',
+            input: { attempts: attempts }
+          });
+          updateEntityData(r.entity_id, { credentials_escalated: true }, r.tenant_id, 'system');
+          stats.escalated++;
+        }
+        continue;
+      }
+      if (stats.retried >= CREDENTIALS_WATCHDOG_BATCH) { stats.skipped++; continue; }
+
+      var profile = getEntityById(r.entity_id, r.tenant_id);
+      var user = profile ? findTalentUser_(profile) : null;
+      if (!user || String(user.role) !== ROLES.USER) {
+        logError_({
+          severity: 'ERROR', module: 'JOBS', action: 'credentials.watchdog.nouser',
+          entity_type: 'TALENT_PROFILE', entity_id: r.entity_id, actor: 'system', tenant_id: r.tenant_id,
+          message: 'Retry credenziali impossibile: USER talent collegato non trovato'
+        });
+        updateEntityData(r.entity_id, { credentials_attempts: 1 + CREDENTIALS_WATCHDOG_MAX_RETRIES }, r.tenant_id, 'system');
+        continue;
+      }
+
+      var tempPwd = generateTempPassword();
+      updateRow('Users', user.user_id, {
+        password_hash: hashPassword(tempPwd),
+        pwd_version:   (parseInt(user.pwd_version, 10) || 0) + 1
+      });
+      stats.retried++;
+      var res = deliverTalentCredentials_(r.entity_id, r.tenant_id, user.email, d.nome || '', tempPwd, { user_id: 'system' }, false);
+      if (res.ok) stats.recovered++;
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return stats;
+}
+
+// ---------------------------------------------------------------------------
+// TEST MANUALE (Esegui dall'editor GAS) — simula un invio fallito end-to-end:
+// riga ERROR in ErrorLog + TALENT_PROFILE con credentials_sent=false.
+// Il profilo di prova viene soft-deleted a fine test.
+// ---------------------------------------------------------------------------
+function testForcedCredentialsFailure() {
+  var tenant = getAllRows('Tenants')[0];
+  var tenantId = tenant && tenant.tenant_id;
+  var profile = createEntity('TALENT_PROFILE', ENTITY_STATUS.TALENT_PROFILE.APPROVED, {
+    nome: 'TEST', cognome: 'FORCED_FAILURE', email: 'indirizzo-non-valido',
+    credentials_sent: false, credentials_attempts: 0, stato_profilo: 'approvato'
+  }, tenantId, 'system');
+  var res = deliverTalentCredentials_(profile.entity_id, tenantId, 'indirizzo-non-valido', 'TEST', 'Pwd-Test-123', { user_id: 'system' }, false);
+  var after = getEntityById(profile.entity_id, tenantId);
+  Logger.log('esito=' + JSON.stringify(res));
+  Logger.log('flag=' + JSON.stringify({
+    credentials_sent: after.data.credentials_sent, last_error: after.data.credentials_last_error, attempts: after.data.credentials_attempts
+  }));
+  Logger.log('profile_id=' + profile.entity_id + ' (visibile in ErrorLog -> action mail.send.WELCOME_CREDENTIALS)');
+  softDelete('Entities', profile.entity_id, 'system');
 }

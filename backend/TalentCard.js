@@ -302,7 +302,7 @@ function isDriveFileInTenantFolder_(fileId, tenantId) {
       ' tenantFolderId(atteso)=' + tenantFolderId +
       ' parentChain=[' + chain.join(' -> ') + ']';
     Logger.log(diagMsg);
-    logError_('TALENT_CARD_DIAG', 'isDriveFileInTenantFolder_', diagMsg, '', null, tenantId);
+    logError_({ severity: 'INFO', module: 'TALENT_CARD_DIAG', action: 'isDriveFileInTenantFolder_', message: diagMsg, tenant_id: tenantId });
 
     // Cammina i parent fino a 4 livelli cercando la cartella tenant
     return searchParents_(file.getParents(), tenantFolderId, 4);

@@ -159,6 +159,7 @@ export const talentApi = {
   updateEventiPreCRM: (entity_id, eventi_precrm) => gasPost('talent.updateEventiPreCRM', { entity_id, eventi_precrm }, t()),
   generateCard:       (talent_id)                => gasPost('talent.generateCard',        { talent_id },               t(), GAS_UPLOAD_TIMEOUT_MS),
   softDelete:         (entity_id)                => gasPost('talent.softDelete',          { entity_id },               t()),
+  resendCredentials:  (entity_id)                => gasPost('talent.resendCredentials',   { entity_id },               t()),
 }
 
 export const leadApi = {

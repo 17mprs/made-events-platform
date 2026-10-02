@@ -905,6 +905,26 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
     return <span style={{ fontSize:10, fontWeight:700, background:c.bg, color:c.color, padding:'2px 8px', borderRadius:10 }}>{c.label}</span>
   }
 
+  const [credsSending, setCredsSending] = useState(false)
+  const [credsDone,    setCredsDone]    = useState(false)
+  const credsMissing = !credsDone && d.credentials_sent !== true
+
+  const handleResendCredentials = async () => {
+    if (!window.confirm(`Generare una nuova password temporanea e reinviare l'accesso a ${nome}? La password attuale smette di funzionare.`)) return
+    setCredsSending(true)
+    const res = handleApiResponse
+      ? handleApiResponse(await talentApi.resendCredentials(talent.entity_id))
+      : await talentApi.resendCredentials(talent.entity_id)
+    setCredsSending(false)
+    if (res.success) {
+      setCredsDone(true)
+      showToast('Accesso reinviato ✓')
+      await adminStore.refresh()
+    } else {
+      alert(getErrorMessage(res.error))
+    }
+  }
+
   const handleSendEmail = async () => {
     setEmailSending(true); setEmailResult(null)
     const res = await emailApi.sendCustom(d.email, d.nome || '', emailBody, 'custom')
@@ -1478,6 +1498,13 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
         {/* Sticky bottom actions */}
         <div style={{ borderTop:`1px solid ${COLORS.border}`, padding:'12px 28px', flexShrink:0, background:'#fff' }}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {credsMissing && (
+              <button onClick={handleResendCredentials} disabled={credsSending}
+                title={d.credentials_last_error ? `Ultimo errore: ${d.credentials_last_error}` : 'Credenziali non confermate come inviate'}
+                style={{ flex:'1 1 90px', padding:'9px 12px', background: d.credentials_sent === false ? '#C62828' : 'none', border:'1px solid #C62828', color: d.credentials_sent === false ? '#fff' : '#C62828', borderRadius:6, fontSize:12, fontWeight:700, cursor: credsSending ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                {credsSending ? 'Invio…' : 'Reinvia accesso'}
+              </button>
+            )}
             <button onClick={() => { setEmailResult(null); setShowEmailModal(true) }}
               style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', border:`1px solid ${COLORS.border}`, color:COLORS.text, borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
               Invia email
@@ -1717,6 +1744,7 @@ export function TalentsSection({ handleApiResponse }) {
     const email         = (l.data?.email ?? '').toLowerCase()
     const linkedProfile = profileByEmail[email]
     const hasPending    = linkedProfile?.status === 'PENDING_REVIEW'
+    const credsFailed   = linkedProfile?.status === 'APPROVED' && linkedProfile?.data?.credentials_sent === false
     return (
       <tr key={l.entity_id}>
         <td>
@@ -1731,6 +1759,11 @@ export function TalentsSection({ handleApiResponse }) {
         <td>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
             {l.data?.nome} {l.data?.cognome}
+            {credsFailed && (
+              <span title={linkedProfile.data?.credentials_last_error || 'Email credenziali non inviata'} style={{ fontSize:9, fontWeight:700, background:'#FFEBEE', color:'#C62828', border:'1px solid #EF9A9A', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
+                ACCESSO NON INVIATO
+              </span>
+            )}
             {hasPending && (
               <span style={{ fontSize:9, fontWeight:700, background:'#FFF3E0', color:'#E65100', border:'1px solid #F9A825', padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap' }}>
                 MODIFICHE IN ATTESA

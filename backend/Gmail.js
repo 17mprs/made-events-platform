@@ -33,30 +33,86 @@ var LEGACY_APOLOGY_TEXT =
 // SEND HELPER (unico punto di invio)
 // ---------------------------------------------------------------------------
 
-/**
- * Invia un'email. Wrappato in try/catch: un fallimento email non
- * blocca mai il flusso principale.
- * @returns {boolean} true se inviata, false se fallita
- */
-function sendEmail_(to, subject, bodyHtml, bodyText) {
-  try {
-    if (!to || !isValidEmail(to)) {
-      Logger.log('[GMAIL] Email non valida, skip invio: ' + to);
-      return false;
-    }
+// Riserva di quota giornaliera: le mail NON prioritarie (newsletter, solleciti,
+// import legacy, reminder) non possono consumare le ultime MAIL_QUOTA_RESERVE
+// mail del giorno, che restano per credenziali / reset / approvazioni.
+var MAIL_QUOTA_RESERVE = 30;
+var _quotaWarnLogged = false;
 
+/**
+ * Invia un'email. Non lancia mai e NON ingoia gli errori: ogni fallimento
+ * finisce in ErrorLog (destinatario mascherato) e l'esito è restituito.
+ *
+ * @param {object} [opts]
+ *   mailType    etichetta per i log (es. 'WELCOME_CREDENTIALS')
+ *   priority    true = transazionale: ignora la riserva quota
+ *   entity_type, entity_id, actor, tenant_id — contesto per ErrorLog
+ * @returns {{ok:boolean, error:string, quotaLeft:(number|null)}}
+ */
+function sendEmail_(to, subject, bodyHtml, bodyText, opts) {
+  opts = opts || {};
+  var mailType = opts.mailType || 'GENERIC';
+  var priority = opts.priority === true;
+  var quotaLeft = null;
+
+  function fail_(error, severity, stack) {
+    logError_({
+      severity:    severity,
+      module:      'GMAIL',
+      action:      'mail.send.' + mailType,
+      entity_type: opts.entity_type,
+      entity_id:   opts.entity_id,
+      actor:       opts.actor,
+      tenant_id:   opts.tenant_id,
+      message:     'Invio ' + mailType + ' a ' + maskEmail_(to) + ' fallito: ' + error,
+      stack:       stack || '',
+      input:       { kind: mailType, subject: subject, recipient: maskEmail_(to), priority: priority, quotaLeft: quotaLeft }
+    });
+    return { ok: false, error: error, quotaLeft: quotaLeft };
+  }
+
+  if (!to || !isValidEmail(to)) {
+    return fail_('INVALID_EMAIL', priority ? 'ERROR' : 'WARN');
+  }
+
+  try {
+    quotaLeft = MailApp.getRemainingDailyQuota();
+  } catch (qe) {
+    quotaLeft = null; // controllo quota non disponibile: si prova comunque l'invio
+  }
+
+  if (!priority && quotaLeft !== null && quotaLeft <= MAIL_QUOTA_RESERVE) {
+    // Una sola riga WARN per esecuzione, altrimenti un lotto riempie ErrorLog.
+    if (_quotaWarnLogged) return { ok: false, error: 'QUOTA_RESERVE', quotaLeft: quotaLeft };
+    _quotaWarnLogged = true;
+    return fail_('QUOTA_RESERVE: residuo ' + quotaLeft + ' <= riserva ' + MAIL_QUOTA_RESERVE, 'WARN');
+  }
+
+  try {
     GmailApp.sendEmail(to, EMAIL_CONFIG.SUBJECT_PREFIX + subject, bodyText || stripHtml_(bodyHtml), {
       htmlBody: bodyHtml,
       name:     EMAIL_CONFIG.FROM_NAME,
       replyTo:  EMAIL_CONFIG.REPLY_TO
     });
-
-    Logger.log('[GMAIL] Email inviata a: ' + to + ' | subject: ' + subject);
-    return true;
   } catch (e) {
-    Logger.log('[GMAIL] Errore invio a ' + to + ': ' + e.message);
-    return false;
+    return fail_(String(e && e.message || e), 'ERROR', e && e.stack);
   }
+
+  var left = quotaLeft !== null ? quotaLeft - 1 : null;
+  try {
+    PropertiesService.getScriptProperties().setProperty('mail_quota_last',
+      JSON.stringify({ left: left, at: new Date().toISOString(), kind: mailType }));
+  } catch (pe) {}
+  if (priority) {
+    logActivity({
+      level: 'INFO', module: 'GMAIL', action: 'mail.sent.' + mailType,
+      entity_type: opts.entity_type || '', entity_id: opts.entity_id || '',
+      tenant_id: opts.tenant_id || '',
+      note: 'to=' + maskEmail_(to) + ' quota_residua=' + left
+    });
+  }
+  Logger.log('[GMAIL] ' + mailType + ' inviata a ' + maskEmail_(to) + ' | quota residua: ' + left);
+  return { ok: true, error: '', quotaLeft: left };
 }
 
 /**
@@ -144,8 +200,10 @@ function buildEmailButton_(label, url) {
  * @param {string} nome        nome del talent
  * @param {string} tempPassword password temporanea generata
  * @param {string} loginUrl    URL della piattaforma (opzionale)
+ * @param {object} ctx         contesto log opzionale { entity_type, entity_id, actor, tenant_id }
+ * @returns {{ok:boolean, error:string, quotaLeft:(number|null)}}
  */
-function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
+function sendWelcomeEmail(to, nome, tempPassword, loginUrl, ctx) {
   var url = loginUrl || (getFrontendUrl() + '/login');
 
   var body = [
@@ -179,14 +237,15 @@ function sendWelcomeEmail(to, nome, tempPassword, loginUrl) {
     '— MADE EVENTS'
   ].join('\n');
 
-  return sendEmail_(to, 'Benvenuto! Le tue credenziali di accesso', html, text);
+  return sendEmail_(to, 'Benvenuto! Le tue credenziali di accesso', html, text,
+    Object.assign({ mailType: 'WELCOME_CREDENTIALS', priority: true }, ctx || {}));
 }
 
 // ---------------------------------------------------------------------------
 // TEMPLATE 2 — Conferma approvazione profilo (senza credenziali, se USER già esiste)
 // ---------------------------------------------------------------------------
 
-function sendProfileApprovedEmail(to, nome) {
+function sendProfileApprovedEmail(to, nome, ctx) {
   var body = [
     '<p style="margin:0 0 16px;">Il tuo profilo talent è stato <strong>approvato</strong> dal team MADE EVENTS.</p>',
     '<p style="margin:0 0 8px;">Ora puoi:</p>',
@@ -199,7 +258,8 @@ function sendProfileApprovedEmail(to, nome) {
 
   var html = buildEmailTemplate('Profilo approvato ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-  return sendEmail_(to, 'Profilo approvato — Benvenuto nel team!', html);
+  return sendEmail_(to, 'Profilo approvato — Benvenuto nel team!', html, undefined,
+    Object.assign({ mailType: 'PROFILE_APPROVED', priority: true }, ctx || {}));
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +310,7 @@ function sendAssignmentConfirmedEmail(to, nome, shiftData, assignmentId, eventDa
 
   var html = buildEmailTemplate('Turno confermato ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-  return sendEmail_(to, 'Turno confermato — ' + (eventData.titolo ? escapeHtml_(eventData.titolo) + ' · ' : '') + dataFormatted, html);
+  return sendEmail_(to, 'Turno confermato — ' + (eventData.titolo ? escapeHtml_(eventData.titolo) + ' · ' : '') + dataFormatted, html, undefined, { mailType: 'ASSIGNMENT_CONFIRMED', priority: true }).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +334,7 @@ function sendReminder24hEmail(to, nome, shiftData) {
 
   var html = buildEmailTemplate('⏰ Il tuo turno è domani', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-  return sendEmail_(to, 'Reminder turno domani — ' + dataFormatted, html);
+  return sendEmail_(to, 'Reminder turno domani — ' + dataFormatted, html).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +352,7 @@ function sendReminder2hEmail(to, nome, shiftData) {
 
   var html = buildEmailTemplate('🔔 Il tuo turno inizia tra 2 ore!', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-  return sendEmail_(to, 'Il tuo turno inizia tra 2 ore!', html);
+  return sendEmail_(to, 'Il tuo turno inizia tra 2 ore!', html).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +375,7 @@ function sendNoShowAlertEmail(adminEmail, talentNome, talentEmail, shiftData, as
 
   var html = buildEmailTemplate('⚠ Alert No-Show', null, body, { headerColor: '#d32f2f' });
 
-  return sendEmail_(adminEmail, 'ALERT: No-Show rilevato — ' + dataFormatted, html);
+  return sendEmail_(adminEmail, 'ALERT: No-Show rilevato — ' + dataFormatted, html).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +394,7 @@ function sendDocumentExpiryEmail(to, nome, tipoDocumento, giorniMancanti) {
 
   var html = buildEmailTemplate('📄 ' + urgency + 'Documento in scadenza', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
-  return sendEmail_(to, urgency + 'Documento in scadenza: ' + tipoDocumento, html);
+  return sendEmail_(to, urgency + 'Documento in scadenza: ' + tipoDocumento, html).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +453,7 @@ function sendOnboardingStep1Email(to, nome, completionUrl) {
     'MADE EVENTS — Non rispondere a questa email.'
   ].join('\n');
 
-  return sendEmail_(to, 'Completa la tua iscrizione — MADE EVENTS', html, text);
+  return sendEmail_(to, 'Completa la tua iscrizione — MADE EVENTS', html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +475,7 @@ function sendProfiloRicevutoEmail(to, nome) {
   var html = buildEmailTemplate('Profilo ricevuto ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = 'Ciao ' + nome + ',\n\nIl tuo profilo è stato ricevuto ed è in attesa di revisione.\nTi contatteremo via email con l\'esito entro pochi giorni.\n\n— MADE EVENTS';
-  return sendEmail_(to, 'Profilo ricevuto — in attesa di approvazione', html, text);
+  return sendEmail_(to, 'Profilo ricevuto — in attesa di approvazione', html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +498,7 @@ function sendAdminNuovoProfilo(to, nome, cognome, score, leadId) {
   var html = buildEmailTemplate('Nuovo profilo da approvare', null, body);
 
   var text = 'NUOVO PROFILO DA APPROVARE\n\nNome: ' + nome + ' ' + cognome + '\nScore: ' + score + '/100\nLead ID: ' + leadId + '\n\nAccedi alla piattaforma per approvare o rifiutare.\n\n— MADE EVENTS';
-  return sendEmail_(to, 'Nuovo profilo da approvare — ' + nome + ' ' + cognome + ' [' + score + '/100]', html, text);
+  return sendEmail_(to, 'Nuovo profilo da approvare — ' + nome + ' ' + cognome + ' [' + score + '/100]', html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +532,7 @@ function sendSollecitoEmail(to, nome, completionUrl, completati, mancanti, apolo
   var html = buildEmailTemplate('Hai lasciato la registrazione a metà', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = (apologyText ? apologyText + '\n\n' : '') + 'Ciao ' + nome + ',\n\nHai lasciato la registrazione incompleta.\nRiprendi qui: ' + completionUrl + '\n\nManca ancora: ' + mancanti.join(', ') + '\n\n— MADE EVENTS';
-  return sendEmail_(to, 'Completa la tua iscrizione — ' + (mancanti.length ? mancanti.length + ' sezioni mancanti' : 'quasi pronta!'), html, text);
+  return sendEmail_(to, 'Completa la tua iscrizione — ' + (mancanti.length ? mancanti.length + ' sezioni mancanti' : 'quasi pronta!'), html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -511,7 +571,7 @@ function sendCustomAdminEmail(to, nome, contenutoTesto, emailAdmin) {
   var html = buildEmailTemplate('Comunicazione dal team', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = 'Ciao ' + nome + ',\n\n' + contenutoTesto + '\n\n— Il team MADE EVENTS';
-  return sendEmail_(to, 'Comunicazione dal team MADE EVENTS', html, text);
+  return sendEmail_(to, 'Comunicazione dal team MADE EVENTS', html, text, { mailType: 'ADMIN_CUSTOM', priority: true }).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -532,7 +592,7 @@ function sendSocialInviteEmail(to, nome, contenutoTesto) {
   var html = buildEmailTemplate('Seguici sui social 📱', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = contenutoTesto + '\n\nInstagram: @madeevents\nFacebook: Made Events\n\n— Il team MADE EVENTS';
-  return sendEmail_(to, 'Seguici sui social — MADE EVENTS', html, text);
+  return sendEmail_(to, 'Seguici sui social — MADE EVENTS', html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +624,7 @@ function sendConvocazioneEmail(to, nome, titoloEvento, dataEvento, luogoEvento, 
     ? titoloEvento + (dataEvento ? ' · ' + dataEvento : '') + (luogoEvento ? ' · ' + luogoEvento : '') + '\n\n'
     : '';
   var text = 'Ciao ' + nome + ',\n\n' + textHeader + contenutoTesto + '\n\n— Il team MADE EVENTS';
-  return sendEmail_(to, 'Sei stata selezionata — ' + (titoloEvento || 'MADE EVENTS'), html, text);
+  return sendEmail_(to, 'Sei stata selezionata — ' + (titoloEvento || 'MADE EVENTS'), html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -628,7 +688,7 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, eventLink)
     '— MADE EVENTS'
   ].filter(Boolean).join('\n');
 
-  return sendEmail_(to, 'Sei stato selezionato per ' + (eventData.titolo || 'un evento') + ' — conferma la tua disponibilità', html, text);
+  return sendEmail_(to, 'Sei stato selezionato per ' + (eventData.titolo || 'un evento') + ' — conferma la tua disponibilità', html, text, { mailType: 'APPLICATION_APPROVED', priority: true }).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -646,7 +706,7 @@ function sendRegistrazioneEsistenteEmail(to, nome, completionUrl) {
 
   var html = buildEmailTemplate('Registrazione già in corso', 'Ciao ' + escapeHtml_(nome) + ',', body);
   var text = 'Ciao ' + nome + ',\n\nCi risulti già registrato/a. Riprendi da qui: ' + completionUrl + '\n\n— MADE EVENTS';
-  return sendEmail_(to, 'Riprendi la tua registrazione — MADE EVENTS', html, text);
+  return sendEmail_(to, 'Riprendi la tua registrazione — MADE EVENTS', html, text).ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -664,7 +724,7 @@ function sendAccountEsistenteEmail(to, nome, loginUrl) {
 
   var html = buildEmailTemplate('Hai già un account', 'Ciao ' + escapeHtml_(nome) + ',', body);
   var text = 'Ciao ' + nome + ',\n\nHai già un account attivo. Accedi qui: ' + loginUrl + '\n\n— MADE EVENTS';
-  return sendEmail_(to, 'Il tuo account MADE EVENTS', html, text);
+  return sendEmail_(to, 'Il tuo account MADE EVENTS', html, text).ok;
 }
 
 // ---------------------------------------------------------------------------

@@ -394,11 +394,7 @@ function handleTalentApprove(payload, auth) {
     var mergedData = Object.assign({}, lead.data, pendingData);
     delete mergedData.pending_data;
     delete mergedData.pending_submitted_at;
-    updateRow('Entities', lead.entity_id, {
-      status:     ENTITY_STATUS.TALENT_PROFILE.APPROVED,
-      data:       serializeJSON(mergedData),
-      updated_at: new Date()
-    });
+    transitionTalentToApproved_(lead, ENTITY_STATUS.TALENT_PROFILE.APPROVED, mergedData);
     return successResponse({ profile_id: lead.entity_id, status: ENTITY_STATUS.TALENT_PROFILE.APPROVED });
   }
 
@@ -422,13 +418,23 @@ function handleTalentApprove(payload, auth) {
   }
 
   var userId;
-  var tempPwd;
+  var tempPwd = generateTempPassword();
   if (existingUser) {
-    userId  = existingUser.user_id;
-    tempPwd = null; // password già esistente
+    userId = existingUser.user_id;
+    if (String(existingUser.role) === ROLES.USER) {
+      // Mai più approvazione senza accesso: nuova password temporanea anche se lo USER esiste già.
+      updateRow('Users', existingUser.user_id, {
+        password_hash: hashPassword(tempPwd),
+        pwd_version:   (parseInt(existingUser.pwd_version, 10) || 0) + 1
+      });
+    } else {
+      // Account staff con la stessa email: non si tocca la sua password.
+      tempPwd = null;
+      logError_({ severity: 'WARN', module: 'WORKFLOWS', action: 'talent.approve', entity_type: 'LEAD_TALENT', entity_id: lead.entity_id,
+        actor: auth.user_id, tenant_id: auth.tenant_id, message: 'Email gia associata a un utente non-talent (' + existingUser.role + '): password non reimpostata' });
+    }
   } else {
     // Crea USER con password temporanea
-    tempPwd = generateTempPassword();
     var now = new Date();
     var newUser = appendRow_('Users', {
       user_id:       Utilities.getUuid(),
@@ -488,37 +494,152 @@ function handleTalentApprove(payload, auth) {
       score_admin:          leadData.score_admin           || 5,
       ranking:              leadData.ranking               || 'D',
       eventi_crm_completati: 0,
-      eventi_precrm:        leadData.eventi_precrm         || 0
+      eventi_precrm:        leadData.eventi_precrm         || 0,
+      stato_profilo:        'approvato',
+      credentials_sent:       false,
+      credentials_sent_at:    '',
+      credentials_last_error: '',
+      credentials_attempts:   0
     }), auth.tenant_id, auth.user_id);
     profileId = profile.entity_id;
   }
 
-  // Transiziona LEAD → APPROVED
-  updateRow('Entities', lead.entity_id, { status: ENTITY_STATUS.LEAD_TALENT.APPROVED });
+  // Transiziona LEAD → APPROVED (status + stato_profilo allineati)
+  transitionTalentToApproved_(lead, ENTITY_STATUS.LEAD_TALENT.APPROVED);
+  if (existingProfile) {
+    updateEntityData(profileId, { stato_profilo: 'approvato' }, auth.tenant_id, auth.user_id);
+  }
 
   // Log obbligatorio PRD: approvazione talent
   logTalentApproved(lead.entity_id, userId, profileId, auth.user_id, auth.tenant_id);
 
-  // Email con credenziali (solo se nuova password generata)
-  try {
-    if (tempPwd) {
-      sendWelcomeEmail(leadData.email, leadData.nome, tempPwd);
-    } else {
-      sendProfileApprovedEmail(leadData.email, leadData.nome);
-    }
-  } catch (emailErr) {
-    Logger.log('[WORKFLOWS] Email approvazione fallita: ' + emailErr.message);
-  }
+  // Email credenziali: credentials_sent=TRUE solo se l'invio riesce davvero.
+  // Se fallisce lo stato resta APPROVED con credentials_sent=FALSE (+ ERROR in ErrorLog)
+  // e l'admin / il watchdog possono ripetere l'invio.
+  var credRes = deliverTalentCredentials_(profileId, auth.tenant_id, leadData.email, leadData.nome, tempPwd, auth, false);
 
   var result = {
     lead_id:    lead.entity_id,
     user_id:    userId,
     profile_id: profileId,
-    email:      leadData.email
+    email:      leadData.email,
+    credentials_sent:  credRes.ok,
+    credentials_error: credRes.ok ? '' : credRes.error
   };
   if (tempPwd) result.temp_password = tempPwd;
 
   return successResponse(result);
+}
+
+/**
+ * Unica funzione di transizione verso APPROVED per lead e profili talent:
+ * scrive status e stato_profilo ('approvato') nella stessa updateRow, così
+ * colonna e JSON interno non possono più divergere.
+ * @param {object} entity       entità con .data già parsato
+ * @param {string} newStatus
+ * @param {object} [dataOverride] dati da scrivere al posto di entity.data
+ */
+function transitionTalentToApproved_(entity, newStatus, dataOverride) {
+  var data = Object.assign({}, dataOverride || entity.data || {}, { stato_profilo: 'approvato' });
+  updateRow('Entities', entity.entity_id, {
+    status:     newStatus,
+    data:       serializeJSON(data),
+    updated_at: new Date()
+  });
+  return data;
+}
+
+/**
+ * Invia le credenziali (tempPwd valorizzata) o la sola conferma approvazione
+ * (tempPwd null, account staff) e registra l'esito sul TALENT_PROFILE.
+ * credentials_sent=TRUE SOLO dopo ok:true. Non lancia mai.
+ * @param {boolean} manual  true = azione admin: azzera il contatore tentativi
+ * @returns {{ok:boolean, error:string}}
+ */
+function deliverTalentCredentials_(profileId, tenantId, email, nome, tempPwd, auth, manual) {
+  var actor = (auth && auth.user_id) || 'system';
+  var ctx = { entity_type: 'TALENT_PROFILE', entity_id: profileId, actor: actor, tenant_id: tenantId };
+  var res;
+  try {
+    res = tempPwd
+      ? sendWelcomeEmail(email, nome, tempPwd, undefined, ctx)
+      : sendProfileApprovedEmail(email, nome, ctx);
+  } catch (e) {
+    res = { ok: false, error: 'EXCEPTION: ' + e.message };
+    logError_({ severity: 'ERROR', module: 'WORKFLOWS', action: 'talent.credentials', entity_type: 'TALENT_PROFILE',
+      entity_id: profileId, actor: actor, tenant_id: tenantId, message: 'Eccezione invio credenziali: ' + e.message, stack: e.stack });
+  }
+
+  var nowIso = new Date().toISOString();
+  var prev = 0;
+  try {
+    var cur = getEntityById(profileId, tenantId);
+    prev = manual ? 0 : (parseInt(cur && cur.data && cur.data.credentials_attempts, 10) || 0);
+  } catch (e) {}
+  var upd = res.ok
+    ? { credentials_sent: true,  credentials_sent_at: nowIso, credentials_last_error: '', credentials_attempts: prev + 1 }
+    : { credentials_sent: false, credentials_last_error: String(res.error || 'UNKNOWN').substring(0, 300),
+        credentials_last_attempt_at: nowIso, credentials_attempts: prev + 1 };
+  try {
+    updateEntityData(profileId, upd, tenantId, actor);
+  } catch (e) {
+    logError_({ severity: 'ERROR', module: 'WORKFLOWS', action: 'talent.credentials.flag', entity_type: 'TALENT_PROFILE',
+      entity_id: profileId, actor: actor, tenant_id: tenantId, message: 'Scrittura flag credentials_sent fallita: ' + e.message, stack: e.stack });
+  }
+  return { ok: !!res.ok, error: res.ok ? '' : String(res.error || 'UNKNOWN') };
+}
+
+/**
+ * Admin: rigenera una password temporanea e reinvia l'accesso a un talent
+ * già approvato. Action 'talent.resendCredentials'.
+ */
+function handleTalentResendCredentials(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+
+  var profile = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!profile || profile.type !== 'TALENT_PROFILE') return errorResponse('SYS_002', 'Profilo talent non trovato');
+  if (profile.status !== ENTITY_STATUS.TALENT_PROFILE.APPROVED && profile.status !== ENTITY_STATUS.TALENT_PROFILE.ACTIVE) {
+    return errorResponse('WF_002', 'Il profilo deve essere APPROVED o ACTIVE. Stato attuale: ' + profile.status);
+  }
+
+  var user = findTalentUser_(profile);
+  if (!user) {
+    logError_({ severity: 'ERROR', module: 'WORKFLOWS', action: 'talent.resendCredentials', entity_type: 'TALENT_PROFILE',
+      entity_id: profile.entity_id, actor: auth.user_id, tenant_id: auth.tenant_id, message: 'USER collegato al profilo non trovato' });
+    return errorResponse('SYS_002', 'Account utente collegato non trovato');
+  }
+  if (String(user.role) !== ROLES.USER) {
+    return errorResponse('WF_002', 'L\'account collegato non è un account talent: password non reimpostabile da qui');
+  }
+
+  var tempPwd = generateTempPassword();
+  updateRow('Users', user.user_id, {
+    password_hash: hashPassword(tempPwd),
+    pwd_version:   (parseInt(user.pwd_version, 10) || 0) + 1
+  });
+
+  var res = deliverTalentCredentials_(profile.entity_id, auth.tenant_id, user.email, profile.data.nome || '', tempPwd, auth, true);
+  logActivity({
+    level: res.ok ? 'INFO' : 'ERROR', module: 'WORKFLOWS', action: 'talent.resendCredentials',
+    entity_type: 'TALENT_PROFILE', entity_id: profile.entity_id, user_id: auth.user_id, tenant_id: auth.tenant_id,
+    note: res.ok ? 'ok' : res.error
+  });
+  if (!res.ok) return errorResponse('SYS_001', 'Invio email fallito: ' + res.error);
+  return successResponse({ profile_id: profile.entity_id, credentials_sent: true });
+}
+
+/** USER collegato a un TALENT_PROFILE (user_id nel JSON, fallback sull'email). */
+function findTalentUser_(profile) {
+  var d = profile.data || {};
+  var users = getAllRows('Users');
+  var byEmail = null;
+  var email = String(d.email || d.email_contatto || '').toLowerCase().trim();
+  for (var i = 0; i < users.length; i++) {
+    if (d.user_id && String(users[i].user_id) === String(d.user_id)) return users[i];
+    if (!byEmail && email && String(users[i].email).toLowerCase().trim() === email) byEmail = users[i];
+  }
+  return byEmail;
 }
 
 function handleTalentReject(payload, auth) {
@@ -537,11 +658,7 @@ function handleTalentReject(payload, auth) {
     delete restoredData.pending_data;
     delete restoredData.pending_submitted_at;
     if (payload.nota_rifiuto) restoredData.nota_rifiuto_modifiche = payload.nota_rifiuto;
-    updateRow('Entities', lead.entity_id, {
-      status:     ENTITY_STATUS.TALENT_PROFILE.APPROVED,
-      data:       serializeJSON(restoredData),
-      updated_at: new Date()
-    });
+    transitionTalentToApproved_(lead, ENTITY_STATUS.TALENT_PROFILE.APPROVED, restoredData);
     return successResponse({ profile_id: lead.entity_id, status: ENTITY_STATUS.TALENT_PROFILE.APPROVED });
   }
 
