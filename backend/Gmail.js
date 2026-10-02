@@ -39,6 +39,15 @@ var LEGACY_APOLOGY_TEXT =
 var MAIL_QUOTA_RESERVE = 30;
 var _quotaWarnLogged = false;
 
+// Contesto di invio impostato da withMailCtx_: permette ai punti di chiamata che
+// usano i template sendXxxEmail() di attribuire l'eventuale errore a un'entità.
+var _mailCtx = null;
+function withMailCtx_(ctx, fn) {
+  var prev = _mailCtx;
+  _mailCtx = ctx;
+  try { return fn(); } finally { _mailCtx = prev; }
+}
+
 /**
  * Invia un'email. Non lancia mai e NON ingoia gli errori: ogni fallimento
  * finisce in ErrorLog (destinatario mascherato) e l'esito è restituito.
@@ -47,17 +56,19 @@ var _quotaWarnLogged = false;
  *   mailType    etichetta per i log (es. 'WELCOME_CREDENTIALS')
  *   priority    true = transazionale: ignora la riserva quota
  *   entity_type, entity_id, actor, tenant_id — contesto per ErrorLog
+ *   rawSubject  true = niente prefisso [MADE EVENTS] (alert interni)
+ *   suppressAlert true = un fallimento è loggato solo WARN (mai ERROR): evita alert-di-alert
  * @returns {{ok:boolean, error:string, quotaLeft:(number|null)}}
  */
 function sendEmail_(to, subject, bodyHtml, bodyText, opts) {
-  opts = opts || {};
+  opts = Object.assign({}, _mailCtx || {}, opts || {});
   var mailType = opts.mailType || 'GENERIC';
   var priority = opts.priority === true;
   var quotaLeft = null;
 
   function fail_(error, severity, stack) {
     logError_({
-      severity:    severity,
+      severity:    opts.suppressAlert ? 'WARN' : severity,
       module:      'GMAIL',
       action:      'mail.send.' + mailType,
       entity_type: opts.entity_type,
@@ -89,7 +100,7 @@ function sendEmail_(to, subject, bodyHtml, bodyText, opts) {
   }
 
   try {
-    GmailApp.sendEmail(to, EMAIL_CONFIG.SUBJECT_PREFIX + subject, bodyText || stripHtml_(bodyHtml), {
+    GmailApp.sendEmail(to, (opts.rawSubject ? '' : EMAIL_CONFIG.SUBJECT_PREFIX) + subject, bodyText || stripHtml_(bodyHtml), {
       htmlBody: bodyHtml,
       name:     EMAIL_CONFIG.FROM_NAME,
       replyTo:  EMAIL_CONFIG.REPLY_TO

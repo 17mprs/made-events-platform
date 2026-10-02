@@ -27,12 +27,15 @@ function handleRegisterStep1(payload) {
   var existing = findLeadByEmail_(emailLower);
   if (existing && existing.status !== ENTITY_STATUS.LEAD_TALENT.REJECTED) {
     var completionUrl = getFrontendUrl() + '/registrazione/completa?token=' + (existing.data.lead_token || '');
+    var resumeMailOk = false;
     try {
-      sendRegistrazioneEsistenteEmail(existing.data.email, existing.data.nome || '', completionUrl);
+      resumeMailOk = withMailCtx_({ mailType: 'REGISTRATION_RESUME', entity_type: 'LEAD_TALENT', entity_id: existing.entity_id }, function() {
+        return sendRegistrazioneEsistenteEmail(existing.data.email, existing.data.nome || '', completionUrl);
+      });
     } catch (e) {
-      Logger.log('[REGISTER_STEP1] Email lead esistente non inviata: ' + e.message);
+      logError_({ severity: 'ERROR', module: 'REGISTRATION_FLOW', action: 'talent.registerStep1.mail', entity_type: 'LEAD_TALENT', entity_id: existing.entity_id, message: 'Email lead esistente: eccezione ' + e.message, stack: e.stack });
     }
-    return successResponse({ message: 'LEAD_ESISTENTE' });
+    return successResponse({ message: 'LEAD_ESISTENTE', email_sent: resumeMailOk });
   }
 
   // CASO 2 — account talent già attivo (Users): niente nuova registrazione,
@@ -46,12 +49,15 @@ function handleRegisterStep1(payload) {
                       : '/portale';
       var loginUrl = getFrontendUrl() + portalPath + '?token=' + encodeURIComponent(generateToken_(talentUser));
       var talentLead = findLeadByEmail_(emailLower);
+      var accountMailOk = false;
       try {
-        sendAccountEsistenteEmail(talentUser.email, (talentLead && talentLead.data.nome) || '', loginUrl);
+        accountMailOk = withMailCtx_({ mailType: 'REGISTRATION_EXISTING_ACCOUNT', entity_type: 'USER', entity_id: talentUser.user_id }, function() {
+          return sendAccountEsistenteEmail(talentUser.email, (talentLead && talentLead.data.nome) || '', loginUrl);
+        });
       } catch (e) {
-        Logger.log('[REGISTER_STEP1] Email account esistente non inviata: ' + e.message);
+        logError_({ severity: 'ERROR', module: 'REGISTRATION_FLOW', action: 'talent.registerStep1.mail', entity_type: 'USER', entity_id: talentUser.user_id, message: 'Email account esistente: eccezione ' + e.message, stack: e.stack });
       }
-      return successResponse({ message: 'TALENT_ESISTENTE' });
+      return successResponse({ message: 'TALENT_ESISTENTE', email_sent: accountMailOk });
     }
   }
 
@@ -301,17 +307,26 @@ function handleRegisterStep3(payload) {
   updateRow('Entities', entity.entity_id, { status: ENTITY_STATUS.LEAD_TALENT.COMPLETED_PENDING_APPROVAL });
 
   // Email alla candidata
+  var receivedMailOk = false;
   try {
-    sendProfiloRicevutoEmail(current.email, current.nome);
-  } catch (e) { Logger.log('[REGISTRATION_FLOW] Email candidata non inviata: ' + e.message); }
+    receivedMailOk = withMailCtx_({ mailType: 'REGISTRATION_RECEIVED', entity_type: 'LEAD_TALENT', entity_id: entity.entity_id, tenant_id: entity.tenant_id }, function() {
+      return sendProfiloRicevutoEmail(current.email, current.nome);
+    });
+  } catch (e) {
+    logError_({ severity: 'ERROR', module: 'REGISTRATION_FLOW', action: 'talent.registerStep3.mail', entity_type: 'LEAD_TALENT', entity_id: entity.entity_id, message: 'Email profilo ricevuto: eccezione ' + e.message, stack: e.stack });
+  }
 
   // Email all'admin
   try {
     var adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
     if (adminEmail) {
-      sendAdminNuovoProfilo(adminEmail, current.nome, current.cognome, scoreResult.score, entity.entity_id);
+      withMailCtx_({ mailType: 'ADMIN_NEW_PROFILE', entity_type: 'LEAD_TALENT', entity_id: entity.entity_id, tenant_id: entity.tenant_id }, function() {
+        return sendAdminNuovoProfilo(adminEmail, current.nome, current.cognome, scoreResult.score, entity.entity_id);
+      });
     }
-  } catch (e) { Logger.log('[REGISTRATION_FLOW] Email admin non inviata: ' + e.message); }
+  } catch (e) {
+    logError_({ severity: 'ERROR', module: 'REGISTRATION_FLOW', action: 'talent.registerStep3.adminMail', entity_type: 'LEAD_TALENT', entity_id: entity.entity_id, message: 'Email admin nuovo profilo: eccezione ' + e.message, stack: e.stack });
+  }
 
   return successResponse({
     lead_id:        entity.entity_id,
@@ -635,11 +650,15 @@ function inviaEmailSollecito(leadId, apologyText) {
   try {
     var frontendUrl = getFrontendUrl();
     var completionUrl = frontendUrl + '/registrazione/completa?token=' + (d.lead_token || '');
-    sendSollecitoEmail(d.email, d.nome, completionUrl, completati, mancanti, apologyText);
+    var sollecitoOk = withMailCtx_({ mailType: 'REGISTRATION_REMINDER', entity_type: 'LEAD_TALENT', entity_id: leadId, tenant_id: entity.tenant_id }, function() {
+      return sendSollecitoEmail(d.email, d.nome, completionUrl, completati, mancanti, apologyText);
+    });
+    // ultimo_sollecito e il ritorno true SOLO se la mail è davvero partita.
+    if (!sollecitoOk) return false;
     updateEntityData(leadId, { ultimo_sollecito: new Date().toISOString() }, entity.tenant_id, null);
     return true;
   } catch (e) {
-    Logger.log('[REGISTRATION_FLOW] Sollecito non inviato: ' + e.message);
+    logError_({ severity: 'ERROR', module: 'REGISTRATION_FLOW', action: 'registration.sollecito', entity_type: 'LEAD_TALENT', entity_id: leadId, message: 'Sollecito: eccezione ' + e.message, stack: e.stack });
     return false;
   }
 }

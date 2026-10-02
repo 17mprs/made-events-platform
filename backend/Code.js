@@ -33,6 +33,9 @@ function doPost(e) {
     }
     var body = JSON.parse(raw || '{}');
   } catch (err) {
+    // Non si logga il body (può contenere password/PII): solo lunghezza e motivo.
+    logError_({ severity: 'ERROR', priority: 'P1', error_class: 'VALIDATION', module: 'CODE', action: 'doPost.parse',
+      message: 'JSON non valido: ' + err.message, input: { rawLength: (raw || '').length } });
     return jsonResponse_(errorResponse('SYS_001', 'JSON non valido: ' + (raw || '').substring(0, 200)));
   }
 
@@ -48,7 +51,8 @@ function doPost(e) {
     var result = handleRequest(action, payload, token);
     return jsonResponse_(result);
   } catch (err) {
-    logError_('CODE', action, err.message, err.stack || '', null, null);
+    logError_({ severity: 'ERROR', module: 'CODE', action: action, message: err.message, stack: err.stack || '',
+      input: { action: action, payloadKeys: Object.keys(payload || {}) } });
     return jsonResponse_(errorResponse('SYS_001', 'Errore interno: ' + err.message));
   }
 }
@@ -125,6 +129,8 @@ function handleRequest(action, payload, token) {
     case 'talent.approve':           return handleTalentApprove(payload, auth);
     case 'talent.reject':            return handleTalentReject(payload, auth);
     case 'talent.resendCredentials': return handleTalentResendCredentials(payload, auth);
+    case 'talent.credentialsInfo':   return handleTalentCredentialsInfo(payload, auth);
+    case 'admin.auditCredentials':   return handleAuditCredentials(payload, auth);
     case 'talent.list':              return handleTalentList(payload, auth);
     case 'talent.get':               return handleTalentGet(payload, auth);
     case 'talent.updateProfile':     return handleTalentUpdateProfile(payload, auth);
@@ -279,7 +285,8 @@ function jsonResponse_(obj) {
 // Colonne aggiunte in fondo a ErrorLog (le 9 originali restano intatte).
 var ERRORLOG_EXTRA_COLUMNS = [
   'severity', 'entity_type', 'entity_id', 'actor', 'input',
-  'deployment_id', 'fingerprint', 'alert_sent', 'alert_sent_at'
+  'deployment_id', 'fingerprint', 'alert_sent', 'alert_sent_at',
+  'error_class', 'priority'
 ];
 
 var DEPLOYMENT_ID = 'AKfycbywK-f8EOav2gS7MKNlLRT38eVe9h4SH827Zv91kFp7l0A4LEg2s13IJXwvwNns_UKA-g';
@@ -303,10 +310,24 @@ function logError_(ctxOrModule, action, message, stack, userId, tenantId) {
     var msg = String(ctx.message || '');
     var act = String(ctx.action || '');
     var actor = ctx.actor || ctx.user_id || '';
+    var errorId = Utilities.getUuid();
+    var fingerprint = errorFingerprint_(act, msg);
+
+    // Classificazione (override possibile dal chiamante) + registro per fingerprint.
+    var errorClass = ctx.error_class || classifyError_(ctx.module, act, msg);
+    var priority = '';
+    if (severity === 'ERROR') {
+      priority = (ctx.priority === 'P1' || ctx.priority === 'P2') ? ctx.priority : priorityFor_(errorClass, ctx.module, act);
+      var reg = upsertErrorRegistry_(fingerprint, errorClass, priority, act, msg, errorId);
+      if (reg && reg.regression) {
+        priority = 'P1';
+        msg = '[REGRESSION] ' + msg;
+      }
+    }
 
     ensureErrorLogColumns_();
     appendRow_('ErrorLog', {
-      error_id:      Utilities.getUuid(),
+      error_id:      errorId,
       timestamp:     new Date(),
       level:         severity,
       module:        ctx.module || '',
@@ -321,9 +342,11 @@ function logError_(ctxOrModule, action, message, stack, userId, tenantId) {
       actor:         actor,
       input:         ctx.input !== undefined ? sanitizeForLog_(ctx.input) : '',
       deployment_id: DEPLOYMENT_ID,
-      fingerprint:   errorFingerprint_(act, msg),
+      fingerprint:   fingerprint,
       alert_sent:    severity === 'ERROR' ? false : '',
-      alert_sent_at: ''
+      alert_sent_at: '',
+      error_class:   errorClass,
+      priority:      priority
     });
   } catch (e) {
     Logger.log('ErrorLog write failed: ' + e.message);

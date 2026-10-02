@@ -90,6 +90,8 @@ function setupAllTriggers() {
     .everyHours(1)
     .create();
 
+  setupAlertTriggers();
+
   Logger.log('[JOBS] Tutti i trigger installati correttamente.');
 }
 
@@ -276,16 +278,19 @@ function jobNoShowCheck() {
               var adminEmail  = getAdminEmail_(tenantId);
               var talentProfile = getEntityById(d.talent_profile_id, tenantId);
               if (adminEmail && talentProfile) {
-                sendNoShowAlertEmail(
-                  adminEmail,
-                  (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
-                  talentProfile.data.email_contatto || '',
-                  shift.data,
-                  a.entity_id
-                );
+                var noShowMailOk = withMailCtx_({ mailType: 'NOSHOW_ALERT', entity_type: 'ASSIGNMENT', entity_id: a.entity_id, actor: 'system', tenant_id: tenantId }, function() {
+                  return sendNoShowAlertEmail(
+                    adminEmail,
+                    (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
+                    talentProfile.data.email_contatto || '',
+                    shift.data,
+                    a.entity_id
+                  );
+                });
+                if (!noShowMailOk) stats.mailFailed = (stats.mailFailed || 0) + 1;
               }
             } catch (emailErr) {
-              Logger.log('[' + jobName + '] Email no-show alert fallita: ' + emailErr.message);
+              logError_({ severity: 'ERROR', module: 'JOBS', action: 'jobNoShowCheck.mail', entity_type: 'ASSIGNMENT', entity_id: a.entity_id, actor: 'system', message: 'Email no-show: eccezione ' + emailErr.message, stack: emailErr.stack });
             }
           }
         } catch (e) {
@@ -366,7 +371,7 @@ function jobDocumentExpiry() {
               // Notifica talent
               try {
                 if (data.email_contatto) {
-                  sendDocumentExpiryEmail(data.email_contatto, data.nome || '', tipo, 0);
+                  if (!sendDocumentExpiryEmail(data.email_contatto, data.nome || '', tipo, 0)) stats.mailFailed = (stats.mailFailed || 0) + 1;
                 }
               } catch (e) {
                 logError_({ severity: 'ERROR', module: 'JOBS', action: 'jobDocumentExpiry.notify', entity_type: 'TALENT_PROFILE', entity_id: p.entity_id, message: 'Notifica documento scaduto fallita: ' + e.message, stack: e.stack, actor: 'system' });
@@ -381,7 +386,7 @@ function jobDocumentExpiry() {
               // Notifica talent
               try {
                 if (data.email_contatto) {
-                  sendDocumentExpiryEmail(data.email_contatto, data.nome || '', tipo, giorniMancanti);
+                  if (!sendDocumentExpiryEmail(data.email_contatto, data.nome || '', tipo, giorniMancanti)) stats.mailFailed = (stats.mailFailed || 0) + 1;
                 }
               } catch (e) {
                 logError_({ severity: 'ERROR', module: 'JOBS', action: 'jobDocumentExpiry.notify', entity_type: 'TALENT_PROFILE', entity_id: p.entity_id, message: 'Notifica documento in scadenza fallita: ' + e.message, stack: e.stack, actor: 'system' });
@@ -1008,6 +1013,13 @@ function checkMissingCredentials_() {
           message: 'Retry credenziali impossibile: USER talent collegato non trovato'
         });
         updateEntityData(r.entity_id, { credentials_attempts: 1 + CREDENTIALS_WATCHDOG_MAX_RETRIES }, r.tenant_id, 'system');
+        continue;
+      }
+
+      // Ha già fatto login: ha le credenziali, non va resettata la sua password.
+      if (user.last_login) {
+        updateEntityData(r.entity_id, { credentials_sent: true, credentials_last_error: 'login_gia_effettuato' }, r.tenant_id, 'system');
+        stats.skipped++;
         continue;
       }
 

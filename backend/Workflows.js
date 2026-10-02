@@ -201,7 +201,9 @@ function sideEffect_ApplicationApproved_(application, auth) {
   );
 
   // Email notifica talent — candidatura approvata, con link di accesso
-  // automatico all'area riservata (best-effort: non blocca se fallisce).
+  // automatico all'area riservata (non blocca l'approvazione se fallisce, ma l'esito
+  // è registrato da sendEmail_ in ErrorLog e restituito come email_sent).
+  var appMailOk = null;
   try {
     var talentProfile = getEntityById(appData.talent_profile_id, auth.tenant_id);
     if (talentProfile && talentProfile.data.email_contatto) {
@@ -217,20 +219,23 @@ function sideEffect_ApplicationApproved_(application, auth) {
         }
         var eventLink = getFrontendUrl() + '/portale' +
           (token ? '?token=' + encodeURIComponent(token) : '');
-        sendApplicationApprovedEmail(
-          talentProfile.data.email_contatto,
-          (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
-          event ? event.data : {},
-          shift.data,
-          eventLink
-        );
+        appMailOk = withMailCtx_({ entity_type: 'APPLICATION', entity_id: appData.talent_profile_id, actor: auth.user_id, tenant_id: auth.tenant_id }, function() {
+          return sendApplicationApprovedEmail(
+            talentProfile.data.email_contatto,
+            (talentProfile.data.nome || '') + ' ' + (talentProfile.data.cognome || ''),
+            event ? event.data : {},
+            shift.data,
+            eventLink
+          );
+        });
       }
     }
   } catch (emailErr) {
-    Logger.log('[WORKFLOWS] Email candidatura approvata fallita: ' + emailErr.message);
+    appMailOk = false;
+    logError_({ severity: 'ERROR', module: 'WORKFLOWS', action: 'application.approve.mail', entity_type: 'APPLICATION', actor: auth.user_id, tenant_id: auth.tenant_id, message: 'Email candidatura approvata: eccezione ' + emailErr.message, stack: emailErr.stack });
   }
 
-  return successResponse({ assignment_id: assignment.entity_id });
+  return successResponse({ assignment_id: assignment.entity_id, email_sent: appMailOk });
 }
 
 // ---------------------------------------------------------------------------
@@ -613,6 +618,11 @@ function handleTalentResendCredentials(payload, auth) {
     return errorResponse('WF_002', 'L\'account collegato non è un account talent: password non reimpostabile da qui');
   }
 
+  // Il talent ha già fatto login: resettare la password lo sloggherebbe. Serve conferma esplicita.
+  if (user.last_login && payload.confirm_reset !== true) {
+    return errorResponse('WF_CONFIRM', 'Il talent ha già acceduto (ultimo login ' + formatLastLogin_(user.last_login) + '): conferma il reset password');
+  }
+
   var tempPwd = generateTempPassword();
   updateRow('Users', user.user_id, {
     password_hash: hashPassword(tempPwd),
@@ -627,6 +637,64 @@ function handleTalentResendCredentials(payload, auth) {
   });
   if (!res.ok) return errorResponse('SYS_001', 'Invio email fallito: ' + res.error);
   return successResponse({ profile_id: profile.entity_id, credentials_sent: true });
+}
+
+function formatLastLogin_(v) {
+  if (!v) return '';
+  var d = v instanceof Date ? v : new Date(v);
+  return isNaN(d.getTime()) ? String(v) : d.toISOString();
+}
+
+/**
+ * Sola lettura: ultimo login dell'account collegato, per il popup di conferma
+ * di "Reinvia accesso". Action 'talent.credentialsInfo'.
+ */
+function handleTalentCredentialsInfo(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+  var profile = getEntityById(payload.entity_id, auth.tenant_id);
+  if (!profile || profile.type !== 'TALENT_PROFILE') return errorResponse('SYS_002', 'Profilo talent non trovato');
+  var user = findTalentUser_(profile);
+  return successResponse({
+    user_found:       !!user,
+    last_login:       user ? formatLastLogin_(user.last_login) : '',
+    credentials_sent: profile.data.credentials_sent === undefined ? null : profile.data.credentials_sent
+  });
+}
+
+/**
+ * AUDIT SOLA LETTURA — 'admin.auditCredentials'.
+ * TALENT_PROFILE APPROVED il cui USER non ha mai fatto login (o non esiste).
+ * Nessuna scrittura.
+ */
+function handleAuditCredentials(payload, auth) {
+  var users = getAllRows('Users');
+  var byId = {}, byEmail = {};
+  users.forEach(function(u) {
+    byId[String(u.user_id)] = u;
+    byEmail[String(u.email).toLowerCase().trim()] = u;
+  });
+
+  var list = [];
+  getAllRows('Entities').forEach(function(r) {
+    if (r.type !== 'TALENT_PROFILE' || r.status !== ENTITY_STATUS.TALENT_PROFILE.APPROVED) return;
+    if (String(r.tenant_id) !== String(auth.tenant_id)) return;
+    var d = parseJSON(r.data) || {};
+    var email = String(d.email || d.email_contatto || '').toLowerCase().trim();
+    var u = (d.user_id && byId[String(d.user_id)]) || byEmail[email] || null;
+    if (u && u.last_login) return;
+    list.push({
+      entity_id:        r.entity_id,
+      nome:             ((d.nome || '') + ' ' + (d.cognome || '')).trim(),
+      email:            email,
+      approvato_il:     formatLastLogin_(r.created_at),
+      user_found:       !!u,
+      credentials_sent: d.credentials_sent === undefined ? null : d.credentials_sent,
+      credentials_last_error: d.credentials_last_error || ''
+    });
+  });
+  list.sort(function(a, b) { return String(a.approvato_il).localeCompare(String(b.approvato_il)); });
+  return successResponse({ count: list.length, profiles: list });
 }
 
 /** USER collegato a un TALENT_PROFILE (user_id nel JSON, fallback sull'email). */

@@ -909,13 +909,24 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   const [credsDone,    setCredsDone]    = useState(false)
   const credsMissing = !credsDone && d.credentials_sent !== true
 
+  const [credsConfirm, setCredsConfirm] = useState(null) // null | { lastLogin: string }
+
+  // Passo 1: legge l'ultimo login e apre il popup di conferma.
   const handleResendCredentials = async () => {
-    if (!window.confirm(`Generare una nuova password temporanea e reinviare l'accesso a ${nome}? La password attuale smette di funzionare.`)) return
     setCredsSending(true)
-    const res = handleApiResponse
-      ? handleApiResponse(await talentApi.resendCredentials(talent.entity_id))
-      : await talentApi.resendCredentials(talent.entity_id)
+    const info = await talentApi.credentialsInfo(talent.entity_id)
     setCredsSending(false)
+    if (!info.success) { alert(getErrorMessage(info.error)); return }
+    setCredsConfirm({ lastLogin: info.data?.last_login || '' })
+  }
+
+  // Passo 2: conferma → nuova password temporanea + invio.
+  const confirmResendCredentials = async () => {
+    const hadLogin = !!credsConfirm?.lastLogin
+    setCredsSending(true)
+    const res = await talentApi.resendCredentials(talent.entity_id, hadLogin)
+    setCredsSending(false)
+    setCredsConfirm(null)
     if (res.success) {
       setCredsDone(true)
       showToast('Accesso reinviato ✓')
@@ -1498,6 +1509,34 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
         {/* Sticky bottom actions */}
         <div style={{ borderTop:`1px solid ${COLORS.border}`, padding:'12px 28px', flexShrink:0, background:'#fff' }}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {credsConfirm && (
+              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <div style={{ background:'#fff', borderRadius:10, padding:24, width:'min(440px, 92vw)', fontFamily:'Montserrat,sans-serif' }}>
+                  <h3 style={{ margin:'0 0 12px', fontSize:15, fontWeight:700, color:COLORS.text }}>Reinvia accesso a {nome}</h3>
+                  <p style={{ margin:'0 0 10px', fontSize:13, color:COLORS.text }}>
+                    Verrà generata una nuova password temporanea e inviata via email.
+                  </p>
+                  <p style={{ margin:'0 0 14px', fontSize:12, color:'#666' }}>
+                    Ultimo login: {credsConfirm.lastLogin ? new Date(credsConfirm.lastLogin).toLocaleString('it-IT') : 'mai'}
+                  </p>
+                  {credsConfirm.lastLogin && (
+                    <div style={{ margin:'0 0 14px', padding:'10px 12px', background:'#FFEBEE', border:'1px solid #EF9A9A', borderRadius:6, color:'#C62828', fontSize:13, fontWeight:700 }}>
+                      Il talent ha già acceduto: la password verrà resettata.
+                    </div>
+                  )}
+                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                    <button onClick={() => setCredsConfirm(null)} disabled={credsSending}
+                      style={{ padding:'8px 14px', background:'none', border:`1px solid ${COLORS.border}`, borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                      Annulla
+                    </button>
+                    <button onClick={confirmResendCredentials} disabled={credsSending}
+                      style={{ padding:'8px 14px', background:'#C62828', color:'#fff', border:'none', borderRadius:6, fontSize:12, fontWeight:700, cursor: credsSending ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}>
+                      {credsSending ? 'Invio…' : (credsConfirm.lastLogin ? 'Resetta e reinvia' : 'Reinvia accesso')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {credsMissing && (
               <button onClick={handleResendCredentials} disabled={credsSending}
                 title={d.credentials_last_error ? `Ultimo errore: ${d.credentials_last_error}` : 'Credenziali non confermate come inviate'}
