@@ -78,7 +78,7 @@ function getErrorRegistrySheet_() {
  * Upsert per fingerprint. Se la riga era FIXED → status REGRESSION.
  * @returns {{regression:boolean, occurrences:number, status:string}|null} null se fallisce (non lancia mai)
  */
-function upsertErrorRegistry_(fingerprint, errorClass, priority, action, message, errorId) {
+function upsertErrorRegistry_(fingerprint, errorClass, priority, action, message, errorId, module) {
   try {
     var sheet = getErrorRegistrySheet_();
     var now = new Date();
@@ -92,8 +92,10 @@ function upsertErrorRegistry_(fingerprint, errorClass, priority, action, message
     }
     if (row === -1) {
       var tipo = String(message || '').replace(/\d+/g, '#').substring(0, 200);
-      sheet.appendRow([fingerprint, errorClass, priority, action, tipo, now, now, 1, errorId, 'NEW', '', '', '']);
-      return { regression: false, occurrences: 1, status: 'NEW' };
+      // Errori di prova (module=TEST) non sono mai NEW: nascono già ACK.
+      var initial = String(module || '').toUpperCase() === 'TEST' ? 'ACK' : 'NEW';
+      sheet.appendRow([fingerprint, errorClass, priority, action, tipo, now, now, 1, errorId, initial, '', '', '']);
+      return { regression: false, occurrences: 1, status: initial };
     }
     var cur = sheet.getRange(row, 1, 1, ERROR_REGISTRY_COLUMNS.length).getValues()[0];
     var status = String(cur[9] || 'NEW');
@@ -210,12 +212,63 @@ function sheetLink_(sheet, row) {
   } catch (e) { return ''; }
 }
 
+var MAIL_DAILY_LIMIT_DEFAULT = 100;   // Gmail consumer; override con Script Property MAIL_DAILY_LIMIT (es. 1500 Workspace)
+
+/** Quota mail in forma leggibile: "73/100 · ultimo invio: 08:14 (rimasti 74)". */
 function currentMailQuotaInfo_() {
   var live = null;
   try { live = MailApp.getRemainingDailyQuota(); } catch (e) {}
-  var last = '';
-  try { last = PropertiesService.getScriptProperties().getProperty('mail_quota_last') || ''; } catch (e) {}
-  return { live: live, last: last };
+  var props = PropertiesService.getScriptProperties();
+  var limit = parseInt(props.getProperty('MAIL_DAILY_LIMIT') || '', 10) || MAIL_DAILY_LIMIT_DEFAULT;
+  var text = live === null ? 'non disponibile (scope send_mail non autorizzato?)' : live + '/' + limit;
+  try {
+    var last = JSON.parse(props.getProperty('mail_quota_last') || 'null');
+    if (last && last.at) {
+      var hhmm = Utilities.formatDate(new Date(last.at), 'Europe/Rome', 'HH:mm');
+      text += ' · ultimo invio: ' + hhmm + (last.left !== null && last.left !== undefined ? ' (rimasti ' + last.left + ')' : '');
+    }
+  } catch (e) {}
+  return { live: live, limit: limit, text: text };
+}
+
+/** Riga "azione consigliata" in base a classe/action. */
+function recommendedAction_(f) {
+  var a = String(f.action || '');
+  if (/^mail\.send\.WELCOME_CREDENTIALS|^talent\.credentials|credentials\.watchdog/.test(a) && f.error_class !== 'EMAIL_QUOTA') {
+    return 'Apri il profilo talent in admin → Reinvia accesso. Controlla l\'email del talent.';
+  }
+  if (f.error_class === 'EMAIL_QUOTA') {
+    return 'Quota esaurita: i solleciti si fermano, le mail transazionali hanno la riserva. Verifica i consumi di oggi.';
+  }
+  if (a === 'doPost.parse') {
+    return 'Richiesta malformata, probabile bot/scan. Ignorare se isolata.';
+  }
+  if (/^mail\.send\.PASSWORD_RESET/.test(a)) {
+    return 'Il reset password non è partito: verifica l\'email dell\'utente e riprova dal login.';
+  }
+  return 'Apri la riga ErrorLog (link sotto).';
+}
+
+/**
+ * Contesto umano per TALENT_PROFILE / LEAD_TALENT: nome cognome + email mascherata.
+ * Mai password, token o altri campi. Non lancia.
+ */
+function entityContext_(f) {
+  try {
+    if (!f.entity_id || (f.entity_type !== 'TALENT_PROFILE' && f.entity_type !== 'LEAD_TALENT')) return '';
+    var e = getEntityById(f.entity_id, null);
+    if (!e || !e.data) return '';
+    var nome = ((e.data.nome || '') + ' ' + (e.data.cognome || '')).trim();
+    var email = maskEmail_(e.data.email || e.data.email_contatto || '');
+    return [nome, email].filter(Boolean).join(' · ');
+  } catch (err) { return ''; }
+}
+
+/** APP_VERSION/APP_BUILD sono in Version.js (scritto da scripts/deploy-backend.sh). */
+function appVersionText_() {
+  var v = (typeof APP_VERSION !== 'undefined') ? APP_VERSION : '?';
+  var b = (typeof APP_BUILD !== 'undefined' && APP_BUILD) ? ' (' + APP_BUILD + ')' : '';
+  return v + b;
 }
 
 /** Webhook secondario (GHL). Script Property GHL_ALERT_WEBHOOK; vuota = salta senza errore. */
@@ -266,7 +319,7 @@ function alertFieldsOf_(d) {
     error_id: d.error_id, timestamp: d.timestamp instanceof Date ? d.timestamp.toISOString() : String(d.timestamp),
     error_class: d.error_class || 'UNKNOWN', priority: d.priority || 'P2', severity: d.severity || d.level,
     module: d.module, action: d.action, entity_type: d.entity_type, entity_id: d.entity_id,
-    actor: d.actor || d.user_id, tenant_id: d.tenant_id, message: d.message, stack: d.stack,
+    actor: d.actor || d.user_id, tenant_id: (String(d.tenant_id).toUpperCase() === 'UUID' ? '' : d.tenant_id), message: d.message, stack: d.stack,
     input: d.input, deployment_id: d.deployment_id, fingerprint: d.fingerprint
   };
 }
@@ -276,49 +329,61 @@ function htmlRow_(k, v) {
     '</td><td style="padding:4px 0;"><code style="white-space:pre-wrap;word-break:break-word;">' + escapeHtml_(String(v === undefined || v === null ? '' : v)) + '</code></td></tr>';
 }
 
-/** Alert immediato P1 per un fingerprint. */
-function sendP1Alert_(group, tail) {
+function sendP1Alert_(group, tail, opts) {
+  opts = opts || {};
   var latest = group.rows[group.rows.length - 1];
   var f = alertFieldsOf_(latest.d);
   var reg = getRegistryEntry_(group.fingerprint);
   var quota = currentMailQuotaInfo_();
   var batchCount = group.rows.length;
   var total = reg ? reg.occurrences : batchCount;
+  var isTest = String(f.module).toUpperCase() === 'TEST';
+  var human = entityContext_(f);
 
-  var subject = '[MADE EVENTS][P1][' + f.error_class + '] ' + f.action + ' — ' + oneLine_(f.message, 80);
+  var msg = (opts.note ? opts.note + ' — ' : '') + oneLine_(f.message, 80);
+  var subject = (isTest ? '[TEST]' : '') + '[MADE EVENTS][P1][' + f.error_class + '] ' + f.action + ' — ' + msg;
   var linkLog = sheetLink_(tail.sheet, latest.row);
   var linkReg = reg ? sheetLink_(getErrorRegistrySheet_(), reg.row) : '';
 
   var lines = [
-    ['error_id', f.error_id], ['timestamp', f.timestamp], ['classe', f.error_class], ['priorità', f.priority],
+    ['azione consigliata', opts.note ? opts.note + '. ' + recommendedAction_(f) : recommendedAction_(f)],
+    ['error_id', f.error_id], ['timestamp', f.timestamp], ['classe', f.error_class], ['priorità', 'P1' + (opts.note ? ' (escalation)' : '')],
     ['severity', f.severity], ['module', f.module], ['action', f.action],
-    ['entity', (f.entity_type || '') + ' ' + (f.entity_id || '')], ['actor', f.actor], ['tenant_id', f.tenant_id],
+    ['entity', (f.entity_type || '') + ' ' + (f.entity_id || '')]
+  ];
+  if (human) lines.push(['persona', human]);
+  lines = lines.concat([
+    ['actor', f.actor], ['tenant_id', f.tenant_id],
     ['messaggio', f.message], ['stack', f.stack], ['input (sanificato)', f.input],
-    ['deployment_id', f.deployment_id], ['fingerprint', f.fingerprint],
-    ['quota mail residua', quota.live + (quota.last ? ' | ultimo invio: ' + quota.last : '')],
+    ['versione / deployment', appVersionText_() + ' · ' + f.deployment_id], ['fingerprint', f.fingerprint],
+    ['quota mail residua', quota.text],
     ['occorrenze (in questo avviso / totali)', batchCount + ' / ' + total],
     ['stato registry', reg ? reg.status : ''],
     ['riga ErrorLog', linkLog], ['riga ErrorRegistry', linkReg]
-  ];
+  ]);
   var html = '<table style="font-family:Arial,sans-serif;font-size:13px;border-collapse:collapse;">' +
     lines.map(function(l) { return htmlRow_(l[0], l[1]); }).join('') + '</table>';
   var text = lines.map(function(l) { return l[0] + ': ' + l[1]; }).join('\n');
 
   var payload = alertFieldsOf_(latest.d);
   payload.source = 'MADE EVENTS'; payload.subject = subject; payload.occurrences = batchCount; payload.occurrences_total = total;
-  payload.quota_live = quota.live; payload.link_errorlog = linkLog; payload.link_registry = linkReg;
+  payload.recommended_action = lines[0][1]; payload.person = human; payload.app_version = appVersionText_();
+  payload.quota = quota.text; payload.link_errorlog = linkLog; payload.link_registry = linkReg;
   return sendAlertChannel_(subject, html, text, payload);
 }
 
-/** Trigger ogni 5 minuti: notifica gli ERROR P1 non ancora notificati. */
+// Errori P2 che diventano P1 solo oltre una soglia di frequenza (anti-rumore: scan/bot).
+var ALERT_ESCALATIONS = {
+  'doPost.parse': { threshold: 20, windowMs: 60 * 60 * 1000, note: 'Possibile scan/attacco' }
+};
+
 function jobErrorAlerts() {
   try {
     var tail = readErrorLogTail_(ALERT_SCAN_ROWS);
-    var pending = tail.rows.filter(function(r) { return isPendingAlert_(r.d) && String(r.d.priority) === 'P1'; });
-    if (!pending.length) return;
-
     var dedup = loadAlertDedup_();
     var now = Date.now();
+
+    var pending = tail.rows.filter(function(r) { return isPendingAlert_(r.d) && String(r.d.priority) === 'P1'; });
     groupByFingerprint_(pending).forEach(function(g) {
       var lastAt = dedup[g.fingerprint];
       if (lastAt && now - lastAt < ALERT_DEDUP_MS) return;   // le righe restano non notificate: finiscono nel prossimo avviso, col conteggio
@@ -328,6 +393,30 @@ function jobErrorAlerts() {
         dedup[g.fingerprint] = now;
       }
     });
+
+    // Escalation P2 → P1 per frequenza (es. doPost.parse >= 20 nell'ultima ora): una sola mail all'ora.
+    var byFp = {};
+    tail.rows.forEach(function(r) {
+      var cfg = ALERT_ESCALATIONS[String(r.d.action)];
+      var sev = String(r.d.severity || r.d.level).toUpperCase();
+      if (!cfg || sev !== 'ERROR' || !r.d.fingerprint) return;
+      var ts = r.d.timestamp instanceof Date ? r.d.timestamp.getTime() : new Date(r.d.timestamp).getTime();
+      if (isNaN(ts) || now - ts > cfg.windowMs) return;
+      (byFp[r.d.fingerprint] = byFp[r.d.fingerprint] || { cfg: cfg, rows: [] }).rows.push(r);
+    });
+    Object.keys(byFp).forEach(function(fp) {
+      var g = byFp[fp];
+      var key = 'esc_' + fp;
+      if (g.rows.length < g.cfg.threshold) return;
+      if (dedup[key] && now - dedup[key] < ALERT_DEDUP_MS) return;
+      var res = sendP1Alert_({ fingerprint: fp, rows: g.rows }, tail,
+        { note: g.cfg.note + ' (' + g.rows.length + ' in 1h)' });
+      if (res.ok) {
+        markAlerted_(tail, g.rows.filter(function(r) { return isPendingAlert_(r.d); }));
+        dedup[key] = now;
+      }
+    });
+
     saveAlertDedup_(dedup);
   } catch (e) {
     Logger.log('[ALERTS] jobErrorAlerts: ' + e.message);
@@ -337,9 +426,24 @@ function jobErrorAlerts() {
 
 /** Trigger giornaliero 08:00 (Europe/Rome): digest unico degli ERROR P2 non notificati. */
 function jobErrorDigest() {
+  runErrorDigest_({});
+}
+
+/** Come jobErrorDigest ma include anche gli errori module=TEST (per provare il digest a mano). */
+function testErrorDigest() {
+  runErrorDigest_({ includeTest: true });
+}
+
+function runErrorDigest_(opts) {
   try {
     var tail = readErrorLogTail_(DIGEST_SCAN_ROWS);
     var pending = tail.rows.filter(function(r) { return isPendingAlert_(r.d) && String(r.d.priority) !== 'P1'; });
+    if (!opts.includeTest) {
+      // Gli errori di prova non entrano nel digest: vengono solo chiusi, senza mail.
+      var testRows = pending.filter(function(r) { return String(r.d.module).toUpperCase() === 'TEST'; });
+      if (testRows.length) markAlerted_(tail, testRows);
+      pending = pending.filter(function(r) { return String(r.d.module).toUpperCase() !== 'TEST'; });
+    }
     if (!pending.length) return;
 
     var groups = groupByFingerprint_(pending);
@@ -356,11 +460,11 @@ function jobErrorDigest() {
     var html = '<p style="font-family:Arial,sans-serif;font-size:13px;">Digest errori P2 — ' + escapeHtml_(new Date().toISOString()) + '</p>' +
       items.map(function(it) {
         return '<table style="font-family:Arial,sans-serif;font-size:13px;border-collapse:collapse;margin:0 0 16px;border-top:1px solid #ddd;">' +
-          [['classe', it.f.error_class], ['action', it.f.action], ['messaggio', it.f.message],
-           ['entity', (it.f.entity_type || '') + ' ' + (it.f.entity_id || '')], ['actor', it.f.actor],
+          [['azione consigliata', recommendedAction_(it.f)], ['classe', it.f.error_class], ['action', it.f.action], ['messaggio', it.f.message],
+           ['entity', (it.f.entity_type || '') + ' ' + (it.f.entity_id || '')], ['persona', entityContext_(it.f)], ['actor', it.f.actor],
            ['occorrenze (digest / totali)', it.count + ' / ' + it.total], ['stato registry', it.status],
            ['ultimo error_id', it.f.error_id], ['timestamp ultimo', it.f.timestamp], ['stack', it.f.stack],
-           ['input (sanificato)', it.f.input], ['deployment_id', it.f.deployment_id], ['fingerprint', it.f.fingerprint],
+           ['input (sanificato)', it.f.input], ['versione / deployment', appVersionText_() + ' · ' + it.f.deployment_id], ['fingerprint', it.f.fingerprint],
            ['riga ErrorLog', it.link]
           ].map(function(l) { return htmlRow_(l[0], l[1]); }).join('') + '</table>';
       }).join('');
@@ -375,7 +479,7 @@ function jobErrorDigest() {
     });
     if (res.ok) markAlerted_(tail, pending);
   } catch (e) {
-    Logger.log('[ALERTS] jobErrorDigest: ' + e.message);
+    Logger.log('[ALERTS] runErrorDigest_: ' + e.message);
     logError_({ severity: 'WARN', module: 'ALERTS', action: 'jobErrorDigest', message: e.message, stack: e.stack });
   }
 }
@@ -449,7 +553,8 @@ function testForcedErrors() {
   logError_({ severity: 'ERROR', module: 'TEST', action: 'test.forcedP2',
     message: 'Errore di prova P2 (test.forcedP2)' });
   jobErrorAlerts();
-  Logger.log('P1 notificato (se la mail non è in dedup). Controlla ErrorLog, ErrorRegistry e dev-alerts. P2 nel digest delle 08:00.');
+  Logger.log('P1 notificato (se la mail non è in dedup 60 min). Controlla ErrorLog, ErrorRegistry (status ACK, module=TEST) e dev-alerts. ' +
+    'Gli errori TEST non entrano nel digest delle 08:00: per provare il digest lancia testErrorDigest().');
 }
 
 /**

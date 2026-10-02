@@ -34,7 +34,7 @@ function doPost(e) {
     var body = JSON.parse(raw || '{}');
   } catch (err) {
     // Non si logga il body (può contenere password/PII): solo lunghezza e motivo.
-    logError_({ severity: 'ERROR', priority: 'P1', error_class: 'VALIDATION', module: 'CODE', action: 'doPost.parse',
+    logError_({ severity: 'ERROR', priority: 'P2', error_class: 'VALIDATION', module: 'CODE', action: 'doPost.parse',
       message: 'JSON non valido: ' + err.message, input: { rawLength: (raw || '').length } });
     return jsonResponse_(errorResponse('SYS_001', 'JSON non valido: ' + (raw || '').substring(0, 200)));
   }
@@ -318,7 +318,7 @@ function logError_(ctxOrModule, action, message, stack, userId, tenantId) {
     var priority = '';
     if (severity === 'ERROR') {
       priority = (ctx.priority === 'P1' || ctx.priority === 'P2') ? ctx.priority : priorityFor_(errorClass, ctx.module, act);
-      var reg = upsertErrorRegistry_(fingerprint, errorClass, priority, act, msg, errorId);
+      var reg = upsertErrorRegistry_(fingerprint, errorClass, priority, act, msg, errorId, ctx.module);
       if (reg && reg.regression) {
         priority = 'P1';
         msg = '[REGRESSION] ' + msg;

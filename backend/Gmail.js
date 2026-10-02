@@ -69,7 +69,7 @@ function sendEmail_(to, subject, bodyHtml, bodyText, opts) {
   function fail_(error, severity, stack) {
     logError_({
       severity:    opts.suppressAlert ? 'WARN' : severity,
-      module:      'GMAIL',
+      module:      opts.module || 'GMAIL',
       action:      'mail.send.' + mailType,
       entity_type: opts.entity_type,
       entity_id:   opts.entity_id,

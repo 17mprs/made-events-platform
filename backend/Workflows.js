@@ -668,6 +668,15 @@ function handleTalentCredentialsInfo(payload, auth) {
  * Nessuna scrittura.
  */
 function handleAuditCredentials(payload, auth) {
+  var list = collectAuditCredentials_(auth.tenant_id);
+  return successResponse({ count: list.length, profiles: list });
+}
+
+/**
+ * Logica condivisa dell'audit credenziali (SOLA LETTURA).
+ * @param {string|null} tenantId  null = tutti i tenant (uso da editor GAS)
+ */
+function collectAuditCredentials_(tenantId) {
   var users = getAllRows('Users');
   var byId = {}, byEmail = {};
   users.forEach(function(u) {
@@ -678,7 +687,7 @@ function handleAuditCredentials(payload, auth) {
   var list = [];
   getAllRows('Entities').forEach(function(r) {
     if (r.type !== 'TALENT_PROFILE' || r.status !== ENTITY_STATUS.TALENT_PROFILE.APPROVED) return;
-    if (String(r.tenant_id) !== String(auth.tenant_id)) return;
+    if (tenantId && String(r.tenant_id) !== String(tenantId)) return;
     var d = parseJSON(r.data) || {};
     var email = String(d.email || d.email_contatto || '').toLowerCase().trim();
     var u = (d.user_id && byId[String(d.user_id)]) || byEmail[email] || null;
@@ -690,11 +699,34 @@ function handleAuditCredentials(payload, auth) {
       approvato_il:     formatLastLogin_(r.created_at),
       user_found:       !!u,
       credentials_sent: d.credentials_sent === undefined ? null : d.credentials_sent,
-      credentials_last_error: d.credentials_last_error || ''
+      credentials_last_error: d.credentials_last_error || '',
+      last_login:       u ? formatLastLogin_(u.last_login) : ''
     });
   });
   list.sort(function(a, b) { return String(a.approvato_il).localeCompare(String(b.approvato_il)); });
-  return successResponse({ count: list.length, profiles: list });
+  return list;
+}
+
+/**
+ * Da eseguire dall'editor GAS: scrive nel Log (Visualizza → Log di esecuzione) i TALENT_PROFILE
+ * APPROVED il cui USER non ha mai fatto login. SOLA LETTURA: nessuna scrittura su sheet,
+ * nessuna mail, nessuna modifica password.
+ */
+function auditCredentialsReport() {
+  var list = collectAuditCredentials_(null);
+  Logger.log('=== AUDIT CREDENZIALI — profili APPROVED senza login: ' + list.length + ' ===');
+  Logger.log('nome | email | approvato_il | credentials_sent | last_login | account');
+  list.forEach(function(p) {
+    Logger.log([
+      p.nome || '(senza nome)', p.email || '(senza email)', p.approvato_il || '',
+      p.credentials_sent === null ? 'n/d (storico)' : String(p.credentials_sent),
+      p.last_login || 'mai', p.user_found ? 'USER ok' : 'USER MANCANTE'
+    ].join(' | '));
+  });
+  var noFlag = list.filter(function(p) { return p.credentials_sent === null; }).length;
+  var failed = list.filter(function(p) { return p.credentials_sent === false; }).length;
+  Logger.log('=== di cui: credentials_sent=false: ' + failed + ' | flag assente (storici): ' + noFlag + ' | USER mancante: ' +
+    list.filter(function(p) { return !p.user_found; }).length + ' ===');
 }
 
 /** USER collegato a un TALENT_PROFILE (user_id nel JSON, fallback sull'email). */

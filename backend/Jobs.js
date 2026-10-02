@@ -1044,13 +1044,17 @@ function checkMissingCredentials_() {
 // Il profilo di prova viene soft-deleted a fine test.
 // ---------------------------------------------------------------------------
 function testForcedCredentialsFailure() {
-  var tenant = getAllRows('Tenants')[0];
-  var tenantId = tenant && tenant.tenant_id;
+  // Tenant attivo reale (getAllRows('Tenants')[0] può essere la riga segnaposto "UUID").
+  var tenantId = getDefaultTenantId_();
+  if (!tenantId || String(tenantId).toUpperCase() === 'UUID') throw new Error('Nessun tenant attivo valido');
   var profile = createEntity('TALENT_PROFILE', ENTITY_STATUS.TALENT_PROFILE.APPROVED, {
     nome: 'TEST', cognome: 'FORCED_FAILURE', email: 'indirizzo-non-valido',
     credentials_sent: false, credentials_attempts: 0, stato_profilo: 'approvato'
   }, tenantId, 'system');
-  var res = deliverTalentCredentials_(profile.entity_id, tenantId, 'indirizzo-non-valido', 'TEST', 'Pwd-Test-123', { user_id: 'system' }, false);
+  // module=TEST: l'errore finisce in ErrorRegistry già ACK e fuori dal digest.
+  var res = withMailCtx_({ module: 'TEST' }, function() {
+    return deliverTalentCredentials_(profile.entity_id, tenantId, 'indirizzo-non-valido', 'TEST', 'Pwd-Test-123', { user_id: 'system' }, false);
+  });
   var after = getEntityById(profile.entity_id, tenantId);
   Logger.log('esito=' + JSON.stringify(res));
   Logger.log('flag=' + JSON.stringify({
