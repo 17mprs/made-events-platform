@@ -451,3 +451,12 @@ function testForcedErrors() {
   jobErrorAlerts();
   Logger.log('P1 notificato (se la mail non è in dedup). Controlla ErrorLog, ErrorRegistry e dev-alerts. P2 nel digest delle 08:00.');
 }
+
+/**
+ * Da eseguire UNA volta dall'editor GAS dopo il deploy: fa comparire la schermata di
+ * consenso OAuth per lo scope script.send_mail (serve a MailApp.getRemainingDailyQuota,
+ * usato dal quota guard e dagli alert). Senza consenso il guard resta disattivo.
+ */
+function authorizeMailScope() {
+  Logger.log('Quota mail residua: ' + MailApp.getRemainingDailyQuota());
+}
