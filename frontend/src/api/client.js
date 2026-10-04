@@ -161,6 +161,8 @@ export const talentApi = {
   softDelete:         (entity_id)                => gasPost('talent.softDelete',          { entity_id },               t()),
   resendCredentials:  (entity_id, confirm_reset = false) => gasPost('talent.resendCredentials', { entity_id, confirm_reset }, t()),
   credentialsInfo:    (entity_id)                => gasPost('talent.credentialsInfo',     { entity_id },               t()),
+  previewReviewRequest: (entity_id)              => gasPost('talent.previewReviewRequest', { entity_id },              t()),
+  sendReviewRequest:    (entity_id, force = false) => gasPost('talent.sendReviewRequest',    { entity_id, confirm: true, force }, t()),
 }
 
 export const leadApi = {

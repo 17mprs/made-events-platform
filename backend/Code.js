@@ -131,6 +131,8 @@ function handleRequest(action, payload, token) {
     case 'talent.resendCredentials': return handleTalentResendCredentials(payload, auth);
     case 'talent.credentialsInfo':   return handleTalentCredentialsInfo(payload, auth);
     case 'admin.auditCredentials':   return handleAuditCredentials(payload, auth);
+    case 'talent.previewReviewRequest': return handleTalentPreviewReviewRequest(payload, auth);
+    case 'talent.sendReviewRequest':    return handleTalentSendReviewRequest(payload, auth);
     case 'talent.list':              return handleTalentList(payload, auth);
     case 'talent.get':               return handleTalentGet(payload, auth);
     case 'talent.updateProfile':     return handleTalentUpdateProfile(payload, auth);

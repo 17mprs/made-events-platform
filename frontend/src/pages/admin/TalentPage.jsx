@@ -652,6 +652,19 @@ function TalentChangesDrawer({ profile, onClose, onApprove, onReject, actionLoad
   )
 }
 
+// Icona "G" Google stilizzata (4 colori) + stellina — SVG inline, nessuna dipendenza.
+function GoogleReviewIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ display:'block' }}>
+      <path d="M20.6 12.2c0-.6-.1-1.1-.2-1.6H12v3.1h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.4z" fill="#4285F4" />
+      <path d="M12 21c2.4 0 4.5-.8 5.9-2.2L15 16.6c-.8.5-1.8.9-3 .9-2.3 0-4.3-1.6-5-3.7H4v2.3A9 9 0 0 0 12 21z" fill="#34A853" />
+      <path d="M7 13.8a5.4 5.4 0 0 1 0-3.6V7.9H4a9 9 0 0 0 0 8.2l3-2.3z" fill="#FBBC05" />
+      <path d="M12 6.5c1.3 0 2.5.5 3.4 1.3l2.5-2.5A9 9 0 0 0 4 7.9l3 2.3c.7-2.1 2.7-3.7 5-3.7z" fill="#EA4335" />
+      <path d="M19.5 1.2l.9 1.9 2.1.3-1.5 1.5.4 2.1-1.9-1-1.9 1 .4-2.1-1.5-1.5 2.1-.3z" fill="#F9AB00" />
+    </svg>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // TALENT PROFILE DRAWER — scheda completa talent approvato
 // ---------------------------------------------------------------------------
@@ -708,6 +721,37 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
 
   const [cardLoading, setCardLoading] = useState(false)
   const [cardError,   setCardError]   = useState(null)
+
+  // Richiesta recensione Google (solo APPROVED con email)
+  const [reviewModal,   setReviewModal]   = useState(false)
+  const [reviewPreview, setReviewPreview] = useState(null)   // { subject, html, to_masked, already_sent_at, cooldown_active, can_send, reason }
+  const [reviewLoading, setReviewLoading] = useState(false)  // caricamento anteprima
+  const [reviewSending, setReviewSending] = useState(false)
+  const [reviewError,   setReviewError]   = useState(null)
+  const canReviewRequest = talent.status === 'APPROVED' && !!(d.email || d.email_contatto)
+
+  const openReviewModal = async () => {
+    setReviewModal(true); setReviewPreview(null); setReviewError(null); setReviewLoading(true)
+    const res = await talentApi.previewReviewRequest(talent.entity_id)
+    setReviewLoading(false)
+    if (res.success) setReviewPreview(res.data)
+    else setReviewError(res.error?.message || getErrorMessage(res.error))
+  }
+
+  const closeReviewModal = () => { if (!reviewSending) setReviewModal(false) }
+
+  const sendReviewRequest = async force => {
+    setReviewSending(true); setReviewError(null)
+    const res = await talentApi.sendReviewRequest(talent.entity_id, force)
+    setReviewSending(false)
+    if (res.success) {
+      setReviewModal(false)
+      showToast('Richiesta recensione inviata ✓')
+      await adminStore.refresh()
+    } else {
+      setReviewError(res.error?.message || getErrorMessage(res.error))   // modale resta aperto
+    }
+  }
 
   // Sostituzione foto da admin — crop con lo stesso aspect ratio delle celle
   // template PDF (vedi CropModal.jsx / TalentCard.js insertPhotoAtPlaceholder_).
@@ -1032,6 +1076,47 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
           <img src={lightboxUrl} alt="foto" style={{ maxWidth:'90vw', maxHeight:'90vh', objectFit:'contain', borderRadius:8 }} onClick={e => e.stopPropagation()} />
           <button onClick={() => setLightboxUrl(null)} style={{ position:'absolute', top:20, right:20, background:'rgba(0,0,0,0.5)', border:'none', color:'#fff', fontSize:24, cursor:'pointer', width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
         </div>
+      )}
+
+      {/* Review Request Modal */}
+      {reviewModal && (
+        <>
+          <div onClick={closeReviewModal} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />
+          <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'#fff', borderRadius:8, padding:24, width:640, maxWidth:'94vw', maxHeight:'92vh', display:'flex', flexDirection:'column', zIndex:651, fontFamily:'Montserrat,sans-serif', boxShadow:'0 20px 60px rgba(0,0,0,0.3)', boxSizing:'border-box' }}>
+            <h3 style={{ margin:'0 0 12px', fontSize:15, fontWeight:700, color:COLORS.text }}>Richiesta recensione Google</h3>
+            {reviewLoading && <div style={{ padding:'28px 0', textAlign:'center', fontSize:13, color:COLORS.textSecondary }}>Caricamento anteprima…</div>}
+            {reviewPreview && (
+              <>
+                <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:4 }}>A: <strong style={{ color:COLORS.text }}>{reviewPreview.to_masked || '—'}</strong></div>
+                <div style={{ fontSize:12, color:COLORS.textSecondary, marginBottom:10 }}>Oggetto: <strong style={{ color:COLORS.text }}>{reviewPreview.subject}</strong></div>
+                {reviewPreview.already_sent_at && reviewPreview.cooldown_active && (
+                  <div style={{ marginBottom:10, padding:'8px 12px', background:'#FFF8E1', border:'1px solid #FFE082', borderRadius:6, fontSize:12, color:'#8D6E00', fontWeight:600 }}>
+                    Richiesta già inviata il {new Date(reviewPreview.already_sent_at).toLocaleDateString('it-IT')}
+                  </div>
+                )}
+                {!reviewPreview.can_send && (
+                  <div style={{ marginBottom:10, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>{reviewPreview.reason || 'Invio non disponibile'}</div>
+                )}
+                <iframe title="Anteprima email" sandbox="" srcDoc={reviewPreview.html}
+                  style={{ width:'100%', height:360, flex:'1 1 auto', minHeight:200, border:`1px solid ${COLORS.border}`, borderRadius:6, background:'#F6F6F6' }} />
+              </>
+            )}
+            {reviewError && <div style={{ marginTop:10, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>{reviewError}</div>}
+            <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end', flexWrap:'wrap' }}>
+              <button onClick={closeReviewModal} disabled={reviewSending} style={BTN_OUTLINE}>Annulla</button>
+              {reviewPreview?.can_send && (() => {
+                const force = !!reviewPreview.cooldown_active
+                const busy  = reviewLoading || reviewSending
+                return (
+                  <button onClick={() => sendReviewRequest(force)} disabled={busy}
+                    style={{ padding:'8px 20px', background: busy ? '#ccc' : COLORS.accent, color:'#fff', border:'none', borderRadius:6, cursor: busy ? 'wait' : 'pointer', fontSize:12, fontWeight:700, fontFamily:'Montserrat,sans-serif' }}>
+                    {reviewSending ? 'Invio…' : (force ? 'Invia di nuovo' : 'Conferma e invia')}
+                  </button>
+                )
+              })()}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Email Modal */}
@@ -1508,6 +1593,11 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
 
         {/* Sticky bottom actions */}
         <div style={{ borderTop:`1px solid ${COLORS.border}`, padding:'12px 28px', flexShrink:0, background:'#fff' }}>
+          {d.review_request_sent_at && (
+            <div style={{ marginBottom:8, fontSize:11, color:COLORS.textSecondary }}>
+              Richiesta recensione inviata il {new Date(d.review_request_sent_at).toLocaleDateString('it-IT')} ({parseInt(d.review_request_count, 10) || 1} {(parseInt(d.review_request_count, 10) || 1) === 1 ? 'volta' : 'volte'})
+            </div>
+          )}
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {credsConfirm && (
               <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -1548,6 +1638,12 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
               style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', border:`1px solid ${COLORS.border}`, color:COLORS.text, borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
               Invia email
             </button>
+            {canReviewRequest && (
+              <button onClick={openReviewModal} title="Richiedi recensione Google" aria-label="Richiedi recensione Google"
+                style={{ flex:'0 0 auto', padding:'9px 12px', background:'none', border:`1px solid ${COLORS.border}`, borderRadius:6, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <GoogleReviewIcon />
+              </button>
+            )}
             <button onClick={() => { setSocialResult(null); setShowSocialModal(true) }}
               style={{ flex:'1 1 90px', padding:'9px 12px', background:'none', border:`1px solid ${COLORS.border}`, color:COLORS.text, borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }}>
               Invita social

@@ -662,6 +662,160 @@ function handleTalentCredentialsInfo(payload, auth) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// RICHIESTA RECENSIONE GOOGLE — 'talent.previewReviewRequest' / 'talent.sendReviewRequest'
+// Campi su TALENT_PROFILE.data: review_request_sent_at, review_request_count, review_request_by
+// ---------------------------------------------------------------------------
+
+/**
+ * Controlli comuni ad anteprima e invio (profilo esistente, non eliminato,
+ * APPROVED, email valida) + stato cooldown. Nessun dato sensibile nel risultato.
+ * @returns {{profile:object, email:string, can_send:boolean, reason:string,
+ *            already_sent_at:string, cooldown_active:boolean}}
+ */
+function reviewRequestCheck_(entityId, tenantId) {
+  var profile = getEntityById(entityId, tenantId);   // esclude già i soft-deleted
+  var out = { profile: null, email: '', can_send: false, reason: '', already_sent_at: '', cooldown_active: false };
+  if (!profile || profile.type !== 'TALENT_PROFILE' || String(profile.deleted).toLowerCase() === 'true') {
+    out.reason = 'Profilo talent non trovato';
+    return out;
+  }
+  out.profile = profile;
+  var d = profile.data || {};
+  out.already_sent_at = d.review_request_sent_at ? String(d.review_request_sent_at) : '';
+  if (profile.status !== ENTITY_STATUS.TALENT_PROFILE.APPROVED) {
+    out.reason = 'Il profilo deve essere APPROVED. Stato attuale: ' + profile.status;
+    return out;
+  }
+  out.email = String(d.email || d.email_contatto || '').trim();
+  if (!out.email || !isValidEmail(out.email)) {
+    out.reason = 'Email del talent assente o non valida';
+    return out;
+  }
+  if (out.already_sent_at) {
+    var t = new Date(out.already_sent_at).getTime();
+    out.cooldown_active = !isNaN(t) && (Date.now() - t) < REVIEW_REQUEST_COOLDOWN_DAYS * 24 * 3600 * 1000;
+  }
+  out.can_send = true;
+  return out;
+}
+
+function formatItDate_(iso) {
+  var d = new Date(iso);
+  return isNaN(d.getTime()) ? String(iso) : Utilities.formatDate(d, 'Europe/Rome', 'dd/MM/yyyy');
+}
+
+/** Sola lettura: restituisce l'email ESATTA che verrebbe inviata. */
+function handleTalentPreviewReviewRequest(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+  var chk = reviewRequestCheck_(payload.entity_id, auth.tenant_id);
+  if (!chk.profile) return errorResponse('SYS_002', chk.reason);
+  var m = buildReviewRequestEmail_(chk.profile.data.nome || '');
+  return successResponse({
+    subject:         m.subject,
+    html:            m.html,
+    to_masked:       chk.email ? maskEmail_(chk.email) : '',
+    already_sent_at: chk.already_sent_at,
+    cooldown_active: chk.cooldown_active,
+    can_send:        chk.can_send,
+    reason:          chk.reason
+  });
+}
+
+function handleTalentSendReviewRequest(payload, auth) {
+  var valid = requireFields(payload, ['entity_id']);
+  if (valid) return valid;
+  if (payload.confirm !== true) return errorResponse('VAL_001', 'Conferma esplicita richiesta (confirm:true)', 'confirm');
+
+  var chk = reviewRequestCheck_(payload.entity_id, auth.tenant_id);
+  if (!chk.profile) return errorResponse('SYS_002', chk.reason);
+  if (!chk.can_send) return errorResponse('WF_002', chk.reason);
+  if (chk.cooldown_active && payload.force !== true) {
+    return errorResponse('WF_COOLDOWN', 'Richiesta già inviata il ' + formatItDate_(chk.already_sent_at) +
+      ' (cooldown ' + REVIEW_REQUEST_COOLDOWN_DAYS + ' giorni)');
+  }
+
+  var profile = chk.profile;
+  var mod = (_mailCtx && _mailCtx.module) || 'WORKFLOWS';   // i test impostano module=TEST
+  var ctx = { module: mod, mailType: 'REVIEW_REQUEST', entity_type: 'TALENT_PROFILE',
+              entity_id: profile.entity_id, actor: auth.user_id, tenant_id: auth.tenant_id };
+  var res;
+  try {
+    res = withMailCtx_(ctx, function() { return sendReviewRequestEmail(chk.email, profile.data.nome || '', ctx); });
+  } catch (e) {
+    res = { ok: false, error: 'EXCEPTION: ' + e.message };
+  }
+
+  if (!res.ok) {
+    // QUOTA_RESERVE è uno stato atteso (già loggato WARN da sendEmail_): niente alert P2.
+    if (String(res.error).indexOf('QUOTA_RESERVE') !== 0) {
+      logError_({ severity: 'ERROR', error_class: 'EMAIL_SEND', priority: 'P2', module: mod, action: 'talent.sendReviewRequest',
+        entity_type: 'TALENT_PROFILE', entity_id: profile.entity_id, actor: auth.user_id, tenant_id: auth.tenant_id,
+        message: 'Invio richiesta recensione fallito: ' + res.error });
+    }
+    logActivity({ level: 'ERROR', module: 'WORKFLOWS', action: 'talent.sendReviewRequest', entity_type: 'TALENT_PROFILE',
+      entity_id: profile.entity_id, user_id: auth.user_id, tenant_id: auth.tenant_id, note: String(res.error).substring(0, 200) });
+    var friendly = String(res.error).indexOf('QUOTA_RESERVE') === 0
+      ? 'Quota email giornaliera quasi esaurita: riprova domani (le ultime mail sono riservate a credenziali e approvazioni)'
+      : 'Invio email fallito: ' + res.error;
+    return errorResponse('SYS_001', friendly);
+  }
+
+  var nowIso = new Date().toISOString();
+  var count = (parseInt(profile.data.review_request_count, 10) || 0) + 1;
+  try {
+    updateEntityData(profile.entity_id, { review_request_sent_at: nowIso, review_request_count: count, review_request_by: auth.user_id },
+      auth.tenant_id, auth.user_id);
+  } catch (e) {
+    logError_({ severity: 'ERROR', module: mod, action: 'talent.sendReviewRequest.flag', entity_type: 'TALENT_PROFILE',
+      entity_id: profile.entity_id, actor: auth.user_id, tenant_id: auth.tenant_id,
+      message: 'Mail inviata ma scrittura review_request_* fallita: ' + e.message, stack: e.stack });
+  }
+  logActivity({ level: 'INFO', module: 'WORKFLOWS', action: 'talent.sendReviewRequest', entity_type: 'TALENT_PROFILE',
+    entity_id: profile.entity_id, user_id: auth.user_id, tenant_id: auth.tenant_id,
+    note: 'ok n=' + count + (payload.force === true ? ' force' : '') });
+  return successResponse({ profile_id: profile.entity_id, review_request_sent_at: nowIso, review_request_count: count });
+}
+
+// ---------------------------------------------------------------------------
+// TEST MANUALI (editor GAS)
+// ---------------------------------------------------------------------------
+
+/** Genera l'HTML senza inviare nulla; scrive nel Log lunghezza, oggetto, presenza link CTA. */
+function testReviewRequestPreview() {
+  var m = buildReviewRequestEmail_('Test');
+  Logger.log('subject=' + m.subject);
+  Logger.log('html_length=' + m.html.length + ' | text_length=' + m.text.length);
+  Logger.log('cta_link_in_html=' + (m.html.indexOf('href="' + GOOGLE_REVIEW_URL + '"') !== -1) +
+             ' | cta_link_in_text=' + (m.text.indexOf(GOOGLE_REVIEW_URL) !== -1));
+  Logger.log('contiene_svg=' + /<svg/i.test(m.html));
+}
+
+/**
+ * Invia SOLO a madeeventssrls@gmail.com, con profilo fittizio (soft-deleted a fine test).
+ * Percorre l'intero handler (controlli, invio, scrittura review_request_*).
+ * Mai verso talent reali: destinatario hardcoded.
+ */
+function testReviewRequestSendToSelf() {
+  var SELF = 'madeeventssrls@gmail.com';
+  var tenantId = getDefaultTenantId_();
+  if (!tenantId || String(tenantId).toUpperCase() === 'UUID') throw new Error('Nessun tenant attivo valido');
+  var profile = createEntity('TALENT_PROFILE', ENTITY_STATUS.TALENT_PROFILE.APPROVED, {
+    nome: 'Test', cognome: 'ReviewRequest', email: SELF, stato_profilo: 'approvato'
+  }, tenantId, 'system');
+  try {
+    var res = withMailCtx_({ module: 'TEST' }, function() {
+      return handleTalentSendReviewRequest({ entity_id: profile.entity_id, confirm: true }, { user_id: 'system', tenant_id: tenantId });
+    });
+    Logger.log('esito=' + JSON.stringify(res));
+    var after = getEntityById(profile.entity_id, tenantId);
+    Logger.log('flag=' + JSON.stringify({ sent_at: after.data.review_request_sent_at, count: after.data.review_request_count, by: after.data.review_request_by }));
+  } finally {
+    softDelete('Entities', profile.entity_id, 'system');
+  }
+}
+
 /**
  * AUDIT SOLA LETTURA — 'admin.auditCredentials'.
  * TALENT_PROFILE APPROVED il cui USER non ha mai fatto login (o non esiste).

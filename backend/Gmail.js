@@ -274,6 +274,58 @@ function sendProfileApprovedEmail(to, nome, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE 2b — Richiesta recensione Google
+// Policy Google: la richiesta deve essere neutra. NIENTE sconti, premi, compensi
+// né condizionamento del voto ("solo se sei soddisfatto"). Non aggiungere nulla del genere.
+// ---------------------------------------------------------------------------
+
+/**
+ * Builder UNICO di oggetto/HTML/testo: usato sia dall'anteprima admin sia dall'invio.
+ * @returns {{subject:string, html:string, text:string}}  subject è quello finale (con prefisso)
+ */
+function buildReviewRequestEmail_(nome) {
+  var n = String(nome || '').trim();
+  var greeting = n ? 'Ciao ' + escapeHtml_(n) + ',' : 'Ciao,';
+  var body = [
+    '<p style="margin:0 0 16px;">grazie per aver lavorato con MADE EVENTS.</p>',
+    '<p style="margin:0 0 16px;">Se ti va, dedicaci un minuto per lasciare una recensione sincera su Google: ',
+    'racconta com\'è stata la tua esperienza con noi.</p>',
+    buildEmailButton_('Lascia una recensione', GOOGLE_REVIEW_URL),
+    '<p style="margin:24px 0 0;font-size:12px;color:#8A8A8A;">Non vuoi ricevere altre richieste di questo tipo? Rispondi a questa email e non ti scriveremo più.</p>'
+  ].join('');
+  var html = buildEmailTemplate('La tua opinione conta', greeting, body);
+  var text = [
+    n ? 'Ciao ' + n + ',' : 'Ciao,',
+    '',
+    'grazie per aver lavorato con MADE EVENTS.',
+    '',
+    'Se ti va, dedicaci un minuto per lasciare una recensione sincera su Google: racconta com\'è stata la tua esperienza con noi.',
+    '',
+    'Lascia una recensione: ' + GOOGLE_REVIEW_URL,
+    '',
+    'Non vuoi ricevere altre richieste di questo tipo? Rispondi a questa email e non ti scriveremo più.',
+    '',
+    '— MADE EVENTS'
+  ].join('\n');
+  return {
+    subject: EMAIL_CONFIG.SUBJECT_PREFIX + 'Com\'è andata con MADE EVENTS? Raccontacelo in 1 minuto',
+    html: html,
+    text: text
+  };
+}
+
+/**
+ * Invia la richiesta di recensione. NON prioritaria: rispetta la riserva quota.
+ * Reply-To e mittente sono quelli standard di sendEmail_.
+ * @returns {{ok:boolean, error:string, quotaLeft:(number|null)}}
+ */
+function sendReviewRequestEmail(to, nome, ctx) {
+  var m = buildReviewRequestEmail_(nome);
+  return sendEmail_(to, m.subject, m.html, m.text,
+    Object.assign({ mailType: 'REVIEW_REQUEST', priority: false, rawSubject: true }, ctx || {}));
+}
+
+// ---------------------------------------------------------------------------
 // TEMPLATE 3 — Assignment confermato (candidatura approvata)
 // ---------------------------------------------------------------------------
 
