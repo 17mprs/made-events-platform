@@ -302,6 +302,8 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
     foto_url:           prefill?.foto_url           ?? '',
     hostess_richieste:  prefill?.hostess_richieste  ?? '',
     compenso:           prefill?.compenso           ?? '',
+    compenso_importo:   prefill?.compenso_importo   ?? '',
+    compenso_unita:     prefill?.compenso_unita     ?? '',
     steward_richiesti:  prefill?.steward_richiesti  ?? 0,
     anni_esperienza_minimi: prefill?.anni_esperienza_minimi ?? '',
     richiede_trasferte: prefill?.richiede_trasferte ?? false,
@@ -476,6 +478,17 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
               <Input label="Min. anni esperienza" type="number" min="0" value={form.anni_esperienza_minimi} onChange={set('anni_esperienza_minimi')} placeholder="es. 2" />
             </div>
             <Input label="Compenso (€)" value={form.compenso} onChange={set('compenso')} placeholder="es. €42,00 netti" />
+            <div className="grid-2-collapse" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <Input label="Importo compenso (€)" type="number" min="0" step="0.01" value={form.compenso_importo} onChange={set('compenso_importo')} placeholder="es. 42,00" />
+              <div>
+                <label style={{ display:'block', fontSize:12, color:COLORS.textSecondary, marginBottom:6 }}>Unità compenso</label>
+                <select value={form.compenso_unita} onChange={set('compenso_unita')} style={{ width:'100%', padding:'10px 12px', fontSize:14, border:`1px solid ${COLORS.border}`, borderRadius:4, background:'#fff' }}>
+                  <option value="">—</option>
+                  <option value="orario">Orario</option>
+                  <option value="forfait">Forfait</option>
+                </select>
+              </div>
+            </div>
 
             <label style={{
               display: 'flex', alignItems: 'center', gap: 8, marginTop: 4,

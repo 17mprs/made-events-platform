@@ -229,6 +229,36 @@ function handleClientSoftDelete(payload, auth) {
 // EVENT handlers
 // ---------------------------------------------------------------------------
 
+var COMPENSO_UNITA_ = ['orario', 'forfait'];
+
+/**
+ * Valida compenso_importo (numero >= 0, max 2 decimali) e compenso_unita
+ * ('orario'|'forfait'). Stringa vuota/null = campo non impostato; importo e
+ * unità vanno impostati insieme.
+ * @returns {{error: object}|{importo: (number|string), unita: string}}
+ */
+function parseCompensoStrutturato_(importoRaw, unitaRaw) {
+  var unita = String(unitaRaw == null ? '' : unitaRaw).trim().toLowerCase();
+  var importo = '';
+  var s = String(importoRaw == null ? '' : importoRaw).trim().replace(',', '.');
+  if (s !== '') {
+    if (!/^\d+(\.\d+)?$/.test(s)) {
+      return { error: errorResponse('VAL_002', 'compenso_importo deve essere un numero >= 0', 'compenso_importo') };
+    }
+    importo = Math.round(parseFloat(s) * 100) / 100;
+    if (!isFinite(importo)) {
+      return { error: errorResponse('VAL_002', 'compenso_importo non valido', 'compenso_importo') };
+    }
+  }
+  if (unita !== '' && COMPENSO_UNITA_.indexOf(unita) === -1) {
+    return { error: errorResponse('VAL_002', "compenso_unita deve essere 'orario' o 'forfait'", 'compenso_unita') };
+  }
+  if ((importo === '') !== (unita === '')) {
+    return { error: errorResponse('VAL_002', 'compenso_importo e compenso_unita vanno indicati insieme', importo === '' ? 'compenso_importo' : 'compenso_unita') };
+  }
+  return { importo: importo, unita: unita };
+}
+
 function handleEventCreate(payload, auth) {
   var valid = requireFields(payload, ['titolo', 'client_id']);
   if (valid) return valid;
@@ -238,6 +268,9 @@ function handleEventCreate(payload, auth) {
   if (!client || client.type !== 'CLIENT') {
     return errorResponse('SYS_002', 'Cliente non trovato', 'client_id');
   }
+
+  var compStrutt = parseCompensoStrutturato_(payload.compenso_importo, payload.compenso_unita);
+  if (compStrutt.error) return compStrutt.error;
 
   var entity = createEntity('EVENT', ENTITY_STATUS.EVENT.DRAFT, {
     titolo:                    payload.titolo,
@@ -263,6 +296,8 @@ function handleEventCreate(payload, auth) {
     automunita:                payload.automunita                || '',
     priorita_lavorato_con_noi: !!payload.priorita_lavorato_con_noi,
     compenso:                  payload.compenso                  || '',
+    compenso_importo:          compStrutt.importo,
+    compenso_unita:            compStrutt.unita,
     note_admin:                payload.note_admin                || ''
   }, auth.tenant_id, auth.user_id);
 
@@ -377,12 +412,25 @@ function handleEventUpdate(payload, auth) {
     'anni_esperienza_minimi', 'richiede_trasferte', 'richiede_weekend',
     'sesso_richiesto', 'altezza_minima', 'taglia_richiesta',
     'lingue_richieste', 'ruoli_richiesti', 'automunita', 'priorita_lavorato_con_noi',
-    'compenso'
+    'compenso', 'compenso_importo', 'compenso_unita'
   ];
   var updates = {};
   for (var i = 0; i < allowedFields.length; i++) {
     var f = allowedFields[i];
     if (payload[f] !== undefined) updates[f] = payload[f];
+  }
+
+  // Compenso strutturato: valida la coppia importo/unità (il campo omesso
+  // dal payload resta quello già salvato) e salva i valori normalizzati.
+  if (payload.compenso_importo !== undefined || payload.compenso_unita !== undefined) {
+    var cur = entity.data || {};
+    var compStrutt = parseCompensoStrutturato_(
+      payload.compenso_importo !== undefined ? payload.compenso_importo : cur.compenso_importo,
+      payload.compenso_unita   !== undefined ? payload.compenso_unita   : cur.compenso_unita
+    );
+    if (compStrutt.error) return compStrutt.error;
+    updates.compenso_importo = compStrutt.importo;
+    updates.compenso_unita   = compStrutt.unita;
   }
 
   var updated = updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
@@ -1024,6 +1072,13 @@ function talentToPublic(entity, role) {
       delete pub.data.numero_documento;
       delete pub.data.residenza_indirizzo;
     }
+  }
+  // Dati fiscali/bancari: mai ai clienti (il talent vede i propri)
+  if (role === ROLES.CLIENTE && pub.data) {
+    pub.data = Object.assign({}, pub.data);
+    delete pub.data.iban;
+    delete pub.data.codice_fiscale;
+    delete pub.data.partita_iva;
   }
   return pub;
 }

@@ -506,7 +506,7 @@ function handleGetLead(payload) {
       'lingua_inglese','inglese_certificato','lingua_francese','lingua_spagnolo','lingua_tedesco','altre_lingue',
       'titolo_studio','titolo_studio_indirizzo','professione_attuale','tipologie_esperienza','anni_esperienza_settore',
       'dotazione_personale',
-      'codice_fiscale','partita_iva','iban','disponibile_chiamata','disponibile_ritenuta',
+      'disponibile_chiamata','disponibile_ritenuta',
       'doc_identita_url','doc_cf_url','foto_busto_url','foto_intera_url','foto_extra_url',
       'cv_url','attestato_haccp_url','attestato_sicurezza_url',
     ];
