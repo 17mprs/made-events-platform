@@ -1,7 +1,7 @@
 // === TALENT PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { talentApi, leadApi, applicationApi, contractApi, emailApi, documentApi, getErrorMessage } from '../../api/client'
+import { talentApi, leadApi, applicationApi, contractApi, emailApi, documentApi, getErrorMessage, downloadContractPdf, contractErrorMessage } from '../../api/client'
 import CropModal from '../../components/registration/CropModal'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
@@ -825,6 +825,22 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
     }
   }
 
+  // Dati contratto (solo admin): salvati direttamente, senza PENDING_REVIEW
+  const [docForm,  setDocForm]  = useState({ numero_documento: d.numero_documento ?? '', residenza_indirizzo: d.residenza_indirizzo ?? '' })
+  const [docSaved, setDocSaved] = useState({ numero_documento: d.numero_documento ?? '', residenza_indirizzo: d.residenza_indirizzo ?? '' })
+  const [docSaving, setDocSaving] = useState(false)
+  const docDirty = docForm.numero_documento !== docSaved.numero_documento || docForm.residenza_indirizzo !== docSaved.residenza_indirizzo
+
+  const handleSaveDocData = async () => {
+    setDocSaving(true)
+    const res = handleApiResponse
+      ? handleApiResponse(await talentApi.updateProfile({ entity_id: talent.entity_id, ...docForm }))
+      : await talentApi.updateProfile({ entity_id: talent.entity_id, ...docForm })
+    setDocSaving(false)
+    if (res.success) setDocSaved({ ...docForm })
+    else alert(getErrorMessage(res.error))
+  }
+
   const [history,        setHistory]        = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
 
@@ -1050,8 +1066,12 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
     setContractLoading(true)
     const res = await contractApi.generate(talent.entity_id, contractEventId)
     setContractLoading(false)
-    if (res.success) setContractResult('ok')
-    else setContractResult('error')
+    if (res.success && res.data?.pdf_base64) {
+      downloadContractPdf(res.data)
+      setContractResult('ok')
+    } else {
+      setContractResult(contractErrorMessage(res.error))
+    }
   }
 
   const handleGeneraScheda = async () => {
@@ -1234,7 +1254,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
               </div>
             )}
             {contractResult === 'ok'    && <div style={{ marginBottom:12, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Contratto generato con successo</div>}
-            {contractResult === 'error' && <div style={{ marginBottom:12, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>Errore nella generazione del contratto.</div>}
+            {contractResult && contractResult !== 'ok' && <div style={{ marginBottom:12, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>{contractResult}</div>}
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button onClick={() => { if (!contractLoading) { setShowContractModal(false); setContractResult(null); setContractEventId('') } }} style={BTN_OUTLINE}>Chiudi</button>
               <button onClick={handleGeneraContratto} disabled={!contractEventId || contractLoading}
@@ -1353,6 +1373,38 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
                 <div style={{ fontSize:10, color:COLORS.textSecondary }}>TOTALE</div>
                 <div style={{ fontSize:20, fontWeight:700, color:COLORS.accent }}>{(d.eventi_crm_completati ?? 0) + editableEventiPreCRM}</div>
               </div>
+            </div>
+          </div>
+
+          {/* DATI CONTRATTO (solo admin) */}
+          <div style={{ marginBottom:20, padding:'14px 18px', background:'#F8F8FB', borderRadius:8, border:`1px solid ${COLORS.border}` }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'1px', textTransform:'uppercase', color:COLORS.textSecondary, marginBottom:10 }}>📝 Dati per il contratto (solo admin)</div>
+            <div style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'flex-end' }}>
+              <div style={{ flex:'2 1 220px' }}>
+                <div style={{ fontSize:10, color:COLORS.textSecondary, marginBottom:2 }}>Indirizzo di residenza (via e civico)</div>
+                <input
+                  type="text" maxLength={200} value={docForm.residenza_indirizzo}
+                  onChange={e => setDocForm(f => ({ ...f, residenza_indirizzo: e.target.value }))}
+                  placeholder="es. Via Roma 12"
+                  style={{ width:'100%', boxSizing:'border-box', border:`1px solid ${COLORS.border}`, borderRadius:4, padding:'6px 8px', fontSize:13, fontFamily:'Montserrat,sans-serif' }}
+                />
+              </div>
+              <div style={{ flex:'1 1 150px' }}>
+                <div style={{ fontSize:10, color:COLORS.textSecondary, marginBottom:2 }}>N° documento</div>
+                <input
+                  type="text" maxLength={200} value={docForm.numero_documento}
+                  onChange={e => setDocForm(f => ({ ...f, numero_documento: e.target.value }))}
+                  style={{ width:'100%', boxSizing:'border-box', border:`1px solid ${COLORS.border}`, borderRadius:4, padding:'6px 8px', fontSize:13, fontFamily:'Montserrat,sans-serif' }}
+                />
+              </div>
+              {docDirty && (
+                <button
+                  onClick={handleSaveDocData} disabled={docSaving}
+                  style={{ background:'none', border:`1px solid ${COLORS.accent}`, color:COLORS.accent, borderRadius:6, padding:'6px 12px', fontSize:11, cursor: docSaving ? 'wait' : 'pointer', fontFamily:'Montserrat,sans-serif' }}
+                >
+                  {docSaving ? 'Salvataggio…' : 'Salva'}
+                </button>
+              )}
             </div>
           </div>
 

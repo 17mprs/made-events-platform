@@ -85,6 +85,10 @@ var ENTITY_STATUS = {
     PAID:        'PAID',
     CANCELLED:   'CANCELLED',
     NO_SHOW:     'NO_SHOW'
+  },
+  // Storico contratti generati (nessuna transizione: una riga per generazione)
+  CONTRATTO: {
+    GENERATED: 'GENERATED'
   }
 };
 

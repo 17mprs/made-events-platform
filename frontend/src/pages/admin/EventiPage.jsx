@@ -3,7 +3,7 @@ import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, Align
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { clientApi, eventApi, talentApi, applicationApi, contractApi, shiftApi, newsletterApi, getErrorMessage } from '../../api/client'
+import { clientApi, eventApi, talentApi, applicationApi, contractApi, shiftApi, newsletterApi, getErrorMessage, downloadContractPdf, contractErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
@@ -1379,10 +1379,10 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     setActionLoading(appId + '_ct')
     const res = handleApiResponse(await contractApi.generate(talentProfileId, event.entity_id))
     setActionLoading(null)
-    if (res.success && res.data?.url) {
-      window.open(res.data.url, '_blank')
+    if (res.success && res.data?.pdf_base64) {
+      downloadContractPdf(res.data)
     } else {
-      alert(getErrorMessage(res.error))
+      alert(contractErrorMessage(res.error))
     }
   }
 

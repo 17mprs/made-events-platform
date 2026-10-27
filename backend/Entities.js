@@ -837,7 +837,13 @@ function handleTalentUpdateProfile(payload, auth) {
     return successResponse({ talent: talentToPublic(entity, auth.role), pending: true });
   }
 
-  // ADMIN → aggiornamento diretto
+  // ADMIN → aggiornamento diretto. Campi riservati all'admin (dati per il
+  // contratto): fuori da CAMPI_PUBBLICI e dal ramo USER, mai in pending_data.
+  var adminOnlyFields = ['numero_documento', 'residenza_indirizzo'];
+  for (var a = 0; a < adminOnlyFields.length; a++) {
+    var af = adminOnlyFields[a];
+    if (payload[af] !== undefined) updates[af] = String(payload[af] == null ? '' : payload[af]).trim().substring(0, 200);
+  }
   var updated = updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
   return successResponse({ talent: talentToPublic(updated, auth.role) });
 }
@@ -1011,6 +1017,12 @@ function talentToPublic(entity, role) {
   if (role === ROLES.USER || role === ROLES.CLIENTE) {
     if (pub.data && pub.data.documenti) {
       delete pub.data.documenti.carta_identita;
+    }
+    // Dati contratto inseriti dall'admin: invisibili a talent e clienti
+    if (pub.data) {
+      pub.data = Object.assign({}, pub.data);
+      delete pub.data.numero_documento;
+      delete pub.data.residenza_indirizzo;
     }
   }
   return pub;

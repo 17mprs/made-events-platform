@@ -1,18 +1,81 @@
 // === CONTRACT_MANAGER.JS — MADE EVENT Platform ===
 // Generazione contratti da template Google Doc.
-// Copia il template, sostituisce i placeholder, restituisce il link.
+// Copia il template, sostituisce i placeholder, esporta il PDF, salva Doc e PDF
+// (privati) nella cartella evento e registra la generazione come entità CONTRATTO.
 
-// TODO: ID del vecchio Drive — dopo il cutover il template va duplicato nel
-// nuovo Drive e questo fallback aggiornato (o impostare CONTRACT_TEMPLATE_ID
-// come Script Property, che ha comunque priorità su questo valore).
-var _CONTRACT_TEMPLATE_ID_FALLBACK = '1WyVn17-7Iaq3H5uF0DZPDN_DVC-KQPmFnU4bWbFNYgM';
+var CONTRACT_FILENAME_MAX_ = 100;
 
 function getContractTemplateId_() {
-  try {
-    return PropertiesService.getScriptProperties().getProperty('CONTRACT_TEMPLATE_ID') || _CONTRACT_TEMPLATE_ID_FALLBACK;
-  } catch (e) {
-    return _CONTRACT_TEMPLATE_ID_FALLBACK;
+  var id = PropertiesService.getScriptProperties().getProperty('CONTRACT_TEMPLATE_ID');
+  if (!id || !String(id).trim()) {
+    throw new Error('CONTRACT_TEMPLATE_ID non impostato nelle Script Properties');
   }
+  return String(id).trim();
+}
+
+// ---------------------------------------------------------------------------
+// HELPER — nomi file e date
+// ---------------------------------------------------------------------------
+
+/**
+ * Rende una stringa sicura per un nome file: rimuove accenti e / \ : * ? " < > |,
+ * spazi → _, nessun altro carattere speciale, troncata a maxLen.
+ */
+function sanitizeFilenamePart_(s, maxLen) {
+  var out = String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[\/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^A-Za-z0-9_\-]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (maxLen && out.length > maxLen) out = out.substring(0, maxLen).replace(/_+$/, '');
+  return out;
+}
+
+/**
+ * Normalizza la data di un turno (stringa 'YYYY-MM-DD…' o Date) in
+ * { dmy: 'dd/MM/yyyy', ymd: 'yyyyMMdd' }, oppure null se non valida.
+ * Le stringhe ISO sono lette per componenti: nessuno slittamento di fuso orario.
+ */
+function parseShiftDate_(raw) {
+  if (!raw) return null;
+  var m = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return { dmy: m[3] + '/' + m[2] + '/' + m[1], ymd: m[1] + m[2] + m[3] };
+  var d = new Date(raw);
+  if (isNaN(d.getTime())) return null;
+  return {
+    dmy: Utilities.formatDate(d, 'Europe/Rome', 'dd/MM/yyyy'),
+    ymd: Utilities.formatDate(d, 'Europe/Rome', 'yyyyMMdd')
+  };
+}
+
+/**
+ * Candidatura APPROVED del talent su un evento con un turno valido
+ * (SHIFT non cancellato, dello stesso evento). Se ce ne sono più d'una
+ * (una per turno) restituisce la prima che ha un turno valido.
+ * @returns {{application: object, shift: object}|null}
+ */
+function findApprovedApplicationWithShift_(talentProfileId, eventId, tenantId) {
+  var all = getAllRows('Entities');
+  for (var i = 0; i < all.length; i++) {
+    var e = all[i];
+    if (e.type !== 'APPLICATION') continue;
+    if (e.status !== ENTITY_STATUS.APPLICATION.APPROVED) continue;
+    if (String(e.tenant_id) !== String(tenantId)) continue;
+    if (String(e.deleted).toLowerCase() === 'true') continue;
+    var d = parseJSON(e.data);
+    if (String(d.talent_profile_id) !== String(talentProfileId)) continue;
+    if (String(d.event_id) !== String(eventId)) continue;
+    if (!d.shift_id) continue;
+    var shift = getEntityById(d.shift_id, tenantId);
+    if (!shift || shift.type !== 'SHIFT') continue;
+    if (shift.status === ENTITY_STATUS.SHIFT.CANCELLED) continue;
+    if (String(shift.data.event_id) !== String(eventId)) continue;
+    e.data = d;
+    return { application: e, shift: shift };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -20,15 +83,18 @@ function getContractTemplateId_() {
 // ---------------------------------------------------------------------------
 
 /**
- * Copia il template Doc, sostituisce i placeholder con i dati reali.
+ * Copia il template Doc, sostituisce i placeholder, esporta il PDF e salva
+ * entrambi i file (privati) nella cartella evento.
  * @param {object} talentData  - entity.data del TALENT_PROFILE
  * @param {object} eventData   - entity.data dell'EVENT (con event_id aggiunto)
+ * @param {object} shiftData   - entity.data dello SHIFT assegnato, o null
  * @param {object} auth        - auth context (tenant_id, user_id)
- * @returns {{ file_id, url, filename }}
+ * @returns {{ pdf_blob, pdf_file_id, doc_file_id, filename, doc_filename }}
  */
-function generateContract(talentData, eventData, auth) {
+function generateContract(talentData, eventData, shiftData, auth) {
   var td = talentData || {};
   var ed = eventData  || {};
+  var sd = shiftData  || null;
 
   var MISSING = '[DA COMPILARE]';
   var v = function(val, fallback) {
@@ -36,95 +102,111 @@ function generateContract(talentData, eventData, auth) {
     return s || MISSING;
   };
 
-  // Nome file
-  var nomeCompleto = [td.nome, td.cognome].filter(Boolean).join(' ') || '';
-  var nomePart     = nomeCompleto.replace(/\s+/g, '_') || 'Talent';
-  var dataPart     = ed.data_inizio
-    ? new Date(ed.data_inizio).toISOString().slice(0, 10).replace(/-/g, '')
-    : 'ND';
-  var filename = 'Contratto_' + nomePart + '_' + dataPart;
+  // Data e orario vengono SOLO dal turno assegnato al talent: mai dall'evento
+  // né dal primo turno disponibile.
+  var shiftDate = sd ? parseShiftDate_(sd.data) : null;
+  var dataEventoStr = shiftDate ? shiftDate.dmy : MISSING;
+  var orarioStr = (sd && String(sd.orario_inizio || '').trim() && String(sd.orario_fine || '').trim())
+    ? String(sd.orario_inizio).trim() + '–' + String(sd.orario_fine).trim()
+    : MISSING;
 
-  // Formatta data evento (dd/MM/yyyy)
-  var dataEventoStr = MISSING;
-  if (ed.data_inizio) {
-    try {
-      dataEventoStr = Utilities.formatDate(new Date(ed.data_inizio), 'Europe/Rome', 'dd/MM/yyyy');
-    } catch (e) {
-      dataEventoStr = String(ed.data_inizio);
-    }
-  }
+  // Indirizzo: via (inserita dall'admin) + città (prov). Senza via resta DA COMPILARE.
+  var cittaRes = td.residenza_citta
+    ? td.residenza_citta + (td.residenza_provincia ? ' (' + td.residenza_provincia + ')' : '')
+    : '';
+  var indirizzoStr = String(td.residenza_indirizzo || '').trim()
+    ? String(td.residenza_indirizzo).trim() + (cittaRes ? ', ' + cittaRes : '')
+    : '';
+
+  var nomeCompleto = [td.nome, td.cognome].filter(Boolean).join(' ') || '';
 
   // Data firma odierna
   var dataFirma = Utilities.formatDate(new Date(), 'Europe/Rome', 'dd/MM/yyyy');
 
-  // Placeholder map
+  // Placeholder map (field name reali di TALENT_PROFILE / EVENT / SHIFT)
   var replacements = {
-    // NOTA: il questionario (Section1-7) non colleziona data di nascita esatta,
-    // numero documento, indirizzo con civico, né un campo per il codice fiscale
-    // in nessuna sezione UI — questi restano '[DA COMPILARE]' finché non si
-    // aggiunge un campo dedicato al questionario o si compilano a mano sul
-    // contratto generato. I placeholder qui sotto usano SOLO i field name reali
-    // di TALENT_PROFILE (allineati dopo il fix BUG7) — niente più fallback su
-    // campi sbagliati (es. mostrare la città al posto della data di nascita).
     '{{NOME_COGNOME}}':        v(nomeCompleto),
-    '{{CODICE_FISCALE}}':      v(td.codice_fiscale),          // mai raccolto da nessuna sezione — sempre DA COMPILARE
-    '{{DATA_NASCITA}}':        v(td.data_nascita),             // mai raccolto — sempre DA COMPILARE
+    '{{CODICE_FISCALE}}':      v(td.codice_fiscale),
+    '{{DATA_NASCITA}}':        v(td.data_nascita),
     '{{CITTA_NASCITA}}':       v(td.nascita_citta),
     '{{NAZIONALITA}}':         v(td.nascita_paese, 'Italiana'),
-    '{{INDIRIZZO}}':           v(td.residenza_citta && (td.residenza_citta + (td.residenza_provincia ? ' (' + td.residenza_provincia + ')' : ''))),
-    '{{NUMERO_DOCUMENTO}}':    v(td.numero_documento),         // mai raccolto — sempre DA COMPILARE (doc_identita_url è il file caricato, non il numero)
+    '{{INDIRIZZO}}':           v(indirizzoStr),
+    '{{NUMERO_DOCUMENTO}}':    v(td.numero_documento),         // inserito dall'admin (scheda talent)
     '{{STATO_EMISSIONE_DOC}}': v(td.stato_emissione_documento, 'Italia'),
     '{{DATA_EVENTO}}':         dataEventoStr,
     '{{LUOGO_EVENTO}}':        v(ed.luogo),
-    '{{ORARIO_EVENTO}}':       v(ed.orario, 'Da definire'),
+    '{{ORARIO_EVENTO}}':       orarioStr,
     '{{TIPOLOGIA_EVENTO}}':    v(ed.tipologia, ed.titolo),
-    '{{ABBIGLIAMENTO}}':       v(ed.abbigliamento_richiesto, 'Vedere briefing'),
+    '{{ABBIGLIAMENTO}}':       v(sd && sd.dress_code, ed.abbigliamento_richiesto || 'Vedere briefing'),
     '{{COMPENSO}}':            v(ed.compenso, 'Da definire'),
     '{{DATA_FIRMA}}':          dataFirma,
   };
 
-  // Destinazione: cartella evento se possibile, altrimenti root
+  // Nome file: Contratto_<Nome>_<Cognome>_<EVENTO>_<AAAAMMGG turno>[.pdf]
+  // L'evento è la parte comprimibile: il totale resta entro CONTRACT_FILENAME_MAX_.
+  var nomePart    = sanitizeFilenamePart_(td.nome)    || 'Talent';
+  var cognomePart = sanitizeFilenamePart_(td.cognome);
+  var dataPart    = shiftDate ? shiftDate.ymd : 'ND';
+  var head = ['Contratto', nomePart, cognomePart].filter(Boolean).join('_');
+  var tail = dataPart;
+  var eventoMax = CONTRACT_FILENAME_MAX_ - '.pdf'.length - head.length - tail.length - 2;
+  var eventoPart = sanitizeFilenamePart_(ed.titolo, Math.max(eventoMax, 0)) || (eventoMax > 0 ? 'Evento' : '');
+  var docName = [head, eventoPart, tail].filter(Boolean).join('_');
+  var pdfName = docName + '.pdf';
+
+  // Cartella evento: obbligatoria. Nessun fallback sul root di Drive.
+  if (!auth || !auth.tenant_id || !ed.event_id) {
+    throw new Error('Cartella evento non determinabile: tenant_id o event_id mancante');
+  }
   var targetFolder;
   try {
-    if (auth && auth.tenant_id && ed.event_id) {
-      targetFolder = ensureEventFolder(auth.tenant_id, ed.event_id);
-    } else {
-      targetFolder = DriveApp.getRootFolder();
-    }
+    targetFolder = ensureEventFolder(auth.tenant_id, ed.event_id);
   } catch (e) {
-    targetFolder = DriveApp.getRootFolder();
+    throw new Error('Cartella evento non disponibile: ' + e.message);
   }
 
-  // Copia template
+  // Copia template (privata: nessun setSharing, i permessi sono quelli della cartella)
   var templateFile = DriveApp.getFileById(getContractTemplateId_());
-  var copy = templateFile.makeCopy(filename, targetFolder);
-  copy.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
+  var copy = templateFile.makeCopy(docName, targetFolder);
 
-  // Apri e sostituisci placeholder nel corpo del documento
-  var doc  = DocumentApp.openById(copy.getId());
-  var body = doc.getBody();
+  var pdfFile = null;
+  try {
+    var doc  = DocumentApp.openById(copy.getId());
+    var body = doc.getBody();
 
-  for (var placeholder in replacements) {
-    body.replaceText(placeholder, replacements[placeholder]);
+    for (var placeholder in replacements) {
+      body.replaceText(placeholder, replacements[placeholder]);
+    }
+
+    // Header e footer (se presenti nel template)
+    var header = doc.getHeader();
+    if (header) {
+      for (var ph in replacements) header.replaceText(ph, replacements[ph]);
+    }
+    var footer = doc.getFooter();
+    if (footer) {
+      for (var pf in replacements) footer.replaceText(pf, replacements[pf]);
+    }
+
+    // Il PDF va esportato DOPO il salvataggio, altrimenti esce il template vuoto.
+    doc.saveAndClose();
+
+    var pdfBlob = copy.getAs(MimeType.PDF).setName(pdfName);
+    pdfFile = targetFolder.createFile(pdfBlob);
+
+    return {
+      pdf_blob:     pdfBlob,
+      pdf_file_id:  pdfFile.getId(),
+      doc_file_id:  copy.getId(),
+      filename:     pdfName,
+      doc_filename: docName
+    };
+  } catch (e) {
+    // Niente file orfani se la generazione si interrompe a metà.
+    try { copy.setTrashed(true); } catch (e1) {}
+    try { if (pdfFile) pdfFile.setTrashed(true); } catch (e2) {}
+    throw e;
   }
-
-  // Header e footer (se presenti nel template)
-  var header = doc.getHeader();
-  if (header) {
-    for (var ph in replacements) header.replaceText(ph, replacements[ph]);
-  }
-  var footer = doc.getFooter();
-  if (footer) {
-    for (var pf in replacements) footer.replaceText(pf, replacements[pf]);
-  }
-
-  doc.saveAndClose();
-
-  return {
-    file_id:  copy.getId(),
-    url:      'https://docs.google.com/document/d/' + copy.getId() + '/edit',
-    filename: filename,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,10 +232,51 @@ function handleContractGenerate(payload, auth) {
     var ed = event.data  || {};
     ed.event_id = event.entity_id; // usato per folder routing
 
-    var result = generateContract(td, ed, auth);
-    return successResponse(result);
+    // Turno del talent: APPLICATION APPROVED → shift_id → SHIFT dello stesso evento.
+    // Senza turno valido non si crea nessun file: errore PRIMA di toccare Drive.
+    var assigned = findApprovedApplicationWithShift_(talent.entity_id, event.entity_id, auth.tenant_id);
+    if (!assigned) {
+      return errorResponse('WF_002', "Nessun turno assegnato a questo talent per l'evento");
+    }
+    var application = assigned.application;
+    var shift = assigned.shift;
+
+    var result = generateContract(td, ed, shift.data, auth);
+
+    // Storico: una entità CONTRATTO per ogni generazione. Un errore qui non
+    // deve far perdere il PDF già creato: si logga e si segnala nella risposta.
+    var storicoOk = true;
+    try {
+      createEntity('CONTRATTO', ENTITY_STATUS.CONTRATTO.GENERATED, {
+        application_id: application.entity_id,
+        event_id:       event.entity_id,
+        shift_id:       shift.entity_id,
+        talent_id:      talent.entity_id,
+        pdf_file_id:    result.pdf_file_id,
+        doc_file_id:    result.doc_file_id,
+        filename:       result.filename,
+        generato_il:    new Date().toISOString(),
+        generato_da:    auth.user_id
+      }, auth.tenant_id, auth.user_id);
+    } catch (histErr) {
+      storicoOk = false;
+      logError_({ severity: 'ERROR', module: 'CONTRACT_MANAGER', action: 'contract.generate.storico',
+        entity_type: 'TALENT_PROFILE', entity_id: talent.entity_id, actor: auth.user_id, tenant_id: auth.tenant_id,
+        message: 'Registrazione CONTRATTO fallita (pdf_file_id=' + result.pdf_file_id + '): ' + histErr.message,
+        stack: histErr.stack });
+    }
+
+    return successResponse({
+      pdf_base64:   Utilities.base64Encode(result.pdf_blob.getBytes()),
+      pdf_file_id:  result.pdf_file_id,
+      doc_file_id:  result.doc_file_id,
+      filename:     result.filename,
+      storico:      storicoOk
+    });
   } catch (e) {
-    logError_('CONTRACT_MANAGER', 'contract.generate', e.message, e.stack || '', auth.user_id, auth.tenant_id);
+    logError_({ severity: 'ERROR', module: 'CONTRACT_MANAGER', action: 'contract.generate',
+      entity_type: 'TALENT_PROFILE', entity_id: payload.talent_profile_id, actor: auth.user_id, tenant_id: auth.tenant_id,
+      message: e.message, stack: e.stack || '' });
     return errorResponse('SYS_001', 'Errore generazione contratto: ' + e.message);
   }
 }

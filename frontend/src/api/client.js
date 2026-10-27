@@ -239,6 +239,24 @@ export const contractApi = {
     gasPost('contract.generate', { talent_profile_id, event_id }, t()),
 }
 
+/** Scarica il PDF restituito da contract.generate ({ pdf_base64, filename }). */
+export function downloadContractPdf({ pdf_base64, filename }) {
+  const bytes = Uint8Array.from(atob(pdf_base64), c => c.charCodeAt(0))
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'Contratto.pdf'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/** Messaggio reale del backend (getErrorMessage maschera SYS_001 con un testo generico). */
+export function contractErrorMessage(error) {
+  return error?.message || getErrorMessage(error)
+}
+
 export const documentApi = {
   upload: (talent_profile_id, tipo_documento, file_base64, filename, mime_type) =>
     gasPost('document.upload', { talent_profile_id, tipo_documento, file_base64, filename, mime_type }, t()),
