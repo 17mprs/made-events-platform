@@ -4,7 +4,7 @@
 import React, { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COLORS } from '../styles/theme'
-import { contractApi, talentApi, downloadContractPdf, contractErrorMessage, getErrorMessage } from '../api/client'
+import { contractApi, talentApi, contractErrorMessage, getErrorMessage } from '../api/client'
 
 const TIPI_DOCUMENTO = [
   { value: 'carta_identita', label: "Carta d'identità" },
@@ -19,7 +19,8 @@ const FIELD_STYLE = {
 }
 
 /**
- * Orchestra check → (modale) → generate. onResult({ ok } | { ok:false, message }).
+ * Orchestra check → (modale) → generate. onResult({ ok, data } | { ok:false, message }).
+ * Il PDF generato NON viene scaricato: si controlla con l'anteprima (contract.get) e si invia al talent.
  * Un solo flusso alla volta: i click ripetuti mentre una chiamata è in corso sono ignorati.
  */
 export function useContractGenerator({ onResult, handleApiResponse }) {
@@ -39,9 +40,8 @@ export function useContractGenerator({ onResult, handleApiResponse }) {
   async function generate(talentId, eventId, force) {
     const res = api(await contractApi.generate(talentId, eventId, force))
     if (res.success && res.data?.pdf_base64) {
-      downloadContractPdf(res.data)
       setState(null)
-      onResult({ ok: true })
+      onResult({ ok: true, data: res.data })
     } else {
       onResult({ ok: false, message: contractErrorMessage(res.error) })
     }

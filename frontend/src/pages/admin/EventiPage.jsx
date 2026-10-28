@@ -1,10 +1,9 @@
 // === EVENTI PAGE — MADE EVENTS Platform ===
-import { Document, Packer, Paragraph, TextRun, Header, Footer, PageNumber, AlignmentType } from 'docx'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { clientApi, eventApi, talentApi, applicationApi, shiftApi, newsletterApi, getErrorMessage } from '../../api/client'
-import { useContractGenerator } from '../../components/ContractMissingModal'
+import { ContractPanelModal, ContractBadge, useApplicationContracts } from '../../components/ContractPanel'
 import adminStore from '../../store/adminStore'
 import { COLORS, COMPONENT_STYLES } from '../../styles/theme'
 import Layout from '../../components/Layout'
@@ -46,10 +45,11 @@ function parseEsperienza(val) {
 // SATURATION BAR
 // ---------------------------------------------------------------------------
 
-function SaturationBar({ confirmed, required, onCountClick }) {
+// approved = AWAITING_SIGNATURE + confermati (occupano il posto); confirmed = contratto firmato.
+function SaturationBar({ approved, confirmed, required, onCountClick }) {
   if (!required || required <= 0) return null
-  const pct      = (confirmed / required) * 100
-  const over     = confirmed > required
+  const pct      = (approved / required) * 100
+  const over     = approved > required
   const clampPct = Math.min(pct, 100)
   const color    = over ? '#EF4444' : pct >= 80 ? '#F97316' : '#10B981'
 
@@ -57,17 +57,20 @@ function SaturationBar({ confirmed, required, onCountClick }) {
     <div style={{ marginTop:8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:11, marginBottom:4 }}>
         <span style={{ color:COLORS.textSecondary, letterSpacing:'0.3px' }}>Saturazione</span>
-        <span
-          onClick={onCountClick}
-          title={onCountClick ? 'Vedi talent approvati' : undefined}
-          style={{
-            fontWeight:700, color,
-            cursor: onCountClick ? 'pointer' : 'default',
-            textDecoration: onCountClick ? 'underline' : 'none',
-            ...(over ? { border:`1.5px solid ${color}`, borderRadius:10, padding:'1px 7px', fontSize:11 } : {}),
-          }}
-        >
-          {confirmed}/{required}
+        <span>
+          <span
+            onClick={onCountClick}
+            title={onCountClick ? 'Vedi talent approvati' : undefined}
+            style={{
+              fontWeight:700, color,
+              cursor: onCountClick ? 'pointer' : 'default',
+              textDecoration: onCountClick ? 'underline' : 'none',
+              ...(over ? { border:`1.5px solid ${color}`, borderRadius:10, padding:'1px 7px', fontSize:11 } : {}),
+            }}
+          >
+            {approved}/{required}
+          </span>
+          <span style={{ color:COLORS.textSecondary, marginLeft:6 }}>approvati · {confirmed} confermati</span>
         </span>
       </div>
       <div style={{ height:5, background:'#f0f0f0', borderRadius:3, overflow:'hidden' }}>
@@ -636,354 +639,6 @@ function EventFormDrawer({ onClose, onSaved, clients, prefill, isEdit, handleApi
 }
 
 // ---------------------------------------------------------------------------
-// CONTRACT PREVIEW MODAL
-// ---------------------------------------------------------------------------
-
-export function ContractPreviewModal({ talent, event, onClose }) {
-  const td = talent?.data ?? {}
-  const ed = event?.data ?? {}
-
-  useEffect(() => {
-    const el = document.createElement('style')
-    el.id = '__contract_print_css__'
-    el.textContent = `
-      @media print {
-        body * { visibility: hidden !important; }
-        #contract-printable, #contract-printable * { visibility: visible !important; }
-        #contract-printable {
-          position: fixed !important;
-          top: 0 !important; left: 0 !important; right: 0 !important;
-          padding: 15mm 20mm !important;
-          background: white !important;
-          overflow: visible !important;
-          max-width: none !important;
-        }
-        .contract-chrome { display: none !important; }
-      }
-    `
-    document.head.appendChild(el)
-    return () => { document.head.querySelector('#__contract_print_css__')?.remove() }
-  }, [])
-
-  const missing = (label) => (
-    <span style={{ color:'#C62828', fontWeight:600, background:'#FFF3F3', padding:'0 3px', borderRadius:2 }}>
-      [DATO MANCANTE – {label}]
-    </span>
-  )
-
-  const nomeCognome = [td.nome, td.cognome].filter(Boolean).join(' ') || null
-  const dataEvento  = ed.data_inizio
-    ? new Date(ed.data_inizio).toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' })
-    : null
-  const dataFirma = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' })
-
-  const S = {
-    page:     { fontFamily:'Montserrat,sans-serif', fontSize:'10pt', lineHeight:1.7, color:'#111', background:'#fff', padding:'40px 48px', maxWidth:794, width:'100%', boxSizing:'border-box' },
-    h1:       { fontSize:'14pt', fontWeight:700, color:'#630E33', textAlign:'center', margin:'0 0 2px', letterSpacing:'0.5px' },
-    sub:      { fontSize:'8.5pt', color:'#888', textAlign:'center', margin:'0 0 20px' },
-    divider:  { borderTop:'1px solid #ddd', margin:'18px 0' },
-    artTitle: { fontSize:'10pt', fontWeight:700, color:'#630E33', margin:'18px 0 5px' },
-    p:        { margin:'4px 0', fontSize:'10pt' },
-    dataRow:  { display:'flex', gap:16, marginBottom:3 },
-    dataLbl:  { fontSize:'9.5pt', color:'#555', minWidth:190, flexShrink:0 },
-    dataVal:  { fontSize:'9.5pt', fontWeight:500 },
-    sigRow:   { display:'flex', gap:60, marginTop:40 },
-    sigBox:   { flex:1 },
-    sigLine:  { borderTop:'1.5px solid #111', marginTop:44, marginBottom:5 },
-    sigName:  { fontSize:'9pt', color:'#555' },
-  }
-
-  const DR = ({ label, val, labelM }) => (
-    <div style={S.dataRow}>
-      <span style={S.dataLbl}>{label}</span>
-      <span style={S.dataVal}>{val ? val : missing(labelM || label)}</span>
-    </div>
-  )
-
-  const downloadDocx = async () => {
-
-    const MAROON = '7A1E2C'; const GRAY = '888888'; const RED = 'C62828'
-    const PT11 = 22; const PT14 = 28; const PT9 = 18
-    const CM2_5 = 1418 // 2.5cm in twips (1cm = 567twips)
-
-    const v = (x) => (x && String(x).trim()) ? String(x).trim() : null
-
-    const AT = (text) => new Paragraph({
-      children: [new TextRun({ text, bold: true, color: MAROON, size: PT11 })],
-      spacing: { before: 280, after: 100 },
-    })
-    const BP = (text) => new Paragraph({
-      children: [new TextRun({ text, size: PT11 })],
-      spacing: { after: 80 },
-    })
-    const DL = (label, value) => new Paragraph({
-      children: [
-        new TextRun({ text: `${label}: `, bold: true, size: PT11 }),
-        v(value)
-          ? new TextRun({ text: v(value), size: PT11 })
-          : new TextRun({ text: '[DATO MANCANTE]', bold: true, color: RED, size: PT11 }),
-      ],
-      spacing: { after: 60 },
-    })
-    const LI = (text) => new Paragraph({
-      children: [new TextRun({ text: `\u2022 ${text}`, size: PT11 })],
-      indent: { left: 360 },
-      spacing: { after: 60 },
-    })
-
-    const nomeParts = (nomeCognome || 'Talent').replace(/\s+/g, '_')
-    const dataParts = ed.data_inizio
-      ? new Date(ed.data_inizio).toISOString().slice(0,10).replace(/-/g,'')
-      : 'ND'
-
-    const doc = new Document({
-      sections: [{
-        properties: { page: { margin: { top: CM2_5, right: CM2_5, bottom: CM2_5, left: CM2_5 } } },
-        headers: {
-          default: new Header({
-            children: [new Paragraph({
-              children: [new TextRun({ text: '[LOGO]', bold: true, color: MAROON, size: PT14 })],
-              alignment: AlignmentType.CENTER,
-            })],
-          }),
-        },
-        footers: {
-          default: new Footer({
-            children: [new Paragraph({
-              children: [
-                new TextRun({ text: 'Made Events S.r.l.s. \u2014 Via Montepulciano 60, Roma \u2014 C.F. 16645801008 \u2014 Pagina ', size: PT9, color: GRAY }),
-                new TextRun({ children: [PageNumber.CURRENT], size: PT9, color: GRAY }),
-              ],
-              alignment: AlignmentType.CENTER,
-            })],
-          }),
-        },
-        children: [
-          new Paragraph({
-            children: [new TextRun({ text: 'CONTRATTO DI COLLABORAZIONE OCCASIONALE', bold: true, color: MAROON, size: PT14 })],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 80 },
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: 'Made Events S.r.l.s. \u2014 Via Montepulciano 60, Roma \u2014 C.F. / P.IVA 16645801008', size: PT9, color: GRAY })],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 280 },
-          }),
-          AT('PARTI CONTRAENTI'),
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Committente: ', bold: true, size: PT11 }),
-              new TextRun({ text: 'Made Events S.r.l.s., con sede legale in Via Montepulciano 60, Roma, C.F. / P.IVA 16645801008', size: PT11 }),
-            ],
-            spacing: { after: 80 },
-          }),
-          BP('Prestatore:'),
-          DL('Nome e Cognome',   nomeCognome),
-          DL('Codice Fiscale',   td.codice_fiscale),
-          DL('Data di nascita',  td.data_nascita),
-          DL('Luogo di nascita', td.citta_nascita),
-          DL('Nazionalit\u00e0', td.nazionalita),
-          DL('Residenza',        td.indirizzo_residenza),
-          DL('N\u00b0 Documento',td.numero_documento),
-          DL('Emesso da',        td.stato_emissione_documento),
-          AT("Art. 1 \u2013 OGGETTO DELL'INCARICO"),
-          BP('Il Prestatore si impegna a svolgere attivit\u00e0 di Hostess/Steward/Promoter per conto del Committente.'),
-          DL('Tipologia evento',        ed.tipologia),
-          DL('Data',                    dataEvento),
-          DL('Luogo',                   ed.luogo),
-          DL('Orario',                  ed.orario),
-          DL('Abbigliamento richiesto', ed.abbigliamento_richiesto),
-          AT('Art. 2 \u2013 NATURA DEL RAPPORTO'),
-          BP("La prestazione oggetto del presente accordo \u00e8 da intendersi occasionale, senza alcun vincolo di subordinazione n\u00e9 oneri previdenziali a carico del Committente. La Risorsa dichiara di non aver percepito, nel corso dell'anno solare, compensi complessivi superiori a \u20ac 5.000,00 derivanti da prestazioni di lavoro occasionale. La prestazione avr\u00e0 carattere esclusivamente autonomo e professionale; pertanto, ogni responsabilit\u00e0, ivi compresa quella infortunistica, resta a carico del Prestatore."),
-          AT('Art. 3 \u2013 CORRISPETTIVO E PAGAMENTO'),
-          DL('Compenso', ed.compenso),
-          BP("Il pagamento avverr\u00e0 a 30 giorni fine mese tramite bonifico bancario. Il pagamento \u00e8 subordinato a: corretta esecuzione della prestazione, invio della documentazione richiesta (ritenuta d'acconto o fattura), effettivo incasso da parte del Committente. In assenza dei dati richiesti, il pagamento sar\u00e0 posticipato. Eventuali ore extra saranno riconosciute solo se autorizzate preventivamente."),
-          AT('Art. 4 \u2013 RECESSO E PENALI'),
-          BP('Il Prestatore potr\u00e0 recedere con preavviso minimo di 48 ore, motivando la propria decisione. In caso di mancato preavviso o assenza sar\u00e0 applicata una penale di \u20ac150,00, fatto salvo il risarcimento di eventuali danni ulteriori. La mancata presentazione o ritardi superiori a 15 minuti senza preavviso saranno considerati grave inadempienza.'),
-          AT('Art. 5 \u2013 ANNULLAMENTO O MODIFICHE'),
-          BP("Il Committente si riserva il diritto di annullare l'attivit\u00e0 o modificare orari, luogo o mansioni. Le variazioni saranno comunicate tempestivamente. La Risorsa potr\u00e0 accettare o rifiutare entro 24 ore. Il compenso sar\u00e0 proporzionato alle ore effettivamente svolte."),
-          AT('Art. 6 \u2013 SVOLGIMENTO DEL SERVIZIO'),
-          BP('La Risorsa si impegna a:'),
-          LI('rispettare gli orari di convocazione;'),
-          LI('attenersi alle indicazioni operative;'),
-          LI('mantenere un comportamento professionale.'),
-          BP('\u00c8 fatto divieto di utilizzare il telefono durante il servizio (salvo autorizzazione) e di allontanarsi dalla postazione senza consenso.'),
-          AT('Art. 7 \u2013 DRESS CODE'),
-          BP("La Risorsa \u00e8 tenuta a rispettare il dress code indicato. Il mancato rispetto potr\u00e0 comportare esclusione dall'attivit\u00e0 e mancato riconoscimento del compenso."),
-          AT('Art. 8 \u2013 INTERRUZIONE DEL SERVIZIO'),
-          BP('In caso di comportamento non conforme, il Committente si riserva il diritto di interrompere la prestazione. In tal caso non sar\u00e0 dovuto il compenso per le ore non svolte.'),
-          AT('Art. 9 \u2013 RISERVATEZZA'),
-          BP('Il Prestatore si impegna a non divulgare informazioni relative a cliente, evento e attivit\u00e0 svolta. La violazione comporta risoluzione del contratto ed eventuali azioni legali.'),
-          AT('Art. 10 \u2013 NON CONCORRENZA'),
-          BP("Il Prestatore si impegna a non contattare direttamente il cliente del Committente n\u00e9 ad accettare incarichi senza previa comunicazione e autorizzazione da parte dell'Agenzia. Eventuali contatti ricevuti dovranno essere comunicati entro 24 ore a Made Events S.r.l.s. Tale obbligo si estende anche per un periodo successivo alla conclusione della collaborazione. L'inadempienza potr\u00e0 comportare l'avvio di azioni a tutela del Committente."),
-          AT('Art. 11 \u2013 RESPONSABILIT\u00c0'),
-          BP('Il Prestatore \u00e8 responsabile per eventuali danni arrecati a persone, cose o immagine del cliente.'),
-          AT('Art. 12 \u2013 TRATTAMENTO DATI E IMMAGINE'),
-          BP("La Risorsa autorizza il trattamento dei propri dati personali ai sensi del D.Lgs. 196/2003 e del Regolamento UE 679/2016 (GDPR), esclusivamente per le finalit\u00e0 connesse al presente rapporto. Durante lo svolgimento dell'attivit\u00e0 potranno essere realizzati contenuti fotografici e video a fini di reportistica interna e promozione aziendale. La Risorsa autorizza l'utilizzo di tali materiali, purch\u00e9 non lesivi della propria immagine, dignit\u00e0 e professionalit\u00e0."),
-          AT('Art. 13 \u2013 FORO COMPETENTE'),
-          BP('Per ogni controversia \u00e8 competente in via esclusiva il Foro di Roma.'),
-          AT('Art. 14 \u2013 ACCETTAZIONE'),
-          BP('Il Prestatore dichiara di aver letto e accettato tutte le condizioni.'),
-          new Paragraph({ children: [new TextRun({ text: '\u2500'.repeat(60), color: GRAY, size: PT9 })], spacing: { before: 280, after: 280 } }),
-          BP(`Data: ${dataFirma} \u2014 Roma`),
-          new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 560 } }),
-          new Paragraph({
-            children: [new TextRun({ text: '_'.repeat(32) + '          ' + '_'.repeat(32), size: PT11 })],
-            spacing: { after: 80 },
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: 'Il Committente' + ' '.repeat(40) + 'Il Prestatore', size: PT11 })],
-            spacing: { after: 60 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Made Events S.r.l.s.' + ' '.repeat(34) + (nomeCognome || '[DATO MANCANTE]'), bold: true, size: PT11 }),
-            ],
-          }),
-        ],
-      }],
-    })
-
-    const blob = await Packer.toBlob(doc)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Contratto_${nomeParts}_${dataParts}.docx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  const btnPrimary   = { background:'#630E33', color:'#fff', border:'none', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
-  const btnSecondary = { background:'none', border:'1px solid rgba(255,255,255,0.3)', color:'#ccc', borderRadius:6, padding:'8px 16px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Montserrat,sans-serif' }
-
-  return (
-    <div style={{ position:'fixed', inset:0, zIndex:600 }}>
-      <div onClick={onClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.65)' }} />
-
-      <div style={{ position:'relative', zIndex:1, height:'100%', overflowY:'auto', display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 16px 48px' }}>
-
-        {/* Chrome bar */}
-        <div className="contract-chrome" style={{
-          position:'sticky', top:0, zIndex:10,
-          display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
-          background:'rgba(10,10,16,0.9)', backdropFilter:'blur(10px)',
-          padding:'10px 20px', borderRadius:8, marginBottom:16,
-          width:'100%', maxWidth:794, boxSizing:'border-box',
-        }}>
-          <span style={{ fontSize:13, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-            Contratto — {nomeCognome || 'Talent'}
-          </span>
-          <button onClick={() => window.print()} style={btnPrimary}>Stampa / PDF</button>
-          <button onClick={downloadDocx} style={{ ...btnPrimary, background:'#1D4ED8' }}>Scarica .docx</button>
-          <button onClick={() => alert('Funzione invio email in arrivo')} style={btnSecondary}>Invia per email</button>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#999', fontSize:18, cursor:'pointer', padding:'4px 8px', lineHeight:1 }}>✕</button>
-        </div>
-
-        {/* A4 Contract */}
-        <div id="contract-printable" style={S.page}>
-
-          <p style={S.h1}>CONTRATTO DI COLLABORAZIONE OCCASIONALE</p>
-          <p style={S.sub}>Made Events S.r.l.s. — Via Montepulciano 60, Roma — C.F. / P.IVA 16645801008</p>
-          <div style={S.divider} />
-
-          <p style={{ ...S.artTitle, marginTop:0 }}>PARTI CONTRAENTI</p>
-          <p style={S.p}><strong>Committente:</strong> Made Events S.r.l.s., con sede legale in Via Montepulciano 60, Roma, C.F. / P.IVA 16645801008</p>
-          <p style={{ ...S.p, marginTop:8 }}><strong>Prestatore:</strong></p>
-          <div style={{ marginTop:8, marginBottom:4 }}>
-            <DR label="Nome e Cognome"   val={nomeCognome}              labelM="Nome / Cognome" />
-            <DR label="Codice Fiscale"   val={td.codice_fiscale}        labelM="Codice Fiscale" />
-            <DR label="Data di nascita"  val={td.data_nascita}          labelM="Data di nascita" />
-            <DR label="Luogo di nascita" val={td.citta_nascita}         labelM="Città di nascita" />
-            <DR label="Nazionalità"      val={td.nazionalita}           labelM="Nazionalità" />
-            <DR label="Residenza"        val={td.indirizzo_residenza}   labelM="Indirizzo di residenza" />
-            <DR label="N° Documento"     val={td.numero_documento}      labelM="Numero documento" />
-            <DR label="Emesso da"        val={td.stato_emissione_documento} labelM="Stato emissione documento" />
-          </div>
-
-          <div style={S.divider} />
-
-          <p style={S.artTitle}>Art. 1 – OGGETTO DELL&apos;INCARICO</p>
-          <p style={S.p}>Il Prestatore si impegna a svolgere attività di Hostess/Steward/Promoter per conto del Committente.</p>
-          <div style={{ marginTop:8, marginBottom:4 }}>
-            <DR label="Tipologia evento"        val={ed.tipologia}               labelM="Tipologia evento" />
-            <DR label="Data"                    val={dataEvento}                 labelM="Data evento" />
-            <DR label="Luogo"                   val={ed.luogo}                   labelM="Luogo evento" />
-            <DR label="Orario"                  val={ed.orario}                  labelM="Orario" />
-            <DR label="Abbigliamento richiesto" val={ed.abbigliamento_richiesto} labelM="Abbigliamento richiesto" />
-          </div>
-
-          <p style={S.artTitle}>Art. 2 – NATURA DEL RAPPORTO</p>
-          <p style={S.p}>La prestazione oggetto del presente accordo è da intendersi occasionale, senza alcun vincolo di subordinazione né oneri previdenziali a carico del Committente. La Risorsa dichiara di non aver percepito, nel corso dell&apos;anno solare, compensi complessivi superiori a € 5.000,00 derivanti da prestazioni di lavoro occasionale. La prestazione avrà carattere esclusivamente autonomo e professionale; pertanto, ogni responsabilità, ivi compresa quella infortunistica, resta a carico del Prestatore.</p>
-
-          <p style={S.artTitle}>Art. 3 – CORRISPETTIVO E PAGAMENTO</p>
-          <p style={S.p}>Il compenso sarà quello indicato nei dettagli attività: <strong>{ed.compenso ? ed.compenso : missing('Compenso')}</strong>. Il pagamento avverrà a 30 giorni fine mese tramite bonifico bancario. Il pagamento è subordinato a: corretta esecuzione della prestazione, invio della documentazione richiesta (ritenuta d&apos;acconto o fattura), effettivo incasso da parte del Committente. In assenza dei dati richiesti, il pagamento sarà posticipato. Eventuali ore extra saranno riconosciute solo se autorizzate preventivamente.</p>
-
-          <p style={S.artTitle}>Art. 4 – RECESSO E PENALI</p>
-          <p style={S.p}>Il Prestatore potrà recedere con preavviso minimo di 48 ore, motivando la propria decisione. In caso di mancato preavviso o assenza sarà applicata una penale di €150,00, fatto salvo il risarcimento di eventuali danni ulteriori. La mancata presentazione o ritardi superiori a 15 minuti senza preavviso saranno considerati grave inadempienza.</p>
-
-          <p style={S.artTitle}>Art. 5 – ANNULLAMENTO O MODIFICHE</p>
-          <p style={S.p}>Il Committente si riserva il diritto di annullare l&apos;attività o modificare orari, luogo o mansioni. Le variazioni saranno comunicate tempestivamente. La Risorsa potrà accettare o rifiutare entro 24 ore. Il compenso sarà proporzionato alle ore effettivamente svolte.</p>
-
-          <p style={S.artTitle}>Art. 6 – SVOLGIMENTO DEL SERVIZIO</p>
-          <p style={S.p}>La Risorsa si impegna a:</p>
-          <ul style={{ margin:'5px 0 5px 22px', padding:0 }}>
-            <li style={S.p}>rispettare gli orari di convocazione;</li>
-            <li style={S.p}>attenersi alle indicazioni operative;</li>
-            <li style={S.p}>mantenere un comportamento professionale.</li>
-          </ul>
-          <p style={S.p}>È fatto divieto di utilizzare il telefono durante il servizio (salvo autorizzazione) e di allontanarsi dalla postazione senza consenso.</p>
-
-          <p style={S.artTitle}>Art. 7 – DRESS CODE</p>
-          <p style={S.p}>La Risorsa è tenuta a rispettare il dress code indicato. Il mancato rispetto potrà comportare esclusione dall&apos;attività e mancato riconoscimento del compenso.</p>
-
-          <p style={S.artTitle}>Art. 8 – INTERRUZIONE DEL SERVIZIO</p>
-          <p style={S.p}>In caso di comportamento non conforme, il Committente si riserva il diritto di interrompere la prestazione. In tal caso non sarà dovuto il compenso per le ore non svolte.</p>
-
-          <p style={S.artTitle}>Art. 9 – RISERVATEZZA</p>
-          <p style={S.p}>Il Prestatore si impegna a non divulgare informazioni relative a cliente, evento e attività svolta. La violazione comporta risoluzione del contratto ed eventuali azioni legali.</p>
-
-          <p style={S.artTitle}>Art. 10 – NON CONCORRENZA</p>
-          <p style={S.p}>Il Prestatore si impegna a non contattare direttamente il cliente del Committente né ad accettare incarichi senza previa comunicazione e autorizzazione da parte dell&apos;Agenzia. Eventuali contatti ricevuti dovranno essere comunicati entro 24 ore a Made Events S.r.l.s. Tale obbligo si estende anche per un periodo successivo alla conclusione della collaborazione. L&apos;inadempienza potrà comportare l&apos;avvio di azioni a tutela del Committente.</p>
-
-          <p style={S.artTitle}>Art. 11 – RESPONSABILITÀ</p>
-          <p style={S.p}>Il Prestatore è responsabile per eventuali danni arrecati a persone, cose o immagine del cliente.</p>
-
-          <p style={S.artTitle}>Art. 12 – TRATTAMENTO DATI E IMMAGINE</p>
-          <p style={S.p}>La Risorsa autorizza il trattamento dei propri dati personali ai sensi del D.Lgs. 196/2003 e del Regolamento UE 679/2016 (GDPR), esclusivamente per le finalità connesse al presente rapporto. Durante lo svolgimento dell&apos;attività potranno essere realizzati contenuti fotografici e video a fini di reportistica interna e promozione aziendale. La Risorsa autorizza l&apos;utilizzo di tali materiali, purché non lesivi della propria immagine, dignità e professionalità.</p>
-
-          <p style={S.artTitle}>Art. 13 – FORO COMPETENTE</p>
-          <p style={S.p}>Per ogni controversia è competente in via esclusiva il Foro di Roma.</p>
-
-          <p style={S.artTitle}>Art. 14 – ACCETTAZIONE</p>
-          <p style={S.p}>Il Prestatore dichiara di aver letto e accettato tutte le condizioni.</p>
-
-          <div style={{ ...S.divider, marginTop:28 }} />
-
-          <p style={{ ...S.p, marginBottom:6 }}>Le parti dichiarano di aver letto, compreso e accettato integralmente il presente contratto.</p>
-          <p style={S.p}><strong>Data:</strong> {dataFirma} — Roma</p>
-
-          <div style={S.sigRow}>
-            <div style={S.sigBox}>
-              <div style={S.sigLine} />
-              <div style={S.sigName}>Il Committente</div>
-              <div style={{ ...S.sigName, fontWeight:600 }}>Made Events S.r.l.s.</div>
-            </div>
-            <div style={S.sigBox}>
-              <div style={S.sigLine} />
-              <div style={S.sigName}>Il Prestatore</div>
-              <div style={{ ...S.sigName, fontWeight:600 }}>{nomeCognome || missing('Nome Cognome')}</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // MATCH SCORE (front-end, mirrors backend calculateEventMatch, zero latency)
 // ---------------------------------------------------------------------------
 
@@ -1091,9 +746,10 @@ function ShiftSection({ eventId, handleApiResponse }) {
             <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
               {shifts.map(s => {
                 const sd = s.data ?? {}
-                const postiConfermati  = sd.posti_confermati ?? 0
+                const postiConfermati  = sd.posti_confermati ?? 0          // contratto firmato
+                const postiApprovati   = sd.posti_approvati ?? postiConfermati   // posto occupato (anche in attesa di firma)
                 const postiDisponibili = sd.posti_disponibili ?? 0
-                const postiPieno = postiConfermati >= postiDisponibili
+                const postiPieno = postiApprovati >= postiDisponibili
                 return (
                   <div key={s.entity_id} style={{ background:'#1A1A24', borderRadius:7, padding:'9px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                     <div style={{ flex:1, minWidth:0 }}>
@@ -1103,7 +759,7 @@ function ShiftSection({ eventId, handleApiResponse }) {
                       <div style={{ fontSize:11, color:MUTED, marginTop:2, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                         <span>{sd.ruolo || '—'}</span>
                         <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:8, background: postiPieno ? '#7F1D1D' : '#166534', color: postiPieno ? '#FCA5A5' : '#86EFAC', letterSpacing:'0.5px' }}>
-                          {postiConfermati}/{postiDisponibili} posti
+                          {postiApprovati} approvati · {postiConfermati} confermati / {postiDisponibili} posti
                         </span>
                         {sd.dress_code && <span>·&nbsp;{sd.dress_code}</span>}
                       </div>
@@ -1203,7 +859,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
   const [applications,  setApplications]  = useState([])
   const [loading,       setLoading]       = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
-  const [contractData,    setContractData]    = useState(null)
+  const [contractPanel,   setContractPanel]   = useState(null) // { applicationId, talentId, talentName } | null
   const [markingCompleted, setMarkingCompleted] = useState(null)
   const [profileModal,    setProfileModal]    = useState(null) // { t, matchPct } | null
   const [showExtraProvincia, setShowExtraProvincia] = useState(false)
@@ -1389,16 +1045,8 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
     else alert(getErrorMessage(res.error))
   }
 
-  const { start: startContract, modal: contractMissingModal } = useContractGenerator({
-    onResult: r => { if (!r.ok) alert(r.message) },
-    handleApiResponse,
-  })
-
-  const handleContractGenerate = async (talentProfileId, appId) => {
-    setActionLoading(appId + '_ct')
-    await startContract(talentProfileId, event.entity_id)
-    setActionLoading(null)
-  }
+  // Ultimo contratto di ogni candidatura dell'evento (badge sulla riga)
+  const { byApp: contractsByApp, reload: reloadContracts } = useApplicationContracts([event.entity_id], handleApiResponse)
 
   const handleRevoke = async (appId) => {
     if (!window.confirm('Sei sicuro di voler annullare?')) return
@@ -1440,12 +1088,12 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
         onMouseLeave={dangerAction ? () => setRowHovered(false) : undefined}
         style={{
           background: dangerAction && rowHovered ? 'rgba(229,62,62,0.08)' : '#1A1A24',
-          borderRadius:8, padding:'12px 14px', display:'flex', gap:12, alignItems:'center',
+          borderRadius:8, padding:'12px 14px', display:'flex', gap:12, alignItems:'center', flexWrap:'wrap',
           transition:'background 0.15s',
         }}
       >
         <TalentAvatar nome={nome} fotoUrl={td.foto_busto_url} size={40} />
-        <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ flex:1, minWidth:140 }}>
           <div style={{ fontSize:13, fontWeight:600, color:TEXT, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
             {nome}
             {matchPct != null && (
@@ -1459,7 +1107,7 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
           </div>
           {td.score != null && <div style={{ marginTop:4 }}><ScoreBar score={td.score} /></div>}
         </div>
-        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'flex-end', alignItems:'center', marginLeft:'auto' }}>
           {t && (
             <button
               onClick={() => setProfileModal({ t, matchPct })}
@@ -1648,7 +1296,6 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {approvedApps.map(a => {
                   const t = mergedTalentMap[a.data?.talent_profile_id]
-                  const ctBusy = actionLoading === a.entity_id + '_ct'
                   const mcBusy = markingCompleted === a.entity_id
                   const rvBusy = actionLoading === a.entity_id + '_rv'
                   const asBusy = actionLoading === a.entity_id + '_as'
@@ -1670,26 +1317,18 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
                           const dataFmt = sd.data ? new Date(sd.data).toLocaleDateString('it-IT', { day:'2-digit', month:'short' }) : '—'
                           return (
                             <option key={s.entity_id} value={s.entity_id}>
-                              {dataFmt} {sd.orario_inizio}→{sd.orario_fine} · {sd.ruolo} ({sd.posti_confermati ?? 0}/{sd.posti_disponibili ?? 0} posti)
+                              {dataFmt} {sd.orario_inizio}→{sd.orario_fine} · {sd.ruolo} ({sd.posti_approvati ?? sd.posti_confermati ?? 0} appr. · {sd.posti_confermati ?? 0} conf. / {sd.posti_disponibili ?? 0} posti)
                             </option>
                           )
                         })}
                       </select>
+                      <ContractBadge contract={contractsByApp[a.entity_id]} />
                       <button
-                        disabled={ctBusy}
-                        onClick={() => handleContractGenerate(a.data?.talent_profile_id, a.entity_id)}
-                        style={{ ...BTN('#C8A96E'), color:'#C8A96E', opacity: ctBusy ? 0.6 : 1, minWidth: 80, cursor: ctBusy ? 'wait' : 'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
-                        title="Genera contratto Google Doc"
+                        onClick={() => setContractPanel({ applicationId: a.entity_id, talentId: a.data?.talent_profile_id, talentName: `${t?.data?.nome ?? ''} ${t?.data?.cognome ?? ''}`.trim() })}
+                        style={{ ...BTN('#C8A96E'), color:'#C8A96E' }}
+                        title="Contratto: genera, anteprima, invia al talent"
                       >
-                        {ctBusy && <span className="spinner" style={{ width:11, height:11, borderWidth:'1.5px' }} />}
-                        {ctBusy ? 'Generazione…' : 'Contratto'}
-                      </button>
-                      <button
-                        onClick={() => setContractData({ talent: t ?? null })}
-                        style={{ ...BTN('#6b7280'), color:'#8888A0' }}
-                        title="Anteprima e download .docx offline"
-                      >
-                        .docx
+                        Contratto
                       </button>
                       {a.data?.evento_completato ? (
                         <span style={{ fontSize:10, color:'#16A34A', fontWeight:700, whiteSpace:'nowrap', padding:'5px 6px' }}>✓ Done</span>
@@ -1712,13 +1351,16 @@ function TalentEventDrawer({ event, allTalents, onClose, handleApiResponse, init
         </div>
       </div>
 
-      {contractMissingModal}
-
-      {contractData && (
-        <ContractPreviewModal
-          talent={contractData.talent}
-          event={event}
-          onClose={() => setContractData(null)}
+      {contractPanel && (
+        <ContractPanelModal
+          applicationId={contractPanel.applicationId}
+          talentId={contractPanel.talentId}
+          eventId={event.entity_id}
+          talentName={contractPanel.talentName}
+          eventTitle={d.titolo}
+          handleApiResponse={handleApiResponse}
+          onClose={() => setContractPanel(null)}
+          onChanged={reloadContracts}
         />
       )}
 
@@ -1829,6 +1471,7 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
   const sm      = statusMeta(event.status)
   const client  = clients.find(c => c.entity_id === d.client_id)
   const confirmed  = Number(d.confirmed_count ?? d.posti_confermati ?? 0)
+  const approved   = Number(d.approved_count ?? confirmed)   // prima del flusso contratto approvati = confermati
   const required   = richiestaVal ?? Number(d.hostess_richieste ?? 0)
 
   const coverUrl = d.foto_copertina_url || d.foto_url
@@ -1915,6 +1558,7 @@ const EventCard = React.memo(function EventCard({ event, clients, onDuplica, onM
         {/* Saturation bar — count click apre TAB Approvati */}
         {required > 0 && (
           <SaturationBar
+            approved={approved}
             confirmed={confirmed}
             required={required}
             onCountClick={() => onMatchTalent(event, 'approvati')}
@@ -2311,8 +1955,8 @@ export default function EventiPage() {
       list.sort((a, b) => {
         const aReq = richieste[a.entity_id] ?? Number(a.data?.hostess_richieste ?? 1)
         const bReq = richieste[b.entity_id] ?? Number(b.data?.hostess_richieste ?? 1)
-        const aPct = aReq > 0 ? (Number(a.data?.confirmed_count ?? 0) / aReq) : 0
-        const bPct = bReq > 0 ? (Number(b.data?.confirmed_count ?? 0) / bReq) : 0
+        const aPct = aReq > 0 ? (Number(a.data?.approved_count ?? a.data?.confirmed_count ?? 0) / aReq) : 0
+        const bPct = bReq > 0 ? (Number(b.data?.approved_count ?? b.data?.confirmed_count ?? 0) / bReq) : 0
         return bPct - aPct
       })
     }

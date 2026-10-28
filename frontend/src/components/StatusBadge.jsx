@@ -26,6 +26,7 @@ const STATUS_CONFIG = {
   WITHDRAWN: { label: 'Ritirata',     bg: '#F5F5F5',        color: COLORS.textSecondary },
 
   // ASSIGNMENT
+  AWAITING_SIGNATURE: { label: 'In attesa di firma', bg: '#FFF3E0', color: COLORS.warning },
   CONFIRMED:    { label: 'Confermato',   bg: '#E3F2FD',     color: '#1565C0' },
   CHECKED_IN:   { label: 'Check-in',    bg: COLORS.successLight, color: COLORS.success },
   CHECKED_OUT:  { label: 'Check-out',   bg: '#F3E5F5',     color: '#6A1B9A' },

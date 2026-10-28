@@ -1,13 +1,13 @@
 // === CANDIDATURE PAGE — MADE EVENTS Platform ===
 // 3 tab: ATTIVE (in corso) | STORICO (tutte + eventi archiviati) | INSIGHT (analytics)
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { applicationApi, talentApi, getErrorMessage } from '../../api/client'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
 import { ADMIN_SIDEBAR, PageHeader, TalentAvatar, ScoreBar, FILTER_INPUT, safeArray } from './shared'
 import { COLORS } from '../../styles/theme'
-import { ContractPreviewModal } from '../admin/EventiPage'
+import { ContractsContext, ContractBadge, ContractPanelModal, useApplicationContracts } from '../../components/ContractPanel'
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -45,6 +45,7 @@ function fmtDate(iso, opts = { day:'2-digit', month:'short', year:'2-digit' }) {
 // ---------------------------------------------------------------------------
 
 function AppCtas({ app, onApprove, onReject, onRequestDocs, onConfirmDocs, onContract, actionLoading }) {
+  const { byApp } = useContext(ContractsContext)
   const id   = app.entity_id
   const busy = (k) => actionLoading === id + k
   const BTN  = (label, color, onClick, loadKey) => (
@@ -78,8 +79,10 @@ function AppCtas({ app, onApprove, onReject, onRequestDocs, onConfirmDocs, onCon
         {BTN('Approva', '#15803D', () => onApprove(id), '_ap')}
         {BTN('Rifiuta', '#BE123C', () => onReject(id),  '_rj')}
       </>}
-      {s === 'APPROVED' &&
-        BTN('Contratto', '#C8A96E', () => onContract(app), '_ct')}
+      {s === 'APPROVED' && <>
+        <ContractBadge contract={byApp[id]} />
+        {BTN('Contratto', '#C8A96E', () => onContract(app), '_ct')}
+      </>}
     </div>
   )
 }
@@ -261,7 +264,7 @@ function Vista2({ apps, talentMap, eventMap, actionLoading, onApprove, onReject,
               </div>
               {required > 0 && (
                 <span style={{ fontSize:12, fontWeight:700, color: approvedCount >= required ? '#15803D' : '#C2410C', whiteSpace:'nowrap' }}>
-                  {approvedCount}/{required} approvati
+                  {approvedCount}/{required} approvati · {Number(ed.confirmed_count ?? 0)} confermati
                 </span>
               )}
               <span style={{ fontSize:12, color:COLORS.textSecondary, whiteSpace:'nowrap' }}>{eventApps.length} cand.</span>
@@ -619,7 +622,7 @@ export default function CandidaturePage() {
   const [allTalents,    setAllTalents]    = useState([])
   const [loading,       setLoading]       = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
-  const [contractApp,   setContractApp]   = useState(null)
+  const [contractApp,   setContractApp]   = useState(null)   // pannello contratto: { applicationId, talentId, talentName, eventId, eventTitle }
 
   // TAB 2/3 data (lazy)
   const [appsAll,    setAppsAll]    = useState([])
@@ -636,6 +639,13 @@ export default function CandidaturePage() {
   const [filterStatus,  setFilterStatus]  = useState('ALL')
   const [filterMese,    setFilterMese]    = useState('ALL')
   const [sortBy,        setSortBy]        = useState('data')
+
+  // Ultimo contratto di ogni candidatura approvata (badge sulla riga): una contract.list per evento
+  const approvedEventIds = useMemo(
+    () => apps.filter(a => a.status === 'APPROVED').map(a => a.data?.event_id),
+    [apps]
+  )
+  const { byApp: contractsByApp, reload: reloadContracts } = useApplicationContracts(approvedEventIds, handleApiResponse)
 
   // ── Load TAB 1 ────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -718,7 +728,13 @@ export default function CandidaturePage() {
   const openContract = (app) => {
     const talent = talentMap[app.data?.talent_profile_id] ?? null
     const event  = eventMap[app.data?.event_id] ?? null
-    setContractApp({ talent, event })
+    setContractApp({
+      applicationId: app.entity_id,
+      talentId:      app.data?.talent_profile_id,
+      talentName:    talent?.data?.nome ? `${talent.data.nome} ${talent.data.cognome ?? ''}`.trim() : (app.data?.talent_name ?? ''),
+      eventId:       app.data?.event_id,
+      eventTitle:    event?.data?.titolo ?? app.data?.event_titolo ?? '',
+    })
   }
 
   const eventTitles = useMemo(() => {
@@ -779,6 +795,7 @@ export default function CandidaturePage() {
   }
 
   return (
+    <ContractsContext.Provider value={{ byApp: contractsByApp, reload: reloadContracts }}>
     <Layout sidebarItems={ADMIN_SIDEBAR}>
       <PageHeader
         title="Candidature"
@@ -839,12 +856,18 @@ export default function CandidaturePage() {
       )}
 
       {contractApp && (
-        <ContractPreviewModal
-          talent={contractApp.talent}
-          event={contractApp.event}
+        <ContractPanelModal
+          applicationId={contractApp.applicationId}
+          talentId={contractApp.talentId}
+          eventId={contractApp.eventId}
+          talentName={contractApp.talentName}
+          eventTitle={contractApp.eventTitle}
+          handleApiResponse={handleApiResponse}
           onClose={() => setContractApp(null)}
+          onChanged={reloadContracts}
         />
       )}
     </Layout>
+    </ContractsContext.Provider>
   )
 }

@@ -1255,7 +1255,7 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
                 </select>
               </div>
             )}
-            {contractResult === 'ok'    && <div style={{ marginBottom:12, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Contratto generato con successo</div>}
+            {contractResult === 'ok'    && <div style={{ marginBottom:12, padding:'8px 12px', background:'#E8F5E9', borderRadius:6, fontSize:12, color:'#2E7D32', fontWeight:600 }}>✓ Contratto generato. Per l'anteprima e l'invio al talent apri Eventi → Approvati → Contratto.</div>}
             {contractResult && contractResult !== 'ok' && <div style={{ marginBottom:12, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>{contractResult}</div>}
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button onClick={() => { if (!contractLoading) { setShowContractModal(false); setContractResult(null); setContractEventId('') } }} style={BTN_OUTLINE}>Chiudi</button>

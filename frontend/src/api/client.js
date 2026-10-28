@@ -240,6 +240,16 @@ export const contractApi = {
     gasPost('contract.check', { talent_profile_id, event_id }, t()),
   generate: (talent_profile_id, event_id, force = false) =>
     gasPost('contract.generate', force ? { talent_profile_id, event_id, force: true } : { talent_profile_id, event_id }, t()),
+  /** Solo metadati. USER: i propri (SENT/SIGNED/DECLINED/EXPIRED). ADMIN: { event_id } o { application_id }. */
+  list:     (payload = {}) => gasPost('contract.list', payload, t()),
+  /** PDF in base64 + metadati (USER: solo proprio SENT/SIGNED). meta_only=true: senza PDF. */
+  get:      (entity_id, meta_only = false) =>
+    gasPost('contract.get', meta_only ? { entity_id, meta_only: true } : { entity_id }, t()),
+  send:        (entity_id) => gasPost('contract.send', { entity_id }, t()),
+  void:        (entity_id, motivo = '') => gasPost('contract.void', { entity_id, motivo }, t()),
+  requestCode: (entity_id) => gasPost('contract.requestCode', { entity_id }, t()),
+  accept:      (payload) => gasPost('contract.accept', payload, t()),
+  decline:     (entity_id, motivo = '') => gasPost('contract.decline', { entity_id, motivo }, t()),
 }
 
 /** Scarica il PDF restituito da contract.generate ({ pdf_base64, filename }). */
