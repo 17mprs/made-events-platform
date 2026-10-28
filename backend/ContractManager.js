@@ -79,6 +79,106 @@ function findApprovedApplicationWithShift_(talentProfileId, eventId, tenantId) {
 }
 
 // ---------------------------------------------------------------------------
+// DATI MANCANTI — gate del contratto
+// ---------------------------------------------------------------------------
+
+var DOC_TIPO_LABEL_ = {
+  carta_identita: "Carta d'identità",
+  passaporto:     'Passaporto',
+  patente:        'Patente',
+  permesso:       'Permesso di soggiorno'
+};
+
+function isBlank_(val) {
+  return val === undefined || val === null || String(val).trim() === '';
+}
+
+/** true se l'evento ha un compenso strutturato valido (importo numerico > 0 + unità). */
+function hasCompensoStrutturato_(ed) {
+  if (isBlank_(ed.compenso_importo) || isNaN(Number(ed.compenso_importo)) || Number(ed.compenso_importo) <= 0) return false;
+  return ed.compenso_unita === 'orario' || ed.compenso_unita === 'forfait';
+}
+
+/**
+ * Testo del compenso per il contratto: "€12,00 / ora" o "€120,00 forfait",
+ * con " (lordo)" / " (netto)" solo se il testo libero lo dichiara.
+ * Senza compenso strutturato ritorna ''.
+ */
+function formatCompenso_(ed) {
+  if (!hasCompensoStrutturato_(ed)) return '';
+  var importo = Number(ed.compenso_importo).toFixed(2).replace('.', ',');
+  var testo = '€' + importo + (ed.compenso_unita === 'orario' ? ' / ora' : ' forfait');
+  var libero = String(ed.compenso || '');
+  if (/\bnett/i.test(libero)) testo += ' (netto)';
+  else if (/\blord/i.test(libero)) testo += ' (lordo)';
+  return testo;
+}
+
+/**
+ * Campi obbligatori del contratto che risultano vuoti. Conta come mancante
+ * anche ciò che il PDF coprirebbe con un fallback ('Da definire', 'Vedere briefing').
+ * stato_emissione_documento ha default 'Italia': non segnalato.
+ * @returns {Array<{field:string,label:string,source:string,inline:boolean}>}
+ */
+function collectMissing_(td, ed, sd) {
+  td = td || {}; ed = ed || {}; sd = sd || {};
+  var missing = [];
+  var add = function(field, label, source, inline) {
+    missing.push({ field: field, label: label, source: source, inline: inline });
+  };
+
+  // Talent: inline = l'admin può scriverlo da talent.updateProfile
+  if (isBlank_(td.codice_fiscale))      add('codice_fiscale',      'Codice fiscale',        'talent', true);
+  if (isBlank_(td.data_nascita))        add('data_nascita',        'Data di nascita',       'talent', true);
+  if (isBlank_(td.nascita_citta))       add('nascita_citta',       'Città di nascita',      'talent', true);
+  if (isBlank_(td.residenza_indirizzo)) add('residenza_indirizzo', 'Indirizzo di residenza', 'talent', true);
+  if (isBlank_(td.numero_documento))    add('numero_documento',    'Numero documento',      'talent', true);
+  if (isBlank_(td.tipo_documento))      add('tipo_documento',      'Tipo documento',        'talent', true);
+  if (isBlank_(td.scadenza_documento))  add('scadenza_documento',  'Scadenza documento',    'talent', true);
+
+  // Turno: dress code (l'abbigliamento dell'evento, se presente, è un valore reale)
+  if (isBlank_(sd.dress_code) && isBlank_(ed.abbigliamento_richiesto)) add('dress_code', 'Dress code del turno', 'turno', false);
+
+  // Evento: testo di presentazione E compenso strutturato
+  if (isBlank_(ed.compenso))            add('compenso',         'Compenso (testo)',                'evento', false);
+  if (!hasCompensoStrutturato_(ed))     add('compenso_importo', 'Importo e unità del compenso',    'evento', false);
+
+  return missing;
+}
+
+/**
+ * Carica talent, evento e turno assegnato per contract.check / contract.generate.
+ * Stessi controlli e stessi errori di sempre, PRIMA di toccare Drive.
+ * @returns {{error: object}|{talent, event, td, ed, application, shift}}
+ */
+function loadContractContext_(payload, auth) {
+  var valid = requireFields(payload, ['talent_profile_id', 'event_id']);
+  if (valid) return { error: valid };
+
+  var talent = getEntityById(payload.talent_profile_id, auth.tenant_id);
+  if (!talent || talent.type !== 'TALENT_PROFILE') {
+    return { error: errorResponse('SYS_002', 'Talent profile non trovato') };
+  }
+
+  var event = getEntityById(payload.event_id, auth.tenant_id);
+  if (!event || event.type !== 'EVENT') {
+    return { error: errorResponse('SYS_002', 'Evento non trovato') };
+  }
+
+  var ed = event.data || {};
+  ed.event_id = event.entity_id; // usato per folder routing
+
+  // Turno del talent: APPLICATION APPROVED → shift_id → SHIFT dello stesso evento.
+  var assigned = findApprovedApplicationWithShift_(talent.entity_id, event.entity_id, auth.tenant_id);
+  if (!assigned) {
+    return { error: errorResponse('WF_002', "Nessun turno assegnato a questo talent per l'evento") };
+  }
+
+  return { talent: talent, event: event, td: talent.data || {}, ed: ed,
+           application: assigned.application, shift: assigned.shift };
+}
+
+// ---------------------------------------------------------------------------
 // GENERATE CONTRACT — core
 // ---------------------------------------------------------------------------
 
@@ -118,6 +218,9 @@ function generateContract(talentData, eventData, shiftData, auth) {
     ? String(td.residenza_indirizzo).trim() + (cittaRes ? ', ' + cittaRes : '')
     : '';
 
+  var scadenzaDoc = parseShiftDate_(td.scadenza_documento);
+  var scadenzaDocStr = scadenzaDoc ? scadenzaDoc.dmy : '';
+
   var nomeCompleto = [td.nome, td.cognome].filter(Boolean).join(' ') || '';
 
   // Data firma odierna
@@ -132,13 +235,15 @@ function generateContract(talentData, eventData, shiftData, auth) {
     '{{NAZIONALITA}}':         v(td.nascita_paese, 'Italiana'),
     '{{INDIRIZZO}}':           v(indirizzoStr),
     '{{NUMERO_DOCUMENTO}}':    v(td.numero_documento),         // inserito dall'admin (scheda talent)
+    '{{TIPO_DOCUMENTO}}':      v(DOC_TIPO_LABEL_[td.tipo_documento] || td.tipo_documento),
+    '{{SCADENZA_DOCUMENTO}}':  v(scadenzaDocStr),
     '{{STATO_EMISSIONE_DOC}}': v(td.stato_emissione_documento, 'Italia'),
     '{{DATA_EVENTO}}':         dataEventoStr,
     '{{LUOGO_EVENTO}}':        v(ed.luogo),
     '{{ORARIO_EVENTO}}':       orarioStr,
     '{{TIPOLOGIA_EVENTO}}':    v(ed.tipologia, ed.titolo),
     '{{ABBIGLIAMENTO}}':       v(sd && sd.dress_code, ed.abbigliamento_richiesto || 'Vedere briefing'),
-    '{{COMPENSO}}':            v(ed.compenso, 'Da definire'),
+    '{{COMPENSO}}':            v(formatCompenso_(ed) || ed.compenso, 'Da definire'),
     '{{DATA_FIRMA}}':          dataFirma,
   };
 
@@ -210,38 +315,39 @@ function generateContract(talentData, eventData, shiftData, auth) {
 }
 
 // ---------------------------------------------------------------------------
+// HANDLER — contract.check (sola lettura)
+// ---------------------------------------------------------------------------
+
+function handleContractCheck(payload, auth) {
+  var ctx = loadContractContext_(payload, auth);
+  if (ctx.error) return ctx.error;
+  var missing = collectMissing_(ctx.td, ctx.ed, ctx.shift.data || {});
+  return successResponse({ ok: missing.length === 0, missing: missing });
+}
+
+// ---------------------------------------------------------------------------
 // HANDLER — contract.generate
 // ---------------------------------------------------------------------------
 
 function handleContractGenerate(payload, auth) {
-  var valid = requireFields(payload, ['talent_profile_id', 'event_id']);
-  if (valid) return valid;
+  var ctx = loadContractContext_(payload, auth);
+  if (ctx.error) return ctx.error;
+  var talent = ctx.talent, event = ctx.event, application = ctx.application, shift = ctx.shift;
 
-  var talent = getEntityById(payload.talent_profile_id, auth.tenant_id);
-  if (!talent || talent.type !== 'TALENT_PROFILE') {
-    return errorResponse('SYS_002', 'Talent profile non trovato');
-  }
-
-  var event = getEntityById(payload.event_id, auth.tenant_id);
-  if (!event || event.type !== 'EVENT') {
-    return errorResponse('SYS_002', 'Evento non trovato');
+  // Gate: dati mancanti e nessun force esplicito → niente Drive, lista strutturata.
+  if (payload.force !== true) {
+    var missing = collectMissing_(ctx.td, ctx.ed, shift.data || {});
+    if (missing.length) {
+      return { success: false, error: {
+        code:    'CT_MISSING',
+        message: 'Dati mancanti per il contratto: ' + missing.map(function(m) { return m.label; }).join(', '),
+        missing: missing
+      } };
+    }
   }
 
   try {
-    var td = talent.data || {};
-    var ed = event.data  || {};
-    ed.event_id = event.entity_id; // usato per folder routing
-
-    // Turno del talent: APPLICATION APPROVED → shift_id → SHIFT dello stesso evento.
-    // Senza turno valido non si crea nessun file: errore PRIMA di toccare Drive.
-    var assigned = findApprovedApplicationWithShift_(talent.entity_id, event.entity_id, auth.tenant_id);
-    if (!assigned) {
-      return errorResponse('WF_002', "Nessun turno assegnato a questo talent per l'evento");
-    }
-    var application = assigned.application;
-    var shift = assigned.shift;
-
-    var result = generateContract(td, ed, shift.data, auth);
+    var result = generateContract(ctx.td, ctx.ed, shift.data, auth);
 
     // Storico: una entità CONTRATTO per ogni generazione. Un errore qui non
     // deve far perdere il PDF già creato: si logga e si segnala nella risposta.
@@ -256,7 +362,8 @@ function handleContractGenerate(payload, auth) {
         doc_file_id:    result.doc_file_id,
         filename:       result.filename,
         generato_il:    new Date().toISOString(),
-        generato_da:    auth.user_id
+        generato_da:    auth.user_id,
+        forzato:        payload.force === true
       }, auth.tenant_id, auth.user_id);
     } catch (histErr) {
       storicoOk = false;

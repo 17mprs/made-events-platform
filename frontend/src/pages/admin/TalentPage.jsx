@@ -1,7 +1,8 @@
 // === TALENT PAGE — MADE EVENTS Platform ===
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { talentApi, leadApi, applicationApi, contractApi, emailApi, documentApi, getErrorMessage, downloadContractPdf, contractErrorMessage } from '../../api/client'
+import { talentApi, leadApi, applicationApi, emailApi, documentApi, getErrorMessage } from '../../api/client'
+import { useContractGenerator } from '../../components/ContractMissingModal'
 import CropModal from '../../components/registration/CropModal'
 import adminStore from '../../store/adminStore'
 import Layout from '../../components/Layout'
@@ -718,6 +719,10 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
   const [contractEventId,   setContractEventId]   = useState('')
   const [contractLoading,   setContractLoading]   = useState(false)
   const [contractResult,    setContractResult]    = useState(null)
+  const { start: startContract, modal: contractMissingModal } = useContractGenerator({
+    onResult: r => setContractResult(r.ok ? 'ok' : r.message),
+    handleApiResponse,
+  })
 
   const [cardLoading, setCardLoading] = useState(false)
   const [cardError,   setCardError]   = useState(null)
@@ -1063,15 +1068,10 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
 
   const handleGeneraContratto = async () => {
     if (!contractEventId) return
+    setContractResult(null)
     setContractLoading(true)
-    const res = await contractApi.generate(talent.entity_id, contractEventId)
+    await startContract(talent.entity_id, contractEventId)
     setContractLoading(false)
-    if (res.success && res.data?.pdf_base64) {
-      downloadContractPdf(res.data)
-      setContractResult('ok')
-    } else {
-      setContractResult(contractErrorMessage(res.error))
-    }
   }
 
   const handleGeneraScheda = async () => {
@@ -1235,6 +1235,8 @@ function TalentProfileDrawer({ talent, onClose, onSuspended, onDeleted, handleAp
       )}
 
       {/* Contract Modal */}
+      {contractMissingModal}
+
       {showContractModal && (
         <>
           <div onClick={() => { if (!contractLoading) setShowContractModal(false) }} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:650 }} />

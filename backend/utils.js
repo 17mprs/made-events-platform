@@ -86,6 +86,7 @@ var PERMISSION_MATRIX = {
 
   // CONTRACT
   'contract.generate': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
+  'contract.check':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 
   // TENANT
   'tenant.list':   { SUPER_ADMIN:'Y', ADMIN:'N', USER:'N', CLIENTE:'N' },

@@ -206,6 +206,7 @@ function handleRequest(action, payload, token) {
 
     // CONTRACT
     case 'contract.generate': return handleContractGenerate(payload, auth);
+    case 'contract.check':    return handleContractCheck(payload, auth);
 
     // EMAIL
     case 'email.sendCustom':       return handleEmailSendCustom(payload, auth);
@@ -393,7 +394,7 @@ function maskEmail_(email) {
  * email mascherate, stringhe troncate, profondità limitata.
  */
 function sanitizeForLog_(value) {
-  var SENSITIVE = /pass|pwd|token|secret|hash|authorization|cookie|iban|codice_fiscale|\bcf\b|email|mail|telefono|phone|cellulare|nome|cognome|indirizzo|file_base64|data_nascita|partita_iva|numero_documento/i;
+  var SENSITIVE = /pass|pwd|token|secret|hash|authorization|cookie|iban|codice_fiscale|\bcf\b|email|mail|telefono|phone|cellulare|nome|cognome|indirizzo|file_base64|data_nascita|partita_iva|numero_documento|tipo_documento|scadenza_documento|stato_emissione_documento/i;
   function walk(v, depth) {
     if (v === null || v === undefined) return v;
     if (typeof v === 'string') {

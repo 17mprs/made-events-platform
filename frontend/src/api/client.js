@@ -235,8 +235,10 @@ export const dashboardApi = {
 }
 
 export const contractApi = {
-  generate: (talent_profile_id, event_id) =>
-    gasPost('contract.generate', { talent_profile_id, event_id }, t()),
+  check:    (talent_profile_id, event_id) =>
+    gasPost('contract.check', { talent_profile_id, event_id }, t()),
+  generate: (talent_profile_id, event_id, force = false) =>
+    gasPost('contract.generate', force ? { talent_profile_id, event_id, force: true } : { talent_profile_id, event_id }, t()),
 }
 
 /** Scarica il PDF restituito da contract.generate ({ pdf_base64, filename }). */

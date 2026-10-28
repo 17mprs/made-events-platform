@@ -887,13 +887,38 @@ function handleTalentUpdateProfile(payload, auth) {
 
   // ADMIN → aggiornamento diretto. Campi riservati all'admin (dati per il
   // contratto): fuori da CAMPI_PUBBLICI e dal ramo USER, mai in pending_data.
-  var adminOnlyFields = ['numero_documento', 'residenza_indirizzo'];
+  var adminOnlyFields = ['numero_documento', 'residenza_indirizzo', 'tipo_documento', 'scadenza_documento', 'stato_emissione_documento', 'data_nascita'];
   for (var a = 0; a < adminOnlyFields.length; a++) {
     var af = adminOnlyFields[a];
-    if (payload[af] !== undefined) updates[af] = String(payload[af] == null ? '' : payload[af]).trim().substring(0, 200);
+    if (payload[af] === undefined) continue;
+    var afVal = String(payload[af] == null ? '' : payload[af]).trim().substring(0, 200);
+    if (af === 'tipo_documento' && afVal !== '' && TIPI_DOCUMENTO_.indexOf(afVal) === -1) {
+      return errorResponse('VAL_002', 'tipo_documento deve essere uno di: ' + TIPI_DOCUMENTO_.join(', '), af);
+    }
+    if (af === 'scadenza_documento' && afVal !== '' && !isIsoDate_(afVal)) {
+      return errorResponse('VAL_002', 'scadenza_documento deve essere una data valida (AAAA-MM-GG)', af);
+    }
+    if (af === 'data_nascita' && afVal !== '') {
+      if (!isIsoDate_(afVal)) {
+        return errorResponse('VAL_002', 'data_nascita deve essere una data valida (AAAA-MM-GG)', af);
+      }
+      // Nel Sheet data_nascita è sempre DD/MM/YYYY (vedi toItalianDate_, TalentCard, contratto)
+      afVal = toItalianDate_(afVal);
+    }
+    updates[af] = afVal;
   }
   var updated = updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
   return successResponse({ talent: talentToPublic(updated, auth.role) });
+}
+
+var TIPI_DOCUMENTO_ = ['carta_identita', 'passaporto', 'patente', 'permesso'];
+
+/** true se s è una data reale in formato AAAA-MM-GG (nessun overflow tipo 2026-02-31). */
+function isIsoDate_(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s));
+  if (!m) return false;
+  var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
 }
 
 function handleTalentSoftDelete(payload, auth) {
@@ -1071,6 +1096,9 @@ function talentToPublic(entity, role) {
       pub.data = Object.assign({}, pub.data);
       delete pub.data.numero_documento;
       delete pub.data.residenza_indirizzo;
+      delete pub.data.tipo_documento;
+      delete pub.data.scadenza_documento;
+      delete pub.data.stato_emissione_documento;
     }
   }
   // Dati fiscali/bancari: mai ai clienti (il talent vede i propri)
