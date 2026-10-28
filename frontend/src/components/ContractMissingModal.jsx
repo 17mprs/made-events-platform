@@ -56,7 +56,7 @@ export function useContractGenerator({ onResult, handleApiResponse }) {
     }
     const missing = chk.data?.missing ?? []
     if (missing.length === 0) return generate(talentId, eventId, false)
-    setState({ talentId, eventId, missing })
+    setState({ talentId, eventId, missing, completeness: chk.data?.completeness ?? null })
   }
 
   const start = (talentId, eventId) => exclusive(() => checkAndGenerate(talentId, eventId))
@@ -64,6 +64,7 @@ export function useContractGenerator({ onResult, handleApiResponse }) {
   const modal = state && (
     <ContractMissingModal
       missing={state.missing}
+      completeness={state.completeness}
       talentId={state.talentId}
       busy={busy}
       handleApiResponse={api}
@@ -76,7 +77,7 @@ export function useContractGenerator({ onResult, handleApiResponse }) {
   return { start, busy, modal }
 }
 
-export default function ContractMissingModal({ missing, talentId, busy, handleApiResponse = r => r, onClose, onSavedRecheck, onForce }) {
+export default function ContractMissingModal({ missing, completeness, talentId, busy, handleApiResponse = r => r, onClose, onSavedRecheck, onForce }) {
   const navigate = useNavigate()
   const inlineFields = missing.filter(m => m.source === 'talent' && m.inline)
   const otherTalent  = missing.filter(m => m.source === 'talent' && !m.inline)
@@ -136,6 +137,22 @@ export default function ContractMissingModal({ missing, talentId, busy, handleAp
         <p style={{ margin:'0 0 16px', fontSize:12, color: COLORS.textSecondary }}>
           {missing.length} {missing.length === 1 ? 'dato mancante' : 'dati mancanti'}. Completali oppure genera comunque: i campi vuoti resteranno “[DA COMPILARE]” nel PDF.
         </p>
+
+        {completeness && (
+          <div style={{ margin:'0 0 16px', padding:'10px 12px', background:'#F8F8FB', borderRadius:6, border:`1px solid ${COLORS.border}` }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, fontWeight:600, marginBottom:6 }}>
+              <span>Dati contratto del talent</span><span>{completeness.pct}%</span>
+            </div>
+            <div style={{ height:6, background:'#eee', borderRadius:3, overflow:'hidden' }}>
+              <div style={{ width:`${completeness.pct}%`, height:'100%', background: completeness.pct >= 70 ? '#10B981' : completeness.pct >= 40 ? '#F97316' : '#EF4444' }} />
+            </div>
+            {completeness.mancanti.length > 0 && (
+              <div style={{ marginTop:6, fontSize:11, color: COLORS.textSecondary }}>
+                Mancano: {completeness.mancanti.map(m => m.label).join(', ')}
+              </div>
+            )}
+          </div>
+        )}
 
         {inlineFields.map(m => (
           <div key={m.field} style={{ marginBottom: 12 }}>

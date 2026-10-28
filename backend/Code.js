@@ -136,6 +136,7 @@ function handleRequest(action, payload, token) {
     case 'talent.list':              return handleTalentList(payload, auth);
     case 'talent.get':               return handleTalentGet(payload, auth);
     case 'talent.updateProfile':     return handleTalentUpdateProfile(payload, auth);
+    case 'talent.updateFiscal':      return handleTalentUpdateFiscal(payload, auth);
     case 'talent.updateScoreAdmin':  return handleUpdateScoreAdmin(payload, auth);
     case 'talent.updateEventiPreCRM': return handleUpdateEventiPreCRM(payload, auth);
     case 'talent.generateCard':      return handleGenerateTalentCard(payload, auth);
@@ -394,7 +395,7 @@ function maskEmail_(email) {
  * email mascherate, stringhe troncate, profondità limitata.
  */
 function sanitizeForLog_(value) {
-  var SENSITIVE = /pass|pwd|token|secret|hash|authorization|cookie|iban|codice_fiscale|\bcf\b|email|mail|telefono|phone|cellulare|nome|cognome|indirizzo|file_base64|data_nascita|partita_iva|numero_documento|tipo_documento|scadenza_documento|stato_emissione_documento/i;
+  var SENSITIVE = /pass|pwd|token|secret|hash|authorization|cookie|iban|codice_fiscale|\bcf\b|email|mail|telefono|phone|cellulare|nome|cognome|indirizzo|file_base64|data_nascita|partita_iva|numero_documento|tipo_documento|scadenza_documento|stato_emissione_documento|intestatario_conto|regime_fiscale/i;
   function walk(v, depth) {
     if (v === null || v === undefined) return v;
     if (typeof v === 'string') {

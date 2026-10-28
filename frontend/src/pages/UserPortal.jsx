@@ -459,8 +459,10 @@ function isValidPartitaIva(v) {
   if (!v) return true // opzionale
   return /^\d{11}$/.test(String(v))
 }
+// Formato generale IBAN (qualunque paese): la lunghezza per paese e il checksum
+// mod 97 li verifica il backend (talent.updateFiscal).
 function isValidIban(v) {
-  return /^IT\d{2}[A-Z0-9]{23}$/.test(String(v || '').toUpperCase().replace(/\s/g, ''))
+  return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(String(v || '').toUpperCase().replace(/\s/g, ''))
 }
 
 const PROFILE_SECTIONS = [
@@ -727,21 +729,104 @@ function FiscalRadioGroup({ label, name, value, onChange, error }) {
   )
 }
 
-const FISCALE_FIELDS = ['codice_fiscale', 'partita_iva', 'iban', 'disponibile_chiamata', 'disponibile_ritenuta']
+// Barra "Dati contratto": valori calcolati dal backend (contractDataCompleteness_),
+// così coincidono con quelli della modale contratto. Non incide sulla % del profilo.
+function ContractDataBar({ data }) {
+  if (!data) return null
+  return (
+    <div style={{ marginBottom:20, padding:'12px 14px', background:'#F8F8FB', borderRadius:8, border:`1px solid ${COLORS.border}` }}>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, fontWeight:600, marginBottom:6 }}>
+        <span>Dati contratto: {data.pct}%</span>
+        {data.pct === 100 && <span style={{ color:'#10B981' }}>✓ Completi</span>}
+      </div>
+      <ProgressBar pct={data.pct} />
+      {data.mancanti.length > 0 && (
+        <div style={{ marginTop:8, fontSize:12, color:COLORS.textSecondary }}>Da completare: {data.mancanti.map(m => m.label).join(', ')}</div>
+      )}
+    </div>
+  )
+}
 
-function FiscaleCard({ sec, form, onChange, entityId, handleApiResponse }) {
+// Campi salvati da S8 con talent.updateFiscal (scrittura diretta, validata dal backend).
+const FISCALE_SAVE_FIELDS = [
+  'codice_fiscale', 'partita_iva', 'iban', 'intestatario_conto', 'regime_fiscale',
+  'disponibile_chiamata', 'disponibile_ritenuta',
+  'residenza_indirizzo', 'numero_documento', 'tipo_documento', 'scadenza_documento', 'stato_emissione_documento',
+]
+// Dati documento verificati dal team: sola lettura quando dati_documento_verificati è attivo.
+const DOC_LOCKED_FIELDS = ['residenza_indirizzo', 'numero_documento', 'tipo_documento', 'scadenza_documento']
+const REGIMI_FISCALI = [
+  { value: 'occasionale', label: "Prestazione occasionale (ritenuta d'acconto)" },
+  { value: 'forfettario', label: 'Partita IVA — regime forfettario' },
+  { value: 'ordinario',   label: 'Partita IVA — regime ordinario' },
+]
+const TIPI_DOCUMENTO = [
+  { value: 'carta_identita', label: "Carta d'identità" },
+  { value: 'passaporto',     label: 'Passaporto' },
+  { value: 'patente',        label: 'Patente' },
+  { value: 'permesso',       label: 'Permesso di soggiorno' },
+]
+
+// data_nascita nel Sheet è GG/MM/AAAA; l'input date lavora in AAAA-MM-GG.
+function isoToItalianDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+function italianDateToIso(it) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(it || '')
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
+}
+
+function SelectField({ label, value, onChange, options, error, disabled, helper }) {
+  return (
+    <div style={{ width:'100%' }}>
+      <label style={COMPONENT_STYLES.label}>{label}</label>
+      <select
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        style={{ ...COMPONENT_STYLES.input, borderColor: error ? COLORS.error : COLORS.border, background: disabled ? '#f5f5f5' : '#fff' }}
+      >
+        <option value="">— seleziona —</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      {error && <span style={{ fontSize:12, color:COLORS.error, marginTop:4, display:'block' }}>{error}</span>}
+      {!error && helper && <span style={{ fontSize:12, color:COLORS.textSecondary, marginTop:4, display:'block' }}>{helper}</span>}
+    </div>
+  )
+}
+
+function FiscaleCard({ sec, form, onChange, handleApiResponse, contractData, onContractData }) {
   const { filled, total } = sec.completeness(form)
   const [saving, setSaving] = useState(false)
   const [saved,  setSaved]  = useState(false)
   const [errors, setErrors] = useState({})
+  // Data e città di nascita: mostrate solo se mancanti al momento dell'apertura.
+  const [showBirthDate] = useState(() => !form.data_nascita)
+  const [showBirthCity] = useState(() => !form.nascita_citta)
+  const showBirth = showBirthDate || showBirthCity
+  const verified = form.dati_documento_verificati === true
+  const locked = f => verified && !!form[f]
+  const today = new Date().toISOString().slice(0, 10)
+
+  // Intestatario precompilato col nome del talent finché il campo non è mai stato valorizzato
+  // (undefined = mai salvato; '' = svuotato dall'utente). Si salva col pulsante.
+  const nomeTalent = [form.nome, form.cognome].filter(Boolean).join(' ')
+  const intestatario = form.intestatario_conto === undefined ? nomeTalent : form.intestatario_conto
 
   function validate() {
     const e = {}
     if (!isValidCodiceFiscale(form.codice_fiscale)) e.codice_fiscale = 'Codice fiscale non valido (16 caratteri alfanumerici)'
     if (!isValidPartitaIva(form.partita_iva)) e.partita_iva = 'Partita IVA non valida (11 cifre)'
-    if (!isValidIban(form.iban)) e.iban = 'IBAN non valido (IT + 25 caratteri, 27 totali)'
+    if ((form.regime_fiscale === 'forfettario' || form.regime_fiscale === 'ordinario') && !form.partita_iva) {
+      e.partita_iva = 'Obbligatoria per il regime scelto'
+    }
+    if (!isValidIban(form.iban)) e.iban = 'IBAN non valido (codice paese + cifre, senza simboli)'
     if (!form.disponibile_chiamata) e.disponibile_chiamata = 'Campo obbligatorio'
     if (!form.disponibile_ritenuta) e.disponibile_ritenuta = 'Campo obbligatorio'
+    if (form.scadenza_documento && form.scadenza_documento < today && !locked('scadenza_documento')) {
+      e.scadenza_documento = 'Documento scaduto'
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -750,19 +835,37 @@ function FiscaleCard({ sec, form, onChange, entityId, handleApiResponse }) {
     if (!validate()) return
     setSaving(true)
     setSaved(false)
-    const payload = { entity_id: entityId }
-    FISCALE_FIELDS.forEach(f => { payload[f] = form[f] })
-    const res = handleApiResponse(await talentApi.updateProfile(payload))
+    const payload = {}
+    FISCALE_SAVE_FIELDS.forEach(f => { if (form[f] !== undefined && form[f] !== null) payload[f] = form[f] })
+    if (intestatario) payload.intestatario_conto = intestatario
+    if (showBirth) {
+      if (showBirthDate && form.data_nascita)  payload.data_nascita  = form.data_nascita
+      if (showBirthCity && form.nascita_citta) payload.nascita_citta = form.nascita_citta
+    }
+    const res = handleApiResponse(await talentApi.updateFiscal(payload))
     setSaving(false)
     if (!res.success) {
-      alert(getErrorMessage(res.error))
-    } else {
-      setSaved(true)
+      // Errore di validazione del backend: mostrato sotto il campo, non in un alert.
+      if (res.error?.field) setErrors({ [res.error.field]: res.error.message })
+      else alert(res.error?.message || getErrorMessage(res.error))
+      return
     }
+    setErrors({})
+    setSaved(true)
+    const td = res.data?.talent
+    if (td?.data) {
+      // Valori normalizzati dal server (IBAN senza spazi, CF maiuscolo, flag intestatario…).
+      [...FISCALE_SAVE_FIELDS, 'data_nascita', 'nascita_citta', 'intestatario_diverso', 'dati_documento_verificati']
+        .forEach(f => { if (td.data[f] !== undefined) onChange(f, td.data[f]) })
+    }
+    if (td?.contract_data) onContractData?.(td.contract_data)
   }
+
+  const intestatarioDiverso = !!form.intestatario_conto && form.intestatario_diverso === true
 
   return (
     <SectionCardShell sec={sec} filled={filled} total={total}>
+      <ContractDataBar data={contractData} />
       <div className="form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
         <Input
           label="Codice Fiscale *"
@@ -772,8 +875,15 @@ function FiscaleCard({ sec, form, onChange, entityId, handleApiResponse }) {
           placeholder="— non compilato —"
           error={errors.codice_fiscale}
         />
+        <SelectField
+          label="Regime fiscale"
+          value={form.regime_fiscale}
+          onChange={v => onChange('regime_fiscale', v)}
+          options={REGIMI_FISCALI}
+          error={errors.regime_fiscale}
+        />
         <Input
-          label="Partita IVA (opzionale)"
+          label={form.regime_fiscale === 'forfettario' || form.regime_fiscale === 'ordinario' ? 'Partita IVA *' : 'Partita IVA (opzionale)'}
           value={form.partita_iva || ''}
           onChange={e => onChange('partita_iva', e.target.value)}
           maxLength={11}
@@ -784,10 +894,20 @@ function FiscaleCard({ sec, form, onChange, entityId, handleApiResponse }) {
           label="IBAN *"
           value={form.iban || ''}
           onChange={e => onChange('iban', e.target.value.toUpperCase())}
-          maxLength={27}
+          maxLength={42}
           placeholder="— non compilato —"
           error={errors.iban}
-          style={{ gridColumn: '1 / -1' }}
+          helper="Accettiamo IBAN italiani ed esteri (area SEPA). Se lo modifichi, ti avvisiamo via email."
+        />
+        <Input
+          label="Intestatario del conto"
+          value={intestatario || ''}
+          onChange={e => onChange('intestatario_conto', e.target.value)}
+          maxLength={200}
+          error={errors.intestatario_conto}
+          helper={intestatarioDiverso
+            ? 'Intestatario diverso dal tuo nome: il team è stato avvisato.'
+            : 'Se è diverso dal tuo nome, avvisiamo il team per un controllo.'}
         />
         <FiscalRadioGroup
           label="Disponibile a chiamata diretta"
@@ -804,6 +924,90 @@ function FiscaleCard({ sec, form, onChange, entityId, handleApiResponse }) {
           error={errors.disponibile_ritenuta}
         />
       </div>
+
+      <div style={{ margin:'28px 0 12px', fontSize:12, fontWeight:700, letterSpacing:'0.07em', textTransform:'uppercase', color:COLORS.textSecondary }}>
+        Documento di identità e residenza
+      </div>
+      {verified && (
+        <p style={{ margin:'0 0 12px', fontSize:12, color:COLORS.textSecondary }}>
+          I dati già verificati dal team sono in sola lettura: per modificarli contatta il team.
+        </p>
+      )}
+      <div className="form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
+        <Input
+          label="Indirizzo di residenza (via e civico)"
+          value={form.residenza_indirizzo || ''}
+          onChange={e => onChange('residenza_indirizzo', e.target.value)}
+          maxLength={200}
+          disabled={locked('residenza_indirizzo')}
+          error={errors.residenza_indirizzo}
+          style={{ gridColumn: '1 / -1' }}
+        />
+        <SelectField
+          label="Tipo documento"
+          value={form.tipo_documento}
+          onChange={v => onChange('tipo_documento', v)}
+          options={TIPI_DOCUMENTO}
+          disabled={locked('tipo_documento')}
+          error={errors.tipo_documento}
+        />
+        <Input
+          label="Numero documento"
+          value={form.numero_documento || ''}
+          onChange={e => onChange('numero_documento', e.target.value)}
+          maxLength={200}
+          disabled={locked('numero_documento')}
+          error={errors.numero_documento}
+        />
+        <Input
+          label="Scadenza documento"
+          type="date"
+          value={form.scadenza_documento || ''}
+          min={today}
+          onChange={e => onChange('scadenza_documento', e.target.value)}
+          disabled={locked('scadenza_documento')}
+          error={errors.scadenza_documento}
+        />
+        <Input
+          label="Stato di emissione"
+          value={form.stato_emissione_documento || ''}
+          onChange={e => onChange('stato_emissione_documento', e.target.value)}
+          maxLength={200}
+          placeholder="Italia"
+          error={errors.stato_emissione_documento}
+        />
+      </div>
+
+      {showBirth && (
+        <>
+          <div style={{ margin:'28px 0 12px', fontSize:12, fontWeight:700, letterSpacing:'0.07em', textTransform:'uppercase', color:COLORS.textSecondary }}>
+            Dati di nascita mancanti
+          </div>
+          <div className="form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
+            {showBirthDate && (
+              <Input
+                label="Data di nascita"
+                type="date"
+                max={today}
+                min="1900-01-01"
+                value={italianDateToIso(form.data_nascita)}
+                onChange={e => onChange('data_nascita', isoToItalianDate(e.target.value))}
+                error={errors.data_nascita}
+              />
+            )}
+            {showBirthCity && (
+              <Input
+                label="Città di nascita"
+                value={form.nascita_citta || ''}
+                onChange={e => onChange('nascita_citta', e.target.value)}
+                maxLength={200}
+                error={errors.nascita_citta}
+              />
+            )}
+          </div>
+        </>
+      )}
+
       <div style={{ marginTop:20, display:'flex', alignItems:'center', gap:12 }}>
         <Button type="button" onClick={handleSave} loading={saving}>Salva Dati Fiscali</Button>
         {saved && <span style={{ fontSize:13, color:'#10B981', fontWeight:500 }}>✓ Salvato</span>}
@@ -925,7 +1129,7 @@ function MyProfile({ handleApiResponse }) {
       alert(getErrorMessage(res.error))
     } else {
       setPending(true)
-      setProfile(p => ({ ...p, status: 'PENDING_REVIEW' }))
+      setProfile(p => ({ ...p, status: 'PENDING_REVIEW', contract_data: res.data?.talent?.contract_data ?? p.contract_data }))
     }
   }
 
@@ -1008,7 +1212,7 @@ function MyProfile({ handleApiResponse }) {
 
       {PROFILE_SECTIONS.map(sec => (
         sec.id === 'S7' ? <FotoProfiloCard  key={sec.id} sec={sec} form={form} onChange={onChange} talentProfileId={profile.entity_id} handleApiResponse={handleApiResponse} />
-        : sec.id === 'S8' ? <FiscaleCard    key={sec.id} sec={sec} form={form} onChange={onChange} entityId={profile.entity_id} handleApiResponse={handleApiResponse} />
+        : sec.id === 'S8' ? <FiscaleCard    key={sec.id} sec={sec} form={form} onChange={onChange} handleApiResponse={handleApiResponse} contractData={profile.contract_data} onContractData={cd => setProfile(p => ({ ...p, contract_data: cd }))} />
         : sec.id === 'S9' ? <DocumentiCard  key={sec.id} sec={sec} form={form} onChange={onChange} talentProfileId={profile.entity_id} handleApiResponse={handleApiResponse} />
         : <SectionCard key={sec.id} sec={sec} form={form} onChange={onChange} />
       ))}

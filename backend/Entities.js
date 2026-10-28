@@ -874,6 +874,9 @@ function handleTalentUpdateProfile(payload, auth) {
   if (auth.role === ROLES.USER) {
     var pendingUpdates = {};
     for (var k in updates) { pendingUpdates[k] = updates[k]; }
+    // Dati fiscali: passano solo da talent.updateFiscal (scrittura diretta, validata).
+    // Il form dell'area riservata li invia ancora: vengono ignorati senza errore.
+    for (var b = 0; b < FISCAL_UPDATEPROFILE_USER_BLOCKED_.length; b++) { delete pendingUpdates[FISCAL_UPDATEPROFILE_USER_BLOCKED_[b]]; }
     var pendingOnly = {
       pending_data: pendingUpdates,
       pending_submitted_at: new Date().toISOString()
@@ -887,6 +890,7 @@ function handleTalentUpdateProfile(payload, auth) {
 
   // ADMIN → aggiornamento diretto. Campi riservati all'admin (dati per il
   // contratto): fuori da CAMPI_PUBBLICI e dal ramo USER, mai in pending_data.
+  var docVerificato = false;
   var adminOnlyFields = ['numero_documento', 'residenza_indirizzo', 'tipo_documento', 'scadenza_documento', 'stato_emissione_documento', 'data_nascita'];
   for (var a = 0; a < adminOnlyFields.length; a++) {
     var af = adminOnlyFields[a];
@@ -906,7 +910,13 @@ function handleTalentUpdateProfile(payload, auth) {
       afVal = toItalianDate_(afVal);
     }
     updates[af] = afVal;
+    if (FISCAL_DOC_LOCKED_.indexOf(af) !== -1 && afVal !== '') docVerificato = true;
   }
+  // Flag "dati documento verificati": lo imposta l'admin scrivendo numero/tipo/scadenza/via.
+  // Con flag attivo il talent li vede in sola lettura (talent.updateFiscal li rifiuta).
+  // L'admin può sbloccarli inviando dati_documento_verificati:false.
+  if (payload.dati_documento_verificati !== undefined) updates.dati_documento_verificati = payload.dati_documento_verificati === true;
+  else if (docVerificato) updates.dati_documento_verificati = true;
   var updated = updateEntityData(payload.entity_id, updates, auth.tenant_id, auth.user_id);
   return successResponse({ talent: talentToPublic(updated, auth.role) });
 }
@@ -1085,28 +1095,24 @@ function entityToPublic(entity) {
 function talentToPublic(entity, role) {
   if (!entity) return null;
   var pub = entityToPublic(entity);
+  // Indicatore "Dati contratto": calcolato PRIMA di togliere i campi riservati.
+  // Il talent vede anche ciò che ha appena salvato (pending_data), l'admin solo il dato approvato.
+  var cdSource = entity.data || {};
+  if (role === ROLES.USER && cdSource.pending_data) cdSource = Object.assign({}, cdSource, cdSource.pending_data);
   // ADMIN/SUPER_ADMIN vedono tutto; USER vede solo il proprio (già filtrato prima)
   // Documenti identità: solo ADMIN (dati Classe A per PRD)
   if (role === ROLES.USER || role === ROLES.CLIENTE) {
     if (pub.data && pub.data.documenti) {
       delete pub.data.documenti.carta_identita;
     }
-    // Dati contratto inseriti dall'admin: invisibili a talent e clienti
-    if (pub.data) {
-      pub.data = Object.assign({}, pub.data);
-      delete pub.data.numero_documento;
-      delete pub.data.residenza_indirizzo;
-      delete pub.data.tipo_documento;
-      delete pub.data.scadenza_documento;
-      delete pub.data.stato_emissione_documento;
-    }
   }
-  // Dati fiscali/bancari: mai ai clienti (il talent vede i propri)
+  if (role !== ROLES.CLIENTE) pub.contract_data = contractDataCompleteness_(cdSource);
+  // Dati contratto, fiscali e bancari: mai ai clienti (il talent vede e modifica i propri)
   if (role === ROLES.CLIENTE && pub.data) {
     pub.data = Object.assign({}, pub.data);
-    delete pub.data.iban;
-    delete pub.data.codice_fiscale;
-    delete pub.data.partita_iva;
+    ['numero_documento', 'residenza_indirizzo', 'tipo_documento', 'scadenza_documento', 'stato_emissione_documento',
+     'dati_documento_verificati', 'iban', 'codice_fiscale', 'partita_iva', 'intestatario_conto', 'regime_fiscale',
+     'intestatario_diverso', 'fiscal_alert_sent_at', 'pending_data'].forEach(function(k) { delete pub.data[k]; });
   }
   return pub;
 }

@@ -274,6 +274,38 @@ function sendProfileApprovedEmail(to, nome, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE 2a — Avviso modifica IBAN (talent) e notifica admin
+// Transazionali di sicurezza: priority=true, ignorano la riserva quota.
+// Mai l'IBAN nel testo.
+// ---------------------------------------------------------------------------
+
+function sendIbanChangedEmail(to, nome, ctx) {
+  var body = [
+    '<p style="margin:0 0 16px;">Il tuo <strong>IBAN</strong> nel profilo MADE EVENTS è stato modificato.</p>',
+    '<p style="margin:0 0 16px;">Se sei stato tu, non devi fare nulla.</p>',
+    '<p style="margin:0;">Se <strong>non riconosci</strong> questa modifica, rispondi subito a questa email: il team verificherà prima di qualsiasi pagamento.</p>'
+  ].join('');
+  var html = buildEmailTemplate('IBAN modificato', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nIl tuo IBAN nel profilo MADE EVENTS è stato modificato.\nSe sei stato tu non devi fare nulla. Se non riconosci la modifica, rispondi subito a questa email.\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Il tuo IBAN è stato modificato', html, text,
+    Object.assign({ mailType: 'IBAN_CHANGED', priority: true }, ctx || {})).ok;
+}
+
+function sendAdminFiscalAlertEmail(to, nome, cognome, motivi, ctx) {
+  var items = (motivi || []).map(function(m) { return '<li>' + escapeHtml_(m) + '</li>'; }).join('');
+  var body = [
+    '<p style="margin:0 0 12px;">Dati fiscali aggiornati dal talent <strong>' + escapeHtml_(nome + ' ' + cognome) + '</strong>:</p>',
+    '<ul style="margin:0 0 16px;padding-left:20px;">' + items + '</ul>',
+    '<p style="margin:0 0 16px;">Verificare prima del prossimo pagamento.</p>',
+    buildEmailButton_('Apri i talent', getFrontendUrl() + '/admin/talent')
+  ].join('');
+  var html = buildEmailTemplate('Attenzione: dati fiscali modificati', '', body);
+  var text = 'Dati fiscali aggiornati dal talent ' + nome + ' ' + cognome + ': ' + (motivi || []).join('; ') + '. Verificare prima del prossimo pagamento.';
+  return sendEmail_(to, 'Dati fiscali modificati — ' + nome + ' ' + cognome, html, text,
+    Object.assign({ mailType: 'ADMIN_FISCAL_ALERT', priority: true }, ctx || {})).ok;
+}
+
+// ---------------------------------------------------------------------------
 // TEMPLATE 2b — Richiesta recensione Google
 // Policy Google: la richiesta deve essere neutra. NIENTE sconti, premi, compensi
 // né condizionamento del voto ("solo se sei soddisfatto"). Non aggiungere nulla del genere.

@@ -34,6 +34,7 @@ var PERMISSION_MATRIX = {
   'talent.list':          { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
   'talent.get':           { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
   'talent.updateProfile': { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },
+  'talent.updateFiscal':  { SUPER_ADMIN:'N', ADMIN:'N', USER:'O', CLIENTE:'N' },
   'talent.generateCard':  { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'talent.softDelete':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
 

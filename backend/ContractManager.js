@@ -93,6 +93,41 @@ function isBlank_(val) {
   return val === undefined || val === null || String(val).trim() === '';
 }
 
+/**
+ * Dati del profilo talent che contano per contratto e pagamento (peso uguale).
+ * NON contano: stato_emissione_documento (default Italia), partita_iva, disponibile_ritenuta.
+ * section = dove il talent li compila nel portale (tutti in S8, area "Dati Fiscali e Bancari").
+ */
+var CONTRACT_DATA_FIELDS_ = [
+  { field: 'codice_fiscale',      label: 'Codice fiscale',         section: 'S8' },
+  { field: 'iban',                label: 'IBAN',                   section: 'S8' },
+  { field: 'intestatario_conto',  label: 'Intestatario del conto', section: 'S8' },
+  { field: 'regime_fiscale',      label: 'Regime fiscale',         section: 'S8' },
+  { field: 'residenza_indirizzo', label: 'Indirizzo di residenza', section: 'S8' },
+  { field: 'numero_documento',    label: 'Numero documento',       section: 'S8' },
+  { field: 'tipo_documento',      label: 'Tipo documento',         section: 'S8' },
+  { field: 'scadenza_documento',  label: 'Scadenza documento',     section: 'S8' },
+  { field: 'data_nascita',        label: 'Data di nascita',        section: 'S8' },
+  { field: 'nascita_citta',       label: 'Città di nascita',       section: 'S8' }
+];
+
+/**
+ * Indicatore "Dati contratto" di un profilo talent. Unica fonte per portale S8,
+ * modale contratto e (più avanti) solleciti. Non tocca le % del questionario.
+ * @param {object} data  TALENT_PROFILE.data (o data + pending_data per la vista del talent)
+ * @returns {{pct:number, mancanti:Array<{field:string,label:string,section:string}>}}
+ */
+function contractDataCompleteness_(data) {
+  data = data || {};
+  var mancanti = [];
+  for (var i = 0; i < CONTRACT_DATA_FIELDS_.length; i++) {
+    var f = CONTRACT_DATA_FIELDS_[i];
+    if (isBlank_(data[f.field])) mancanti.push({ field: f.field, label: f.label, section: f.section });
+  }
+  var tot = CONTRACT_DATA_FIELDS_.length;
+  return { pct: Math.round(((tot - mancanti.length) / tot) * 100), mancanti: mancanti };
+}
+
 /** true se l'evento ha un compenso strutturato valido (importo numerico > 0 + unità). */
 function hasCompensoStrutturato_(ed) {
   if (isBlank_(ed.compenso_importo) || isNaN(Number(ed.compenso_importo)) || Number(ed.compenso_importo) <= 0) return false;
@@ -322,7 +357,7 @@ function handleContractCheck(payload, auth) {
   var ctx = loadContractContext_(payload, auth);
   if (ctx.error) return ctx.error;
   var missing = collectMissing_(ctx.td, ctx.ed, ctx.shift.data || {});
-  return successResponse({ ok: missing.length === 0, missing: missing });
+  return successResponse({ ok: missing.length === 0, missing: missing, completeness: contractDataCompleteness_(ctx.td) });
 }
 
 // ---------------------------------------------------------------------------
