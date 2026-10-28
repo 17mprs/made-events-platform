@@ -3,9 +3,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  eventApi, applicationApi, assignmentApi, talentApi, documentApi, shiftApi,
+  eventApi, applicationApi, assignmentApi, talentApi, documentApi, shiftApi, contractApi,
   getErrorMessage,
 } from '../api/client'
+import { PdfPreviewModal, contractErrorText, fmtDateTime, daysLeft } from '../components/ContractPanel'
 import { COLORS, COMPONENT_STYLES, LETTER_SPACING } from '../styles/theme'
 import Layout from '../components/Layout'
 import Button from '../components/Button'
@@ -37,6 +38,7 @@ const SIDEBAR_ITEMS = [
   { label:'Offerte di Lavoro',    to:'/portale#events' },
   { label:'Le Mie Candidature', to:'/portale#applications' },
   { label:'I Miei Turni',       to:'/portale#assignments' },
+  { label:'Contratti',          to:'/portale#contracts' },
   { type:'section', label:'Account' },
   { label:'Il Mio Profilo',    to:'/portale#profile' },
   { type:'section', label:'Supporto' },
@@ -421,6 +423,9 @@ function MyAssignments({ handleApiResponse }) {
             </div>
             <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'8px' }}>
               <StatusBadge status={a.status} />
+              {a.status === 'AWAITING_SIGNATURE' && (
+                <a href="#contracts" style={{ fontSize:'12px', color:COLORS.accent }}>Firma il contratto per confermare</a>
+              )}
               {a.status === 'CONFIRMED' && (
                 <Button size="sm" loading={actionLoading === a.entity_id + '_in'} onClick={() => checkin(a.entity_id)}>
                   Check-in
@@ -435,6 +440,212 @@ function MyAssignments({ handleApiResponse }) {
           </div>
         </Card>
       ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// CONTRATTI — lettura, firma con codice via email, rifiuto
+// ---------------------------------------------------------------------------
+
+// Clausole da approvare specificamente (doppia sottoscrizione). L'elenco numerico è da
+// confermare col consulente legale: va allineato agli articoli del template Doc del contratto.
+const CLAUSOLE_SPECIFICHE = '4, 10 e 13'
+const CODE_COOLDOWN_MS = 60 * 1000   // stessa attesa applicata dal backend tra due richieste di codice
+
+function talentContractMeta(c) {
+  if (c.stato === 'SENT') {
+    if (c.scaduto) return { label: 'Scaduto', bg: '#FEF2F2', color: '#B91C1C' }
+    const n = daysLeft(c.expires_at)
+    return { label: n !== null && n <= 0 ? 'Da firmare · scade oggi' : `Da firmare${n !== null ? ` · scade tra ${n} ${n === 1 ? 'giorno' : 'giorni'}` : ''}`, bg: '#FFF7ED', color: '#C2410C' }
+  }
+  if (c.stato === 'SIGNED')   return { label: 'Firmato',   bg: '#F0FDF4', color: '#15803D' }
+  if (c.stato === 'DECLINED') return { label: 'Rifiutato', bg: '#FEF2F2', color: '#B91C1C' }
+  if (c.stato === 'EXPIRED')  return { label: 'Scaduto',   bg: '#F3F4F6', color: '#6B7280' }
+  return { label: c.stato, bg: '#F3F4F6', color: '#4B5563' }
+}
+
+function ContractCard({ c, handleApiResponse, onChanged, onPreview, notify }) {
+  const [code, setCode]           = useState('')
+  const [agree1, setAgree1]       = useState(false)
+  const [agree2, setAgree2]       = useState(false)
+  const [busy, setBusy]           = useState(null)      // 'code' | 'accept' | 'decline' | 'pdf'
+  const [codeSent, setCodeSent]   = useState(false)
+  const [until, setUntil]         = useState(0)         // fine dell'attesa per un nuovo codice
+  const [, tick]                  = useState(0)
+  const [declining, setDeclining] = useState(false)
+  const [reason, setReason]       = useState('')
+  const [err, setErr]             = useState(null)
+
+  useEffect(() => {
+    if (until <= Date.now()) return undefined
+    const id = setInterval(() => { tick(n => n + 1); if (Date.now() >= until) clearInterval(id) }, 1000)
+    return () => clearInterval(id)
+  }, [until])
+
+  const meta = talentContractMeta(c)
+  const canSign = c.stato === 'SENT' && !c.scaduto
+  const wait = Math.max(0, Math.ceil((until - Date.now()) / 1000))
+  const codeOk = /^\d{6}$/.test(code)
+  const ev = c.evento || {}, tr = c.turno || {}
+
+  async function openPdf() {
+    setBusy('pdf'); setErr(null)
+    const res = handleApiResponse(await contractApi.get(c.entity_id))
+    setBusy(null)
+    if (res.success && res.data?.pdf_base64) {
+      onPreview({ pdfBase64: res.data.pdf_base64, filename: c.filename || 'Contratto.pdf', title: ev.titolo ? `Contratto — ${ev.titolo}` : 'Contratto' })
+    } else {
+      setErr(contractErrorText(res.error, 'talent'))
+    }
+  }
+
+  async function requestCode() {
+    setBusy('code'); setErr(null)
+    const res = handleApiResponse(await contractApi.requestCode(c.entity_id))
+    setBusy(null)
+    if (res.success) {
+      setCodeSent(true); setUntil(Date.now() + CODE_COOLDOWN_MS)
+    } else {
+      if (res.error?.code === 'CT_CODE_WAIT') setUntil(Date.now() + CODE_COOLDOWN_MS)
+      setErr(contractErrorText(res.error, 'talent'))
+    }
+  }
+
+  async function accept() {
+    setBusy('accept'); setErr(null)
+    const res = handleApiResponse(await contractApi.accept({
+      entity_id: c.entity_id, codice: code,
+      accetta_contratto: agree1, accetta_clausole_specifiche: agree2,
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    }))
+    setBusy(null)
+    if (res.success) {
+      notify({ ok: true, text: res.data?.already_signed ? 'Questo contratto risultava già firmato.' : 'Contratto firmato: il tuo incarico è confermato.' })
+      onChanged()
+      return
+    }
+    const k = res.error?.code
+    if (k === 'CT_CODE_LOCKED' || k === 'CT_CODE_EXPIRED' || k === 'CT_CODE_REQUIRED' || (k === 'CT_CODE_INVALID' && /esauriti/.test(res.error.message))) {
+      setCode(''); setCodeSent(false)
+    }
+    setErr(k === 'SYS_002' ? 'Questo contratto non è più disponibile: contatta il team.' : contractErrorText(res.error, 'talent'))
+  }
+
+  async function decline() {
+    setBusy('decline'); setErr(null)
+    const res = handleApiResponse(await contractApi.decline(c.entity_id, reason.trim()))
+    setBusy(null)
+    if (res.success) {
+      notify({ ok: true, text: 'Hai rifiutato il contratto: la candidatura è stata ritirata.' })
+      onChanged()
+    } else {
+      setErr(res.error?.code === 'SYS_002' ? 'Questo contratto non è più disponibile: contatta il team.' : contractErrorText(res.error, 'talent'))
+    }
+  }
+
+  return (
+    <Card>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'12px' }}>
+        <div>
+          <div style={{ fontSize:'15px', fontWeight:500, marginBottom:'4px' }}>{ev.titolo || 'Contratto'}</div>
+          <div style={{ fontSize:'13px', color:COLORS.textSecondary }}>
+            {tr.data ? new Date(tr.data).toLocaleDateString('it-IT', { dateStyle:'medium' }) : ''}
+            {tr.orario_inizio ? ` · ${tr.orario_inizio}${tr.orario_fine ? `–${tr.orario_fine}` : ''}` : ''}
+            {ev.luogo ? ` · ${ev.luogo}` : ''}
+          </div>
+          {c.stato === 'SENT' && <div style={{ fontSize:'12px', color:COLORS.textSecondary, marginTop:4 }}>Da firmare entro il {fmtDateTime(c.expires_at)}</div>}
+          {c.stato === 'SIGNED' && <div style={{ fontSize:'12px', color:'#15803D', marginTop:4 }}>Firmato il {fmtDateTime(c.accepted_at || c.signed_at)} · incarico confermato</div>}
+          {c.stato === 'DECLINED' && <div style={{ fontSize:'12px', color:COLORS.textSecondary, marginTop:4 }}>Rifiutato il {fmtDateTime(c.declined_at)}</div>}
+          {c.stato === 'EXPIRED' && <div style={{ fontSize:'12px', color:COLORS.textSecondary, marginTop:4 }}>Non firmato entro la scadenza: contatta il team se sei ancora disponibile.</div>}
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'8px' }}>
+          <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:12, fontSize:11, fontWeight:600, letterSpacing:'0.4px', background:meta.bg, color:meta.color, whiteSpace:'nowrap' }}>{meta.label}</span>
+          {(c.stato === 'SENT' || c.stato === 'SIGNED') && !c.scaduto && (
+            <Button size="sm" variant="secondary" loading={busy === 'pdf'} onClick={openPdf}>Apri il contratto (PDF)</Button>
+          )}
+        </div>
+      </div>
+
+      {canSign && (
+        <div style={{ marginTop:16, paddingTop:16, borderTop:`1px solid ${COLORS.border}` }}>
+          <div style={{ fontSize:13, fontWeight:600, marginBottom:10 }}>Firma il contratto</div>
+
+          <div style={{ fontSize:13, marginBottom:6 }}>1. Richiedi il codice di firma: lo riceverai via email (valido 10 minuti).</div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom:14 }}>
+            <Button size="sm" variant="secondary" loading={busy === 'code'} disabled={wait > 0} onClick={requestCode}>
+              {codeSent ? 'Invia un nuovo codice' : 'Invia il codice via email'}
+            </Button>
+            {wait > 0 && <span style={{ fontSize:12, color:COLORS.textSecondary }}>Puoi chiedere un nuovo codice tra {wait} s</span>}
+            {codeSent && wait === 0 && <span style={{ fontSize:12, color:COLORS.textSecondary }}>Controlla la tua casella email.</span>}
+            {codeSent && wait > 0 && <span style={{ fontSize:12, color:'#15803D' }}>Codice inviato: controlla la tua casella email.</span>}
+          </div>
+
+          <div style={{ fontSize:13, marginBottom:6 }}>2. Inserisci il codice di 6 cifre.</div>
+          <div style={{ maxWidth:200, marginBottom:14 }}>
+            <Input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="000000" />
+          </div>
+
+          <div style={{ fontSize:13, marginBottom:6 }}>3. Conferma.</div>
+          <label style={{ display:'flex', gap:8, alignItems:'flex-start', fontSize:13, marginBottom:8, cursor:'pointer' }}>
+            <input type="checkbox" checked={agree1} onChange={e => setAgree1(e.target.checked)} style={{ marginTop:3, accentColor:COLORS.accent }} />
+            <span>Ho letto e accetto il contratto.</span>
+          </label>
+          <label style={{ display:'flex', gap:8, alignItems:'flex-start', fontSize:13, marginBottom:14, cursor:'pointer' }}>
+            <input type="checkbox" checked={agree2} onChange={e => setAgree2(e.target.checked)} style={{ marginTop:3, accentColor:COLORS.accent }} />
+            <span>Accetto specificamente le clausole {CLAUSOLE_SPECIFICHE} del contratto.</span>
+          </label>
+
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+            <Button loading={busy === 'accept'} disabled={!agree1 || !agree2 || !codeOk || !!busy} onClick={accept}>Accetta e conferma incarico</Button>
+            {!declining && <Button variant="secondary" disabled={!!busy} onClick={() => setDeclining(true)}>Rifiuta</Button>}
+          </div>
+
+          {declining && (
+            <div style={{ marginTop:14, padding:12, border:`1px solid ${COLORS.border}`, borderRadius:8 }}>
+              <div style={{ fontSize:13, marginBottom:8 }}>Se rifiuti, la candidatura viene ritirata e il posto torna libero. Motivo (facoltativo):</div>
+              <textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={500} rows={2}
+                style={{ width:'100%', boxSizing:'border-box', border:`1px solid ${COLORS.border}`, borderRadius:6, padding:'8px 10px', fontSize:13, fontFamily:'inherit', marginBottom:8 }} />
+              <div style={{ display:'flex', gap:8 }}>
+                <Button size="sm" loading={busy === 'decline'} disabled={!!busy} onClick={decline}>Conferma il rifiuto</Button>
+                <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => { setDeclining(false); setReason('') }}>Indietro</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {err && <div style={{ marginTop:12, padding:'8px 12px', background:'#FFEBEE', borderRadius:6, fontSize:12, color:'#C62828' }}>{err}</div>}
+    </Card>
+  )
+}
+
+function MyContracts({ handleApiResponse }) {
+  const [items, setItems]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [msg, setMsg]         = useState(null)
+  const [preview, setPreview] = useState(null)
+
+  const load = useCallback(async () => {
+    const res = handleApiResponse(await contractApi.list())
+    setLoading(false)
+    if (res.success) setItems(res.data?.items ?? [])
+    else setMsg({ ok: false, text: contractErrorText(res.error, 'talent') })
+  }, [handleApiResponse])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading) return <div className="spinner" />
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+      {msg && <div style={{ padding:'8px 12px', borderRadius:6, fontSize:13, background: msg.ok ? '#E8F5E9' : '#FFEBEE', color: msg.ok ? '#2E7D32' : '#C62828' }}>{msg.text}</div>}
+      {items.length === 0 ? (
+        <div className="empty-state">Nessun contratto: quando una candidatura viene approvata, il contratto da firmare compare qui.</div>
+      ) : items.map(c => (
+        <ContractCard key={c.entity_id} c={c} handleApiResponse={handleApiResponse}
+          onChanged={load} onPreview={setPreview} notify={setMsg} />
+      ))}
+      {preview && <PdfPreviewModal {...preview} onClose={() => setPreview(null)} />}
     </div>
   )
 }
@@ -1304,6 +1515,11 @@ export default function UserPortal() {
       <div id="assignments">
         <SectionTitle>I Miei Turni</SectionTitle>
         {gated(MyAssignments)}
+      </div>
+
+      <div id="contracts">
+        <SectionTitle>Contratti</SectionTitle>
+        {gated(MyContracts)}
       </div>
 
       <div id="profile">

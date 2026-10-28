@@ -22,11 +22,11 @@ const FAQS = [
   },
   {
     q: 'Come funziona il processo di lavoro?',
-    r: 'Dopo registrazione e completamento profilo, accedi all\'area riservata e candidati alle offerte disponibili. Se selezionato ricevi conferma via email e WhatsApp. La conferma è vincolante.',
+    r: 'Dopo registrazione e completamento profilo, accedi all\'area riservata e candidati alle offerte disponibili. Se selezionato ricevi una email di approvazione e il contratto da firmare nell\'area riservata. La firma conferma l\'incarico ed è vincolante.',
   },
   {
     q: 'Come funzionano le offerte di lavoro?',
-    r: 'Nella sezione "Offerte di lavoro" visualizzi e ti candidi alle attività disponibili. Puoi candidarti a più eventi ma solo se realmente disponibile. Hai 24/48h per confermare se selezionato.',
+    r: 'Nella sezione "Offerte di lavoro" visualizzi e ti candidi alle attività disponibili. Puoi candidarti a più eventi ma solo se realmente disponibile. Se selezionato, hai 7 giorni per firmare il contratto.',
   },
   {
     q: 'La candidatura garantisce la selezione?',
@@ -42,14 +42,14 @@ const FAQS = [
   },
   {
     q: 'Posso ritirare la candidatura?',
-    r: 'Sì, fino a quando non sei stato confermato.',
+    r: 'Sì, finché è in attesa (non ancora approvata). Dopo l\'approvazione puoi rifiutare il contratto, prima di firmarlo, dalla sezione "Contratti" dell\'area riservata. Dopo la firma, contatta il team.',
   },
   {
-    q: 'Cosa succede dopo la conferma?',
-    r: 'La partecipazione è obbligatoria. Contratto e info operative saranno disponibili nella tua area personale.',
+    q: 'Cosa succede dopo l\'approvazione?',
+    r: 'Ricevi una email: nella sezione "Contratti" dell\'area riservata trovi il contratto da leggere e firmare entro 7 giorni. Per firmare richiedi un codice, che ti arriva via email, e accetti il contratto. L\'incarico è confermato solo dopo la firma; da quel momento la partecipazione è obbligatoria.',
   },
   {
-    q: 'Posso annullare dopo aver confermato?',
+    q: 'Posso annullare dopo aver firmato?',
     r: 'Solo per gravi motivi comunicati tempestivamente. Le assenze non giustificate compromettono la collaborazione.',
   },
   {
