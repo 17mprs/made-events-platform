@@ -8,6 +8,7 @@
 // dailyMaintenance     giorno 03:00  cleanup token, report errori, contatori
 // monthlyArchive       1° mese 02:00 archivia entità oltre retention, ruota log
 // birthdateReminder    lunedì 08:00  sollecito data_nascita mancante (setupBirthdateReminderTrigger)
+// contractReminders    ogni 6 ore    reminder contratto da firmare (3 gg), scadenza (7 gg) (setupContractRemindersTrigger)
 //
 // REGOLE:
 //   - Ogni job wrappato in try/catch isolato (fallimento non blocca gli altri)
@@ -722,6 +723,125 @@ function jobMonthlyArchive() {
   }
 
   logJobEnd_(jobName, stats);
+}
+
+// ---------------------------------------------------------------------------
+// JOB — contractReminders (ogni 6 ore)
+// ---------------------------------------------------------------------------
+
+/**
+ * Contratti SENT:
+ *   - da almeno CONTRACT_FLOW.REMINDER_AFTER_DAYS giorni dall'invio e senza reminder → reminder al
+ *     talent (NON prioritario: rispetta la riserva quota; se non parte riprova alla prossima esecuzione)
+ *   - oltre expires_at → EXPIRED; incarico in attesa annullato e candidatura → PENDING; mail al talent
+ *     e un'unica mail riepilogativa all'admin (ADMIN_EMAIL)
+ * Contratti SIGNED il cui incarico è ancora AWAITING_SIGNATURE → riallineati a CONFIRMED
+ * (rete di sicurezza se contract.accept si è interrotto a metà).
+ * Idempotente: una seconda esecuzione non ripete reminder né scadenze.
+ * Modello: jobRegistrationSolleciti. Installazione: setupContractRemindersTrigger() (manuale).
+ */
+function jobContractReminders() {
+  var jobName = 'contractReminders';
+  var stats   = { checked: 0, reminded: 0, expired: 0, reconciled: 0, skipped: 0, errors: 0 };
+  var DAY_MS  = 24 * 60 * 60 * 1000;
+
+  logJobStart_(jobName);
+  try {
+    var now = Date.now();
+    var all = getAllRows('Entities');
+    var expiredByTenant = {};
+
+    all.forEach(function(row) {
+      if (row.type !== 'CONTRATTO') return;
+      if (String(row.deleted).toLowerCase() === 'true') return;
+      if (row.status !== ENTITY_STATUS.CONTRATTO.SENT && row.status !== ENTITY_STATUS.CONTRATTO.SIGNED) return;
+
+      try {
+        stats.checked++;
+        var tenantId = row.tenant_id;
+        var systemAuth = { user_id: 'system', tenant_id: tenantId };
+        var c = getEntityById(row.entity_id, tenantId);
+        if (!c) return;
+        var d = c.data || {};
+
+        if (c.status === ENTITY_STATUS.CONTRATTO.SIGNED) {
+          var asg = d.application_id ? findAssignmentByApplicationId_(d.application_id, tenantId) : null;
+          if (asg && asg.status === ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE) {
+            var rr = transitionEntityStatus('ASSIGNMENT', asg, ENTITY_STATUS.ASSIGNMENT.CONFIRMED, systemAuth);
+            if (rr.success) {
+              if (asg.data.shift_id) checkShiftFullness_(asg.data.shift_id, tenantId);
+              else if (d.event_id) checkEventSaturation_(d.event_id, tenantId);
+              stats.reconciled++;
+            }
+          }
+          return;
+        }
+
+        // SENT
+        if (contractIsExpired_(d)) {
+          var item = contractExpireOne_(c, systemAuth);
+          if (!item) { stats.errors++; return; }
+          stats.expired++;
+          (expiredByTenant[tenantId] = expiredByTenant[tenantId] || []).push(item);
+          if (item.to) {
+            sendContractExpiredEmail(item.to, item.nome, item.eventData, { entity_type: 'CONTRATTO', entity_id: c.entity_id, tenant_id: tenantId });
+          }
+          return;
+        }
+
+        var sentAt = d.sent_at ? new Date(d.sent_at).getTime() : 0;
+        if (!d.reminder_sent_at && sentAt && !isNaN(sentAt) && (now - sentAt) >= CONTRACT_FLOW.REMINDER_AFTER_DAYS * DAY_MS) {
+          if (stats.reminded >= CONTRACT_FLOW.REMINDERS_PER_RUN) { stats.skipped++; return; }
+          var profile = d.talent_id ? getEntityById(d.talent_id, tenantId) : null;
+          var event   = d.event_id ? getEntityById(d.event_id, tenantId) : null;
+          var to = profile ? talentContractEmail_(profile.data) : '';
+          if (!to) { stats.skipped++; return; }
+          var ok = sendContractReminderEmail(to, (profile.data.nome || ''), event ? event.data : {}, d.expires_at,
+            { entity_type: 'CONTRATTO', entity_id: c.entity_id, tenant_id: tenantId });
+          if (ok) {
+            updateEntityData(c.entity_id, { reminder_sent_at: new Date().toISOString() }, tenantId, 'system');
+            stats.reminded++;
+          } else {
+            stats.skipped++;   // quota bassa o errore: riprova alla prossima esecuzione
+          }
+        }
+      } catch (e) {
+        stats.errors++;
+        Logger.log('[' + jobName + '] Errore su contratto ' + row.entity_id + ': ' + e.message);
+      }
+    });
+
+    var admin = contractAdminEmail_();
+    if (admin) {
+      Object.keys(expiredByTenant).forEach(function(tenantId) {
+        try {
+          sendAdminContractExpiredDigestEmail(admin, expiredByTenant[tenantId], { entity_type: 'CONTRATTO', tenant_id: tenantId });
+        } catch (e) {
+          stats.errors++;
+          logError_({ severity: 'ERROR', module: 'JOBS', action: 'contractReminders.adminDigest', tenant_id: tenantId, message: 'Mail riepilogo scadenze: ' + e.message, stack: e.stack, actor: 'system' });
+        }
+      });
+    }
+  } catch (e) {
+    logJobError_(jobName, e);
+    return stats;
+  }
+
+  logJobEnd_(jobName, stats);
+  return stats;
+}
+
+/**
+ * Installa il trigger (ogni 6 ore) per jobContractReminders. Da eseguire UNA SOLA VOLTA dal
+ * GAS Editor. Rimuove solo i trigger duplicati dello stesso handler. Nota: setupAllTriggers()
+ * cancella tutti i trigger e NON ricrea questo: dopo averla rieseguita, rilanciare questa funzione.
+ */
+function setupContractRemindersTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'jobContractReminders') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('jobContractReminders').timeBased().everyHours(6).create();
+  Logger.log('[JOBS] Trigger jobContractReminders (ogni 6 ore) installato.');
 }
 
 // ---------------------------------------------------------------------------

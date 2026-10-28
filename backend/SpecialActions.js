@@ -355,6 +355,7 @@ function checkTimeOverlap_(talentProfileId, shift, tenantId) {
     var newEnd   = new Date(dateStr + 'T' + shiftData.orario_fine   + ':00').getTime();
 
     var activeStatuses = [
+      ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE,   // il posto è già occupato
       ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
       ENTITY_STATUS.ASSIGNMENT.CHECKED_IN
     ];

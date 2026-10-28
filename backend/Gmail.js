@@ -306,6 +306,131 @@ function sendAdminFiscalAlertEmail(to, nome, cognome, motivi, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// TEMPLATE 2c — Flusso contratto (invio, codice di firma, conferme, reminder, scadenza)
+// Nessuna mail contiene allegati o token di accesso: il contratto si legge solo
+// nel portale dopo il login. Il codice di firma è nel corpo, mai nell'oggetto.
+// ---------------------------------------------------------------------------
+
+/** Riquadro evento/turno comune alle mail del flusso contratto. */
+function contractMailSummary_(eventData, shiftData) {
+  eventData = eventData || {}; shiftData = shiftData || {};
+  var dataFormatted   = formatDate_(shiftData.data);
+  var orarioFormatted = (shiftData.orario_inizio || '') + (shiftData.orario_fine ? ' – ' + shiftData.orario_fine : '');
+  return '<div style="background:#FDF2F5;border-left:4px solid #630E33;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 16px;">' +
+    '<p style="margin:0 0 4px;font-size:16px;font-weight:bold;color:#2E2E2E;">' + escapeHtml_(eventData.titolo || '') + '</p>' +
+    (dataFormatted   ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">📅 ' + escapeHtml_(dataFormatted)   + '</p>' : '') +
+    (orarioFormatted ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">🕒 ' + escapeHtml_(orarioFormatted) + '</p>' : '') +
+    '</div>';
+}
+
+function sendContractToSignEmail(to, nome, eventData, shiftData, expiresAtIso, ctx) {
+  var scad = formatDate_(expiresAtIso);
+  var body = [
+    '<p style="margin:0 0 16px;">Il contratto per il seguente incarico è pronto per la tua firma:</p>',
+    contractMailSummary_(eventData, shiftData),
+    '<p style="margin:0 0 16px;">Accedi al portale con le tue credenziali per leggerlo e firmarlo' + (scad ? ' <strong>entro ' + escapeHtml_(scad) + '</strong>' : '') + '. Per firmare riceverai un codice via email.</p>',
+    '<p style="margin:0 0 20px;font-size:13px;color:#6B6B6B;">Per sicurezza questa email non contiene il contratto né un link di accesso diretto.</p>',
+    buildEmailButton_('VAI AL PORTALE', getFrontendUrl() + '/portale')
+  ].join('');
+  var html = buildEmailTemplate('Contratto da firmare', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nIl contratto per ' + ((eventData && eventData.titolo) || 'il tuo incarico') + ' è pronto per la tua firma' + (scad ? ' (entro ' + scad + ')' : '') + '.\nAccedi al portale con le tue credenziali: ' + getFrontendUrl() + '/portale\nPer firmare riceverai un codice via email.\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Contratto da firmare — ' + ((eventData && eventData.titolo) || 'MADE EVENTS'), html, text,
+    Object.assign({ mailType: 'CONTRACT_TO_SIGN', priority: true }, ctx || {})).ok;
+}
+
+function sendContractCodeEmail(to, nome, code, ctx) {
+  var body = [
+    '<p style="margin:0 0 16px;">Il tuo codice per firmare il contratto è:</p>',
+    '<p style="margin:0 0 16px;font-size:28px;letter-spacing:6px;font-weight:bold;color:#630E33;">' + escapeHtml_(code) + '</p>',
+    '<p style="margin:0 0 8px;">Vale <strong>10 minuti</strong>, con un massimo di 3 tentativi.</p>',
+    '<p style="margin:0;font-size:13px;color:#6B6B6B;">Non condividerlo con nessuno. Se non hai chiesto tu di firmare, ignora questa email e avvisa il team.</p>'
+  ].join('');
+  var html = buildEmailTemplate('Codice di firma', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nIl tuo codice per firmare il contratto: ' + code + '\nVale 10 minuti, massimo 3 tentativi. Non condividerlo.\nSe non hai chiesto tu di firmare, ignora questa email e avvisa il team.\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Codice per firmare il contratto', html, text,
+    Object.assign({ mailType: 'CONTRACT_CODE', priority: true }, ctx || {})).ok;
+}
+
+function sendContractSignedEmail(to, nome, eventData, shiftData, ctx) {
+  var body = [
+    '<p style="margin:0 0 16px;">Hai firmato il contratto: il tuo incarico è <strong>confermato</strong>.</p>',
+    contractMailSummary_(eventData, shiftData),
+    '<p style="margin:0;font-size:13px;color:#6B6B6B;">Il giorno dell\'evento effettua il check-in dalla piattaforma al momento dell\'arrivo (disponibile 30 minuti prima dell\'inizio turno). Puoi rileggere il contratto firmato nel portale.</p>'
+  ].join('');
+  var html = buildEmailTemplate('Contratto firmato ✓', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nHai firmato il contratto per ' + ((eventData && eventData.titolo) || 'il tuo incarico') + ': incarico confermato.\nPuoi rileggerlo nel portale.\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Contratto firmato — ' + ((eventData && eventData.titolo) || 'MADE EVENTS'), html, text,
+    Object.assign({ mailType: 'CONTRACT_SIGNED', priority: true }, ctx || {})).ok;
+}
+
+function sendAdminContractSignedEmail(to, nome, cognome, eventData, shiftData, version, shaPrefix, ctx) {
+  var body = [
+    '<p style="margin:0 0 12px;">Il talent <strong>' + escapeHtml_(nome + ' ' + cognome) + '</strong> ha firmato il contratto (versione ' + escapeHtml_(String(version || '')) + ').</p>',
+    contractMailSummary_(eventData, shiftData),
+    '<p style="margin:0;font-size:12px;color:#6B6B6B;">Impronta del PDF (SHA-256, prime cifre): <code>' + escapeHtml_(shaPrefix || '') + '</code></p>'
+  ].join('');
+  var html = buildEmailTemplate('Contratto firmato', '', body);
+  var text = 'Il talent ' + nome + ' ' + cognome + ' ha firmato il contratto (v' + version + ') per ' + ((eventData && eventData.titolo) || '') + '. Impronta PDF: ' + (shaPrefix || '');
+  return sendEmail_(to, 'Contratto firmato — ' + nome + ' ' + cognome, html, text,
+    Object.assign({ mailType: 'ADMIN_CONTRACT_SIGNED', priority: true }, ctx || {})).ok;
+}
+
+function sendAdminContractDeclinedEmail(to, nome, cognome, eventData, motivo, ctx) {
+  var body = [
+    '<p style="margin:0 0 12px;">Il talent <strong>' + escapeHtml_(nome + ' ' + cognome) + '</strong> ha <strong>rifiutato</strong> il contratto.</p>',
+    contractMailSummary_(eventData, {}),
+    motivo ? '<p style="margin:0 0 12px;"><strong>Motivo:</strong> ' + escapeHtml_(motivo) + '</p>' : '',
+    '<p style="margin:0;font-size:13px;color:#6B6B6B;">La candidatura è stata ritirata e il posto è libero.</p>'
+  ].join('');
+  var html = buildEmailTemplate('Contratto rifiutato', '', body);
+  var text = 'Il talent ' + nome + ' ' + cognome + ' ha rifiutato il contratto per ' + ((eventData && eventData.titolo) || '') + '.' + (motivo ? ' Motivo: ' + motivo : '') + ' Candidatura ritirata, posto libero.';
+  return sendEmail_(to, 'Contratto rifiutato — ' + nome + ' ' + cognome, html, text,
+    Object.assign({ mailType: 'ADMIN_CONTRACT_DECLINED', priority: true }, ctx || {})).ok;
+}
+
+/** Reminder (NON prioritario: rispetta la riserva quota). */
+function sendContractReminderEmail(to, nome, eventData, expiresAtIso, ctx) {
+  var scad = formatDate_(expiresAtIso);
+  var body = [
+    '<p style="margin:0 0 16px;">Hai ancora un contratto da firmare per questo incarico:</p>',
+    contractMailSummary_(eventData, {}),
+    '<p style="margin:0 0 20px;">' + (scad ? 'Scade il <strong>' + escapeHtml_(scad) + '</strong>: dopo quella data la candidatura torna in attesa e il posto può essere assegnato ad altri.' : 'Accedi al portale per firmarlo.') + '</p>',
+    buildEmailButton_('VAI AL PORTALE', getFrontendUrl() + '/portale')
+  ].join('');
+  var html = buildEmailTemplate('Promemoria: contratto da firmare', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nHai ancora un contratto da firmare per ' + ((eventData && eventData.titolo) || 'il tuo incarico') + (scad ? ' (scade il ' + scad + ')' : '') + '.\nPortale: ' + getFrontendUrl() + '/portale\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Promemoria: contratto da firmare — ' + ((eventData && eventData.titolo) || 'MADE EVENTS'), html, text,
+    Object.assign({ mailType: 'CONTRACT_REMINDER', priority: false }, ctx || {})).ok;
+}
+
+function sendContractExpiredEmail(to, nome, eventData, ctx) {
+  var body = [
+    '<p style="margin:0 0 16px;">Il contratto per questo incarico è <strong>scaduto</strong> senza essere firmato:</p>',
+    contractMailSummary_(eventData, {}),
+    '<p style="margin:0;">La tua candidatura è tornata in attesa. Se sei ancora disponibile, contatta il team.</p>'
+  ].join('');
+  var html = buildEmailTemplate('Contratto scaduto', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nIl contratto per ' + ((eventData && eventData.titolo) || 'il tuo incarico') + ' è scaduto senza firma. La candidatura è tornata in attesa: se sei ancora disponibile, contatta il team.\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Contratto scaduto — ' + ((eventData && eventData.titolo) || 'MADE EVENTS'), html, text,
+    Object.assign({ mailType: 'CONTRACT_EXPIRED', priority: true }, ctx || {})).ok;
+}
+
+/** Un'unica mail riepilogativa all'admin per tutti i contratti scaduti nella stessa esecuzione del job. */
+function sendAdminContractExpiredDigestEmail(to, items, ctx) {
+  var li = (items || []).map(function(i) {
+    return '<li>' + escapeHtml_(i.talent + ' — ' + i.evento) + '</li>';
+  }).join('');
+  var body = [
+    '<p style="margin:0 0 12px;"><strong>' + (items || []).length + '</strong> contratti sono scaduti senza firma. Candidature tornate in attesa, posti liberati:</p>',
+    '<ul style="margin:0 0 16px;padding-left:20px;">' + li + '</ul>'
+  ].join('');
+  var html = buildEmailTemplate('Contratti scaduti', '', body);
+  var text = (items || []).length + ' contratti scaduti senza firma:\n' + (items || []).map(function(i) { return '- ' + i.talent + ' — ' + i.evento; }).join('\n');
+  return sendEmail_(to, 'Contratti scaduti (' + (items || []).length + ')', html, text,
+    Object.assign({ mailType: 'ADMIN_CONTRACT_EXPIRED', priority: true }, ctx || {})).ok;
+}
+
+// ---------------------------------------------------------------------------
 // TEMPLATE 2b — Richiesta recensione Google
 // Policy Google: la richiesta deve essere neutra. NIENTE sconti, premi, compensi
 // né condizionamento del voto ("solo se sei soddisfatto"). Non aggiungere nulla del genere.
@@ -753,7 +878,7 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, eventLink)
     luogoFormatted ? '<p style="margin:4px 0;font-size:13px;color:#6B6B6B;">📍 ' + escapeHtml_(luogoFormatted) + '</p>' : '',
     '</div>',
 
-    '<p style="margin:0 0 16px;">Se sei disponibile, ti chiediamo di confermare la tua partecipazione accedendo alla piattaforma.</p>',
+    '<p style="margin:0 0 16px;"><strong>Candidatura approvata:</strong> riceverai il contratto da firmare nel portale. La partecipazione sarà confermata dopo la firma.</p>',
 
     (shiftData.ruolo || orarioFormatted || shiftData.meeting_point) ? (
       '<div style="background:#F5F5F5;border-radius:8px;padding:20px;margin:0 0 20px;">' +
@@ -764,10 +889,10 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, eventLink)
       '</div>'
     ) : '',
 
-    buildEmailButton_('CONFERMA LA TUA PARTECIPAZIONE', eventLink),
+    buildEmailButton_('VAI AL PORTALE', eventLink),
   ].join('');
 
-  var html = buildEmailTemplate('Sei stato selezionato — conferma la tua disponibilità', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var html = buildEmailTemplate('Candidatura approvata', 'Ciao ' + escapeHtml_(nome) + ',', body);
 
   var text = [
     'Ciao ' + nome + ',',
@@ -777,13 +902,13 @@ function sendApplicationApprovedEmail(to, nome, eventData, shiftData, eventLink)
     luogoFormatted ? 'Luogo: '  + luogoFormatted : '',
     orarioFormatted ? 'Orario: ' + orarioFormatted : '',
     '',
-    'Se sei disponibile, ti chiediamo di confermare la tua partecipazione accedendo alla piattaforma.',
-    'Conferma la tua partecipazione: ' + eventLink,
+    'Candidatura approvata: riceverai il contratto da firmare nel portale. La partecipazione sarà confermata dopo la firma.',
+    'Accedi al portale: ' + eventLink,
     '',
     '— MADE EVENTS'
   ].filter(Boolean).join('\n');
 
-  return sendEmail_(to, 'Sei stato selezionato per ' + (eventData.titolo || 'un evento') + ' — conferma la tua disponibilità', html, text, { mailType: 'APPLICATION_APPROVED', priority: true }).ok;
+  return sendEmail_(to, 'Candidatura approvata — ' + (eventData.titolo || 'un evento'), html, text, { mailType: 'APPLICATION_APPROVED', priority: true }).ok;
 }
 
 // ---------------------------------------------------------------------------

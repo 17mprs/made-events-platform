@@ -78,6 +78,8 @@ var ENTITY_STATUS = {
     WITHDRAWN:       'WITHDRAWN'
   },
   ASSIGNMENT: {
+    // Approvato, posto occupato, in attesa del contratto firmato (non ancora confermato)
+    AWAITING_SIGNATURE: 'AWAITING_SIGNATURE',
     CONFIRMED:   'CONFIRMED',
     CHECKED_IN:  'CHECKED_IN',
     CHECKED_OUT: 'CHECKED_OUT',
@@ -86,10 +88,28 @@ var ENTITY_STATUS = {
     CANCELLED:   'CANCELLED',
     NO_SHOW:     'NO_SHOW'
   },
-  // Storico contratti generati (nessuna transizione: una riga per generazione)
+  // Contratto talent: una riga per ogni generazione (versione). Vedi STATE_TRANSITIONS.CONTRATTO.
   CONTRATTO: {
-    GENERATED: 'GENERATED'
+    GENERATED: 'GENERATED',
+    SENT:      'SENT',
+    SIGNED:    'SIGNED',
+    DECLINED:  'DECLINED',
+    EXPIRED:   'EXPIRED',
+    VOID:      'VOID'
   }
+};
+
+// Flusso contratto: invio → firma → conferma incarico
+var CONTRACT_FLOW = {
+  EXPIRY_DAYS:             7,                 // scadenza dalla data di invio
+  REMINDER_AFTER_DAYS:     3,                 // primo (e unico) reminder al talent
+  CODE_TTL_MS:             10 * 60 * 1000,    // validità del codice di firma
+  CODE_MAX_ATTEMPTS:       3,                 // tentativi per codice
+  CODE_RESEND_COOLDOWN_MS: 60 * 1000,         // attesa minima tra due richieste di codice
+  CODE_MAX_REQUESTS:       5,                 // richieste di codice per contratto
+  USER_AGENT_MAX_LEN:      300,
+  REASON_MAX_LEN:          500,
+  REMINDERS_PER_RUN:       40                 // tetto reminder per esecuzione del job
 };
 
 // ---------------------------------------------------------------------------

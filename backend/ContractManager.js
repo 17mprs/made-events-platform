@@ -370,49 +370,87 @@ function handleContractGenerate(payload, auth) {
   var talent = ctx.talent, event = ctx.event, application = ctx.application, shift = ctx.shift;
 
   // Gate: dati mancanti e nessun force esplicito → niente Drive, lista strutturata.
-  if (payload.force !== true) {
-    var missing = collectMissing_(ctx.td, ctx.ed, shift.data || {});
-    if (missing.length) {
-      return { success: false, error: {
-        code:    'CT_MISSING',
-        message: 'Dati mancanti per il contratto: ' + missing.map(function(m) { return m.label; }).join(', '),
-        missing: missing
-      } };
-    }
+  var missing = collectMissing_(ctx.td, ctx.ed, shift.data || {});
+  if (missing.length && payload.force !== true) return contractMissingError_(missing);
+
+  // Una candidatura già firmata non si rigenera: sarebbe un secondo contratto valido.
+  var previous = listContractsByApplication_(application.entity_id, auth.tenant_id);
+  if (previous.some(function(c) { return c.status === ENTITY_STATUS.CONTRATTO.SIGNED; })) {
+    return errorResponse('WF_002', 'Questa candidatura ha già un contratto firmato');
   }
 
   try {
     var result = generateContract(ctx.td, ctx.ed, shift.data, auth);
+    var pdfBytes = result.pdf_blob.getBytes();
+    var sha256 = contractSha256Hex_(pdfBytes);
 
-    // Storico: una entità CONTRATTO per ogni generazione. Un errore qui non
-    // deve far perdere il PDF già creato: si logga e si segnala nella risposta.
-    var storicoOk = true;
+    // Sezione critica: versione progressiva, nuovo record, VOID dei precedenti GENERATED/SENT
+    // della stessa candidatura (anti doppio clic: al massimo un contratto vivo per candidatura).
+    var lock = LockService.getScriptLock();
     try {
-      createEntity('CONTRATTO', ENTITY_STATUS.CONTRATTO.GENERATED, {
-        application_id: application.entity_id,
-        event_id:       event.entity_id,
-        shift_id:       shift.entity_id,
-        talent_id:      talent.entity_id,
-        pdf_file_id:    result.pdf_file_id,
-        doc_file_id:    result.doc_file_id,
-        filename:       result.filename,
-        generato_il:    new Date().toISOString(),
-        generato_da:    auth.user_id,
-        forzato:        payload.force === true
+      lock.waitLock(15000);
+    } catch (lockErr) {
+      try { DriveApp.getFileById(result.pdf_file_id).setTrashed(true); } catch (e1) {}
+      try { DriveApp.getFileById(result.doc_file_id).setTrashed(true); } catch (e2) {}
+      return errorResponse('SYS_001', 'Server occupato, riprova tra qualche secondo');
+    }
+
+    var storicoOk = true;
+    var contractId = '';
+    var version = null;
+    try {
+      var current = listContractsByApplication_(application.entity_id, auth.tenant_id);
+      var maxVersion = 0;
+      current.forEach(function(c) { maxVersion = Math.max(maxVersion, Number(c.data.version) || 0); });
+      version = Math.max(maxVersion, current.length) + 1;
+
+      var record = createEntity('CONTRATTO', ENTITY_STATUS.CONTRATTO.GENERATED, {
+        application_id:  application.entity_id,
+        event_id:        event.entity_id,
+        shift_id:        shift.entity_id,
+        talent_id:       talent.entity_id,
+        talent_user_id:  ctx.td.user_id || '',
+        pdf_file_id:     result.pdf_file_id,
+        doc_file_id:     result.doc_file_id,
+        filename:        result.filename,
+        sha256:          sha256,
+        version:         version,
+        generato_il:     new Date().toISOString(),
+        generato_da:     auth.user_id,
+        forzato:         payload.force === true && missing.length > 0,
+        campi_mancanti:  missing.map(function(m) { return m.field; })
       }, auth.tenant_id, auth.user_id);
+      contractId = record.entity_id;
+
+      current.forEach(function(prev) {
+        if (prev.status !== ENTITY_STATUS.CONTRATTO.GENERATED && prev.status !== ENTITY_STATUS.CONTRATTO.SENT) return;
+        updateEntityData(prev.entity_id, { voided_at: new Date().toISOString(), voided_by: auth.user_id, void_reason: 'rigenerato (versione ' + version + ')' },
+          auth.tenant_id, auth.user_id);
+        var v = transitionEntityStatus('CONTRATTO', prev, ENTITY_STATUS.CONTRATTO.VOID, auth);
+        if (!v.success) {
+          logError_({ severity: 'ERROR', module: 'CONTRACT_MANAGER', action: 'contract.generate.void', entity_type: 'CONTRATTO', entity_id: prev.entity_id,
+            actor: auth.user_id, tenant_id: auth.tenant_id, message: 'VOID del contratto precedente fallito: ' + (v.error && v.error.message) });
+        }
+      });
     } catch (histErr) {
+      // Un errore qui non deve far perdere il PDF già creato: si logga e si segnala nella risposta.
       storicoOk = false;
       logError_({ severity: 'ERROR', module: 'CONTRACT_MANAGER', action: 'contract.generate.storico',
         entity_type: 'TALENT_PROFILE', entity_id: talent.entity_id, actor: auth.user_id, tenant_id: auth.tenant_id,
         message: 'Registrazione CONTRATTO fallita (pdf_file_id=' + result.pdf_file_id + '): ' + histErr.message,
         stack: histErr.stack });
+    } finally {
+      try { lock.releaseLock(); } catch (e3) {}
     }
 
     return successResponse({
-      pdf_base64:   Utilities.base64Encode(result.pdf_blob.getBytes()),
+      pdf_base64:   Utilities.base64Encode(pdfBytes),
       pdf_file_id:  result.pdf_file_id,
       doc_file_id:  result.doc_file_id,
       filename:     result.filename,
+      contract_id:  contractId,
+      version:      version,
+      sha256:       sha256,
       storico:      storicoOk
     });
   } catch (e) {

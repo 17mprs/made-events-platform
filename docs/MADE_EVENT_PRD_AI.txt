@@ -47,7 +47,8 @@ CLIENT_COMPANY    TENANT              EVENT(1:N)
 EVENT             CLIENT_COMPANY      SHIFT(1:N)
 SHIFT             EVENT               APPLICATION(1:N), ASSIGNMENT(1:N)
 APPLICATION       SHIFT+TALENT        ASSIGNMENT(1:1 se approved)
-ASSIGNMENT        SHIFT+TALENT        —
+ASSIGNMENT        SHIFT+TALENT        CONTRATTO (1:N, una riga per versione generata)
+CONTRATTO         APPLICATION         —
 JOB_ANNOUNCEMENT  TENANT              —
 
 CAMPI CHIAVE PER ENTITA':
@@ -72,19 +73,38 @@ EVENT.data:
 
 SHIFT.data:
   event_id, data, orario_inizio, orario_fine,
-  posti_disponibili, posti_confermati(derivato),
+  posti_disponibili,
+  posti_approvati(derivato: AWAITING_SIGNATURE + confermati; occupano il posto),
+  posti_confermati(derivato: solo incarichi confermati, cioè contratto firmato
+                   o incarichi anteriori al flusso contratto),
   ruolo, dress_code, meeting_point, note_operational
+
+EVENT.data (contatori derivati, stessa logica del turno):
+  approved_count (AWAITING_SIGNATURE + confermati), confirmed_count (solo confermati)
 
 APPLICATION.data:
   shift_id, talent_profile_id, messaggio,
   disponibilita_confermata(bool)
 
 ASSIGNMENT.data:
-  shift_id, talent_profile_id, note_admin,
+  shift_id, talent_profile_id, application_id, note_admin,
   checkin{ timestamp, lat, lng },
   checkout{ timestamp, lat, lng },
   timesheet{ ore_lavorate, minuti_lavorati },
   reminder_24h_sent(bool), reminder_2h_sent(bool)
+
+CONTRATTO.data:
+  application_id, event_id, shift_id, talent_id, talent_user_id,
+  pdf_file_id, doc_file_id (Drive, cartella evento, mai condivisi), filename,
+  sha256 (impronta del PDF, esadecimale), version (progressiva per application_id),
+  generato_il, generato_da, forzato(bool), campi_mancanti[],
+  invio:    destinatario, sent_by, sent_at, expires_at (+7 giorni), reminder_sent_at
+  firma:    accepted_at, accepted_sha256, accepted_by,
+            accepted_user_agent (dichiarato dal client, NON verificato)
+  rifiuto:  declined_at, declined_by, decline_reason
+  annullo:  voided_at, voided_by, void_reason; scadenza: expired_at
+  codice di firma: solo hash HMAC (code_hash), code_expires_at, code_attempts,
+            code_requested_at, code_requests — mai il codice in chiaro
 ################################################################################
 
 
@@ -117,17 +137,40 @@ SHIFT
   *     -> CANCELLED (ADMIN)
 
 APPLICATION
-  PENDING -> APPROVED   (ADMIN, side-effect: crea ASSIGNMENT CONFIRMED)
-  PENDING -> REJECTED   (ADMIN)
-  PENDING -> WITHDRAWN  (USER, solo proprie)
+  INVITED        -> PENDING | APPROVED | REJECTED | WITHDRAWN | DOCS_REQUESTED
+  PENDING        -> APPROVED   (ADMIN, side-effect: crea ASSIGNMENT AWAITING_SIGNATURE)
+  PENDING        -> REJECTED   (ADMIN)
+  PENDING        -> WITHDRAWN  (USER, solo proprie)
+  PENDING        -> DOCS_REQUESTED (ADMIN, application.updateStatus)
+  DOCS_REQUESTED -> DOCS_RECEIVED | REJECTED (ADMIN)
+  DOCS_RECEIVED  -> APPROVED | REJECTED     (ADMIN)
+  APPROVED       -> PENDING    (ADMIN "annulla turno", contratto rifiutato o scaduto:
+                                side-effect: annulla l'ASSIGNMENT e libera il posto)
+  # REJECTED, WITHDRAWN: terminali
+  # NB: application.approve richiede PENDING; la transizione INVITED -> APPROVED
+  #     esiste nella tabella ma non è raggiungibile da application.approve.
 
 ASSIGNMENT
+  AWAITING_SIGNATURE -> CONFIRMED  (sistema, contract.accept: contratto firmato)
+  AWAITING_SIGNATURE -> CANCELLED  (candidatura revocata, contratto rifiutato/scaduto/annullato)
+  # AWAITING_SIGNATURE = approvato: il posto è occupato ma l'incarico non è confermato.
+  # Niente check-in e niente reminder evento finché non è CONFIRMED.
+  # Gli ASSIGNMENT già CONFIRMED prima del flusso contratto restano tali (nessuna migrazione).
   CONFIRMED   -> CHECKED_IN   (USER, solo propria + solo se ora >= shift.orario_inizio - 30min)
   CONFIRMED   -> NO_SHOW      (sistema, se ora > shift.orario_inizio + 30min e no check-in)
   CONFIRMED   -> CANCELLED    (ADMIN)
   CHECKED_IN  -> CHECKED_OUT  (USER, side-effect: calcola timesheet)
   CHECKED_OUT -> VALIDATED    (ADMIN | CLIENTE propri eventi)
   VALIDATED   -> PAID         (ADMIN)
+
+CONTRATTO  (una riga per versione; nessuna scrittura diretta dello stato)
+  GENERATED -> SENT      (ADMIN, contract.send: dati completi, scadenza +7 giorni)
+  GENERATED -> VOID      (ADMIN contract.void | rigenerazione contract.generate)
+  SENT      -> SIGNED    (USER, contract.accept: codice valido + 2 accettazioni)
+  SENT      -> DECLINED  (USER, contract.decline: incarico annullato, APPLICATION -> WITHDRAWN)
+  SENT      -> EXPIRED   (sistema, jobContractReminders: incarico annullato, APPLICATION -> PENDING)
+  SENT      -> VOID      (ADMIN contract.void | rigenerazione)
+  # SIGNED, DECLINED, EXPIRED, VOID: terminali
 ################################################################################
 
 
@@ -178,10 +221,21 @@ APPLICATION
 
 ASSIGNMENT
   assignment.list             Y  Y  O  O   # CLIENTE solo propri eventi
-  assignment.checkin          N  N  O  N   # USER solo propria, stato CONFIRMED
+  assignment.checkin          N  N  O  N   # USER solo propria, stato CONFIRMED (contratto firmato)
   assignment.checkout         N  N  O  N   # USER solo propria, stato CHECKED_IN
   assignment.validate         Y  Y  N  O   # CLIENTE solo propri eventi
   assignment.updatePayment    Y  Y  N  N
+
+CONTRACT
+  contract.check              Y  Y  N  N   # sola lettura: dati mancanti
+  contract.generate           Y  Y  N  N   # nuova versione; VOID dei GENERATED/SENT precedenti
+  contract.send               Y  Y  N  N   # GENERATED -> SENT, mail senza allegato né token
+  contract.get                Y  Y  O  N   # USER solo proprio, solo SENT/SIGNED; ritorna pdf_base64
+  contract.requestCode        N  N  O  N   # codice a 6 cifre via mail, 10 min, hash soltanto
+  contract.accept             N  N  O  N   # codice (max 3 tentativi) + accetta_contratto + accetta_clausole_specifiche
+  contract.decline            N  N  O  N
+  contract.void               Y  Y  N  N   # libera il posto se l'incarico era AWAITING_SIGNATURE
+  # Nessuna azione contract.* è pubblica. Il PDF non è mai condiviso su Drive.
 
 SYSTEM
   config.get                  Y  Y  N  N
@@ -264,9 +318,12 @@ F3. COPERTURA TURNI
                                   no duplicati (BIZ_001)
     → application.approve(ADMIN) → APPLICATION(APPROVED)
                                     side-effect automatico:
-                                    crea ASSIGNMENT(CONFIRMED)
-                                    se posti_confermati >= posti_disponibili:
+                                    crea ASSIGNMENT(AWAITING_SIGNATURE)
+                                    se posti_approvati >= posti_disponibili:
                                     SHIFT → FULL
+    → contract.generate → contract.send (ADMIN) → il talent legge il contratto nel
+      portale (contract.get), chiede il codice (contract.requestCode) e firma
+      (contract.accept) → CONTRATTO(SIGNED), ASSIGNMENT(CONFIRMED)
 
 F4. ESECUZIONE CAMPO
     → assignment.checkin(USER)  → ASSIGNMENT(CHECKED_IN)
@@ -288,8 +345,9 @@ F5. CHIUSURA
 AUTOMAZIONI SINCRONE (in-request, eseguite nello stesso momento dell'azione):
   application.approve
     → APPLICATION.status == PENDING
-    → crea ASSIGNMENT con status CONFIRMED
-    → se posti_confermati >= posti_disponibili: SHIFT → FULL
+    → crea ASSIGNMENT con status AWAITING_SIGNATURE
+    → se posti_approvati >= posti_disponibili: SHIFT → FULL
+    → mail APPLICATION_APPROVED al talent: rimando al portale, senza token di sessione
 
   talent.approve
     → LEAD.status == COMPLETED_PENDING_APPROVAL
@@ -476,6 +534,12 @@ dailyMaintenance     giorno 03:00  cleanup token, ricalcolo contatori,
                                    report giornaliero errori
 monthlyArchive       1° mese 02:00 archivia entità oltre retention,
                                    ruota log, pulizia Drive versioni obsolete
+contractReminders    6 ore         CONTRATTO SENT: reminder dopo 3 giorni (mail non
+                                   prioritaria); oltre expires_at (7 giorni) → EXPIRED,
+                                   incarico annullato, APPLICATION → PENDING, mail talent
+                                   + riepilogo admin; SIGNED con incarico ancora
+                                   AWAITING_SIGNATURE → CONFIRMED.
+                                   Trigger installato a mano: setupContractRemindersTrigger()
 
 REGOLE JOBS:
   - Ogni job wrappato in try/catch (fallimento non blocca altri job)
@@ -578,7 +642,8 @@ FLUSSI CORE (smoke test obbligatori):
   [ ] Login nuovo talent → successo
   [ ] Creazione event + shift → SHIFT OPEN
   [ ] Candidatura talent → APPLICATION PENDING
-  [ ] Approvazione candidatura → ASSIGNMENT CONFIRMED creato automaticamente
+  [ ] Approvazione candidatura → ASSIGNMENT AWAITING_SIGNATURE creato automaticamente
+  [ ] Firma contratto (codice valido) → CONTRATTO SIGNED + ASSIGNMENT CONFIRMED
   [ ] Check-in → CHECKED_IN + timestamp
   [ ] Check-out → CHECKED_OUT + timesheet calcolato
   [ ] Validazione → VALIDATED
@@ -690,7 +755,7 @@ RB-02  Un talent può avere max 1 ASSIGNMENT attivo per shift.
 
 RB-03  application.submit richiede: shift OPEN + talent APPROVED + no duplicati.
 
-RB-04  assignment.checkin richiede: status CONFIRMED.
+RB-04  assignment.checkin richiede: status CONFIRMED (non AWAITING_SIGNATURE).
        assignment.checkout richiede: status CHECKED_IN.
 
 RB-05  Nessuna logica di business può risiedere nel frontend.

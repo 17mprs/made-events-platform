@@ -208,6 +208,12 @@ function handleRequest(action, payload, token) {
     // CONTRACT
     case 'contract.generate': return handleContractGenerate(payload, auth);
     case 'contract.check':    return handleContractCheck(payload, auth);
+    case 'contract.send':        return handleContractSend(payload, auth);
+    case 'contract.get':         return handleContractGet(payload, auth);
+    case 'contract.requestCode': return handleContractRequestCode(payload, auth);
+    case 'contract.accept':      return handleContractAccept(payload, auth);
+    case 'contract.decline':     return handleContractDecline(payload, auth);
+    case 'contract.void':        return handleContractVoid(payload, auth);
 
     // EMAIL
     case 'email.sendCustom':       return handleEmailSendCustom(payload, auth);

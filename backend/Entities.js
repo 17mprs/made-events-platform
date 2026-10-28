@@ -461,6 +461,7 @@ function handleShiftCreate(payload, auth) {
     orario_inizio:      payload.orario_inizio,
     orario_fine:        payload.orario_fine,
     posti_disponibili:  posti,
+    posti_approvati:    0,
     posti_confermati:   0,
     ruolo:              payload.ruolo             || '',
     dress_code:         payload.dress_code        || '',

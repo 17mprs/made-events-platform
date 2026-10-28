@@ -43,11 +43,17 @@ var STATE_TRANSITIONS = {
     // REJECTED, WITHDRAWN: terminali
   },
   ASSIGNMENT: {
+    AWAITING_SIGNATURE: ['CONFIRMED', 'CANCELLED'],   // CONFIRMED solo con contratto firmato (contract.accept)
     CONFIRMED:   ['CHECKED_IN',  'CANCELLED', 'NO_SHOW'],
     CHECKED_IN:  ['CHECKED_OUT'],
     CHECKED_OUT: ['VALIDATED'],
     VALIDATED:   ['PAID']
     // PAID, CANCELLED, NO_SHOW: terminali
+  },
+  CONTRATTO: {
+    GENERATED: ['SENT', 'VOID'],
+    SENT:      ['SIGNED', 'DECLINED', 'EXPIRED', 'VOID']
+    // SIGNED, DECLINED, EXPIRED, VOID: terminali
   }
 };
 
@@ -131,7 +137,7 @@ function runSideEffects_(entityType, oldStatus, newStatus, entity, auth) {
 
   switch (key) {
 
-    // APPLICATION APPROVED → crea ASSIGNMENT(CONFIRMED) + controlla SHIFT FULL
+    // APPLICATION APPROVED → crea ASSIGNMENT(AWAITING_SIGNATURE) + controlla SHIFT FULL
     case 'APPLICATION:APPROVED':
       return sideEffect_ApplicationApproved_(entity, auth);
 
@@ -171,8 +177,9 @@ function sideEffect_ApplicationApproved_(application, auth) {
     return successResponse({ message: 'Assignment già esistente', entity_id: existing.entity_id });
   }
 
-  // Crea ASSIGNMENT CONFIRMED
-  var assignment = createEntity('ASSIGNMENT', ENTITY_STATUS.ASSIGNMENT.CONFIRMED, {
+  // Crea ASSIGNMENT in attesa di firma: il posto è occupato, ma l'incarico diventa
+  // CONFIRMED solo con il contratto firmato (contract.accept). Il check-in richiede CONFIRMED.
+  var assignment = createEntity('ASSIGNMENT', ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE, {
     shift_id:           appData.shift_id,
     talent_profile_id:  appData.talent_profile_id,
     application_id:     application.entity_id,
@@ -200,9 +207,10 @@ function sideEffect_ApplicationApproved_(application, auth) {
     appData.talent_profile_id, auth.user_id, auth.tenant_id
   );
 
-  // Email notifica talent — candidatura approvata, con link di accesso
-  // automatico all'area riservata (non blocca l'approvazione se fallisce, ma l'esito
-  // è registrato da sendEmail_ in ErrorLog e restituito come email_sent).
+  // Email notifica talent — candidatura approvata, con rimando al portale (SENZA token di
+  // sessione nel link: il contratto da firmare si vede solo dopo il login). Non blocca
+  // l'approvazione se fallisce, ma l'esito è registrato da sendEmail_ in ErrorLog e
+  // restituito come email_sent.
   var appMailOk = null;
   try {
     var talentProfile = getEntityById(appData.talent_profile_id, auth.tenant_id);
@@ -210,15 +218,7 @@ function sideEffect_ApplicationApproved_(application, auth) {
       var shift = getEntityById(appData.shift_id, auth.tenant_id);
       var event = getEntityById(appData.event_id, auth.tenant_id);
       if (shift) {
-        var token = '';
-        if (talentProfile.data.user_id) {
-          var talentUser = getRowById('Users', talentProfile.data.user_id);
-          if (talentUser) {
-            token = generateToken_(talentUser);
-          }
-        }
-        var eventLink = getFrontendUrl() + '/portale' +
-          (token ? '?token=' + encodeURIComponent(token) : '');
+        var eventLink = getFrontendUrl() + '/portale';
         appMailOk = withMailCtx_({ entity_type: 'APPLICATION', entity_id: appData.talent_profile_id, actor: auth.user_id, tenant_id: auth.tenant_id }, function() {
           return sendApplicationApprovedEmail(
             talentProfile.data.email_contatto,
@@ -273,28 +273,48 @@ function sideEffect_AssignmentCancelled_(assignment, auth) {
 }
 
 // ---------------------------------------------------------------------------
-// SHIFT FULLNESS CHECK
+// STATI ASSIGNMENT CHE OCCUPANO UN POSTO
+// Unica definizione, usata da saturazione, ricerca assignment e backfill.
+//   approvati  = AWAITING_SIGNATURE + tutti i confermati  → occupano il posto
+//   confermati = approvati meno AWAITING_SIGNATURE         → incarico confermato (contratto firmato o legacy)
 // ---------------------------------------------------------------------------
 
-/**
- * Conta gli ASSIGNMENT CONFIRMED/CHECKED_IN/CHECKED_OUT/VALIDATED/PAID per lo shift.
- * Se >= posti_disponibili: SHIFT → FULL.
- * Se < posti_disponibili e SHIFT era FULL: SHIFT → OPEN.
- */
-function checkShiftFullness_(shiftId, tenantId) {
-  var shift = getEntityById(shiftId, tenantId);
-  if (!shift || shift.status === ENTITY_STATUS.SHIFT.CANCELLED) return;
-
-  var activeStatuses = [
+function activeAssignmentStatuses_() {
+  return [
+    ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE,
     ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
     ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
     ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
     ENTITY_STATUS.ASSIGNMENT.VALIDATED,
     ENTITY_STATUS.ASSIGNMENT.PAID
   ];
+}
+
+function isConfirmedAssignmentStatus_(status) {
+  return status !== ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE &&
+         activeAssignmentStatuses_().indexOf(status) !== -1;
+}
+
+// ---------------------------------------------------------------------------
+// SHIFT FULLNESS CHECK
+// ---------------------------------------------------------------------------
+
+/**
+ * Conta gli ASSIGNMENT attivi dello shift in due modi:
+ *   posti_approvati  = AWAITING_SIGNATURE + confermati (occupano il posto)
+ *   posti_confermati = solo confermati (contratto firmato / incarico confermato)
+ * Se approvati >= posti_disponibili: SHIFT → FULL.
+ * Se approvati < posti_disponibili e SHIFT era FULL: SHIFT → OPEN.
+ */
+function checkShiftFullness_(shiftId, tenantId) {
+  var shift = getEntityById(shiftId, tenantId);
+  if (!shift || shift.status === ENTITY_STATUS.SHIFT.CANCELLED) return;
+
+  var activeStatuses = activeAssignmentStatuses_();
 
   var allAssignments = getAllRows('Entities');
   var count = 0;
+  var confirmed = 0;
   for (var i = 0; i < allAssignments.length; i++) {
     var e = allAssignments[i];
     if (e.type !== 'ASSIGNMENT') continue;
@@ -302,11 +322,14 @@ function checkShiftFullness_(shiftId, tenantId) {
     if (String(e.deleted).toLowerCase() === 'true') continue;
     var d = parseJSON(e.data);
     if (String(d.shift_id) !== String(shiftId)) continue;
-    if (activeStatuses.indexOf(e.status) !== -1) count++;
+    if (activeStatuses.indexOf(e.status) !== -1) {
+      count++;
+      if (isConfirmedAssignmentStatus_(e.status)) confirmed++;
+    }
   }
 
-  // Aggiorna posti_confermati
-  updateEntityData(shiftId, { posti_confermati: count }, tenantId, 'system');
+  // Due contatori: approvati (posto occupato) e confermati (firmati)
+  updateEntityData(shiftId, { posti_approvati: count, posti_confermati: confirmed }, tenantId, 'system');
 
   var posti = parseInt(shift.data.posti_disponibili) || 0;
   var isFull = count >= posti;
@@ -326,18 +349,13 @@ function checkShiftFullness_(shiftId, tenantId) {
 }
 
 /**
- * Ricalcola confirmed_count sull'EVENT: somma degli ASSIGNMENT attivi
- * su tutti gli SHIFT dell'evento. Chiamata da checkShiftFullness_ per
- * tenere sincronizzato il badge saturazione ("X/Y") nella card evento.
+ * Ricalcola sull'EVENT approved_count (AWAITING_SIGNATURE + confermati) e
+ * confirmed_count (solo confermati): somma degli ASSIGNMENT attivi su tutti gli
+ * SHIFT dell'evento. Chiamata da checkShiftFullness_ per tenere sincronizzato
+ * il badge saturazione ("X/Y") nella card evento.
  */
 function checkEventSaturation_(eventId, tenantId) {
-  var activeStatuses = [
-    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
-    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
-    ENTITY_STATUS.ASSIGNMENT.PAID
-  ];
+  var activeStatuses = activeAssignmentStatuses_();
 
   var all = getAllRows('Entities');
 
@@ -364,6 +382,7 @@ function checkEventSaturation_(eventId, tenantId) {
   }
 
   var count = 0;
+  var confirmed = 0;
   for (var j = 0; j < all.length; j++) {
     var a = all[j];
     if (a.type !== 'ASSIGNMENT') continue;
@@ -373,10 +392,13 @@ function checkEventSaturation_(eventId, tenantId) {
     if (!shiftIds[ad.shift_id]) {
       if (!applicationIds[ad.application_id]) continue;
     }
-    if (activeStatuses.indexOf(a.status) !== -1) count++;
+    if (activeStatuses.indexOf(a.status) !== -1) {
+      count++;
+      if (isConfirmedAssignmentStatus_(a.status)) confirmed++;
+    }
   }
 
-  updateEntityData(eventId, { confirmed_count: count }, tenantId, 'system');
+  updateEntityData(eventId, { approved_count: count, confirmed_count: confirmed }, tenantId, 'system');
 }
 
 // ---------------------------------------------------------------------------
@@ -1217,13 +1239,7 @@ function handleMarkEventCompleted(payload, auth) {
 
 function findAssignment_(shiftId, talentProfileId, tenantId) {
   var all = getAllRows('Entities');
-  var activeStatuses = [
-    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
-    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
-    ENTITY_STATUS.ASSIGNMENT.PAID
-  ];
+  var activeStatuses = activeAssignmentStatuses_();
   for (var i = 0; i < all.length; i++) {
     var e = all[i];
     if (e.type !== 'ASSIGNMENT') continue;
@@ -1241,13 +1257,7 @@ function findAssignment_(shiftId, talentProfileId, tenantId) {
 
 function findAssignmentByApplicationId_(applicationId, tenantId) {
   var all = getAllRows('Entities');
-  var activeStatuses = [
-    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
-    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
-    ENTITY_STATUS.ASSIGNMENT.PAID
-  ];
+  var activeStatuses = activeAssignmentStatuses_();
   for (var i = 0; i < all.length; i++) {
     var e = all[i];
     if (e.type !== 'ASSIGNMENT') continue;
@@ -1382,16 +1392,10 @@ function handleEventBackfillSaturation(payload, auth) {
   });
 }
 
-// Stessa logica di conteggio di checkEventSaturation_, senza scrivere —
-// usata dal backfill in dry-run per mostrare cosa cambierebbe.
+// Stessa logica di conteggio di checkEventSaturation_ per confirmed_count, senza
+// scrivere — usata dal backfill in dry-run per mostrare cosa cambierebbe.
 function countActiveAssignmentsForEvent_(eventId, tenantId) {
-  var activeStatuses = [
-    ENTITY_STATUS.ASSIGNMENT.CONFIRMED,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_IN,
-    ENTITY_STATUS.ASSIGNMENT.CHECKED_OUT,
-    ENTITY_STATUS.ASSIGNMENT.VALIDATED,
-    ENTITY_STATUS.ASSIGNMENT.PAID
-  ];
+  var activeStatuses = activeAssignmentStatuses_();
 
   var all = getAllRows('Entities');
 
@@ -1413,7 +1417,8 @@ function countActiveAssignmentsForEvent_(eventId, tenantId) {
     if (String(a.deleted).toLowerCase() === 'true') continue;
     var ad = parseJSON(a.data);
     if (!shiftIds[ad.shift_id]) continue;
-    if (activeStatuses.indexOf(a.status) !== -1) count++;
+    // Stesso conteggio di confirmed_count (solo confermati)
+    if (activeStatuses.indexOf(a.status) !== -1 && isConfirmedAssignmentStatus_(a.status)) count++;
   }
 
   return count;
@@ -1550,7 +1555,7 @@ function handleEventBackfillAssignmentShiftIds(payload, auth) {
     for (var m = 0; m < candidates.length; m++) {
       var c = candidates[m];
       var postiDisp = Number(c.data.posti_disponibili) || 0;
-      var postiConf = Number(c.data.posti_confermati) || 0;
+      var postiConf = Number(c.data.posti_approvati != null ? c.data.posti_approvati : c.data.posti_confermati) || 0;
       if (postiConf < postiDisp) { chosen = c; break; }
     }
     if (!chosen) chosen = candidates[0];
@@ -1584,4 +1589,44 @@ function handleEventBackfillAssignmentShiftIds(payload, auth) {
     gaps_found: report.length,
     details: report
   });
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT — incarichi già CONFIRMED prima del flusso contratto (SOLA LETTURA)
+// Da lanciare a mano dall'editor GAS. Nessuna scrittura, nessuna mail: serve a sapere
+// quanti ASSIGNMENT restano "grandfathered" (CONFIRMED senza contratto firmato).
+// ---------------------------------------------------------------------------
+
+function auditConfirmedAssignments() {
+  var all = getAllRows('Entities');
+  var byTenant = {};
+  var signedApps = {};
+  all.forEach(function(e) {
+    if (e.type !== 'CONTRATTO' || e.status !== ENTITY_STATUS.CONTRATTO.SIGNED) return;
+    if (String(e.deleted).toLowerCase() === 'true') return;
+    signedApps[parseJSON(e.data).application_id] = true;
+  });
+
+  all.forEach(function(e) {
+    if (e.type !== 'ASSIGNMENT') return;
+    if (String(e.deleted).toLowerCase() === 'true') return;
+    var t = byTenant[e.tenant_id] || (byTenant[e.tenant_id] = { confirmed: 0, confirmed_con_contratto_firmato: 0, awaiting_signature: 0, altri_attivi: 0 });
+    if (e.status === ENTITY_STATUS.ASSIGNMENT.CONFIRMED) {
+      t.confirmed++;
+      if (signedApps[parseJSON(e.data).application_id]) t.confirmed_con_contratto_firmato++;
+    } else if (e.status === ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE) {
+      t.awaiting_signature++;
+    } else if (activeAssignmentStatuses_().indexOf(e.status) !== -1) {
+      t.altri_attivi++;
+    }
+  });
+
+  Logger.log('=== AUDIT ASSIGNMENT CONFIRMED (sola lettura) ===');
+  Object.keys(byTenant).forEach(function(tenantId) {
+    var t = byTenant[tenantId];
+    Logger.log('tenant ' + tenantId + ' | CONFIRMED: ' + t.confirmed + ' (di cui con contratto firmato: ' + t.confirmed_con_contratto_firmato +
+      ') | AWAITING_SIGNATURE: ' + t.awaiting_signature + ' | altri attivi (check-in..pagato): ' + t.altri_attivi);
+  });
+  Logger.log('I CONFIRMED esistenti NON vengono migrati: restano tali (grandfathering).');
+  return byTenant;
 }
