@@ -238,6 +238,7 @@ CONTRACT
   contract.generate           Y  Y  N  N   # richiede un incarico attivo sul turno; nuova versione; VOID dei GENERATED/SENT precedenti
   contract.send               Y  Y  N  N   # GENERATED -> SENT, mail senza allegato né token
   contract.get                Y  Y  O  N   # USER solo proprio, solo SENT/SIGNED; ritorna pdf_base64
+  contract.list               Y  Y  O  N   # solo metadati. USER: propri SENT/SIGNED/DECLINED/EXPIRED; ADMIN: per event_id o application_id, tutti gli stati
   contract.requestCode        N  N  O  N   # codice a 6 cifre via mail, 10 min, hash soltanto
   contract.accept             N  N  O  N   # codice (max 3 tentativi) + accetta_contratto + accetta_clausole_specifiche
   contract.decline            N  N  O  N

@@ -210,6 +210,7 @@ function handleRequest(action, payload, token) {
     case 'contract.check':    return handleContractCheck(payload, auth);
     case 'contract.send':        return handleContractSend(payload, auth);
     case 'contract.get':         return handleContractGet(payload, auth);
+    case 'contract.list':        return handleContractList(payload, auth);
     case 'contract.requestCode': return handleContractRequestCode(payload, auth);
     case 'contract.accept':      return handleContractAccept(payload, auth);
     case 'contract.decline':     return handleContractDecline(payload, auth);

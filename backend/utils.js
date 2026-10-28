@@ -90,6 +90,7 @@ var PERMISSION_MATRIX = {
   'contract.check':    { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'contract.send':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'N', CLIENTE:'N' },
   'contract.get':         { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },   // USER: solo proprio, SENT/SIGNED
+  'contract.list':        { SUPER_ADMIN:'Y', ADMIN:'Y', USER:'O', CLIENTE:'N' },   // USER: propri, senza GENERATED/VOID
   'contract.requestCode': { SUPER_ADMIN:'N', ADMIN:'N', USER:'O', CLIENTE:'N' },
   'contract.accept':      { SUPER_ADMIN:'N', ADMIN:'N', USER:'O', CLIENTE:'N' },
   'contract.decline':     { SUPER_ADMIN:'N', ADMIN:'N', USER:'O', CLIENTE:'N' },

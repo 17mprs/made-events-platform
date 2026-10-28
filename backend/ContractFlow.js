@@ -302,6 +302,76 @@ function handleContractGet(payload, auth) {
 }
 
 // ---------------------------------------------------------------------------
+// contract.list (USER propri visibili | ADMIN per evento o candidatura)
+// ---------------------------------------------------------------------------
+
+/**
+ * Elenco contratti, SOLO metadati (mai pdf_base64: per il PDF c'è contract.get).
+ *  - USER: i propri, solo SENT/SIGNED/DECLINED/EXPIRED (mai GENERATED/VOID).
+ *  - ADMIN/SUPER_ADMIN: serve event_id o application_id; tutti gli stati, con talent_id, forced, legacy.
+ * Ogni voce porta un riepilogo di evento e turno per mostrarla senza altre chiamate.
+ */
+function handleContractList(payload, auth) {
+  var isAdmin = auth.role === ROLES.ADMIN || auth.role === ROLES.SUPER_ADMIN;
+  var userVisible = [ENTITY_STATUS.CONTRATTO.SENT, ENTITY_STATUS.CONTRATTO.SIGNED,
+                     ENTITY_STATUS.CONTRATTO.DECLINED, ENTITY_STATUS.CONTRATTO.EXPIRED];
+
+  var profile = null;
+  if (isAdmin) {
+    if (!payload.event_id && !payload.application_id) {
+      return errorResponse('VAL_001', 'Serve event_id oppure application_id', 'event_id');
+    }
+  } else {
+    profile = findTalentProfileByUserId_(auth.user_id, auth.tenant_id);
+    if (!profile) return successResponse({ items: [], total: 0 });
+  }
+
+  var all = getAllRows('Entities');
+  var items = [];
+  var cache = {};
+  var lookup = function(id) {
+    if (!id) return null;
+    if (!(id in cache)) cache[id] = getEntityById(id, auth.tenant_id);
+    return cache[id];
+  };
+
+  for (var i = 0; i < all.length; i++) {
+    var e = all[i];
+    if (e.type !== 'CONTRATTO') continue;
+    if (String(e.tenant_id) !== String(auth.tenant_id)) continue;
+    if (String(e.deleted).toLowerCase() === 'true') continue;
+    var d = parseJSON(e.data);
+    e.data = d;
+
+    if (payload.event_id && String(d.event_id) !== String(payload.event_id)) continue;
+    if (payload.application_id && String(d.application_id) !== String(payload.application_id)) continue;
+    if (!isAdmin) {
+      if (String(d.talent_id) !== String(profile.entity_id)) continue;
+      if (d.talent_user_id && String(d.talent_user_id) !== String(auth.user_id)) continue;
+      if (userVisible.indexOf(e.status) === -1) continue;
+    }
+
+    var item = contractMeta_(e);
+    item.accepted_at = d.accepted_at || '';
+    var ev = lookup(d.event_id), sh = lookup(d.shift_id);
+    item.evento = ev ? { titolo: ev.data.titolo || '', luogo: ev.data.luogo || '', citta: ev.data.citta || '' } : null;
+    item.turno  = sh ? { data: sh.data.data || '', orario_inizio: sh.data.orario_inizio || '', orario_fine: sh.data.orario_fine || '', ruolo: sh.data.ruolo || '' } : null;
+    if (isAdmin) {
+      item.talent_id = d.talent_id || '';
+      item.forced    = d.forzato === true;
+      item.legacy    = !d.assignment_id || !d.sha256;   // non inviabile/firmabile: va rigenerato
+    }
+    items.push(item);
+  }
+
+  items.sort(function(a, b) {
+    if (a.application_id !== b.application_id) return String(a.application_id).localeCompare(String(b.application_id));
+    return (Number(b.version) || 0) - (Number(a.version) || 0);
+  });
+  return successResponse({ items: items, total: items.length });
+}
+
+// ---------------------------------------------------------------------------
 // contract.requestCode (USER)
 // ---------------------------------------------------------------------------
 
