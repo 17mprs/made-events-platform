@@ -373,6 +373,14 @@ function handleContractGenerate(payload, auth) {
   var missing = collectMissing_(ctx.td, ctx.ed, shift.data || {});
   if (missing.length && payload.force !== true) return contractMissingError_(missing);
 
+  // Il contratto si lega all'incarico attuale (assignment_id + shift_id): senza un incarico attivo
+  // sullo stesso turno non si genera.
+  var assignment = findAssignmentByApplicationId_(application.entity_id, auth.tenant_id);
+  if (!assignment) return errorResponse('WF_002', 'Nessun incarico attivo per questa candidatura: impossibile generare il contratto');
+  if (String(assignment.data.shift_id || '') !== String(shift.entity_id)) {
+    return errorResponse('WF_002', "Il turno dell'incarico non coincide con quello della candidatura: verifica l'assegnazione del turno");
+  }
+
   // Una candidatura già firmata non si rigenera: sarebbe un secondo contratto valido.
   var previous = listContractsByApplication_(application.entity_id, auth.tenant_id);
   if (previous.some(function(c) { return c.status === ENTITY_STATUS.CONTRATTO.SIGNED; })) {
@@ -406,6 +414,7 @@ function handleContractGenerate(payload, auth) {
 
       var record = createEntity('CONTRATTO', ENTITY_STATUS.CONTRATTO.GENERATED, {
         application_id:  application.entity_id,
+        assignment_id:   assignment.entity_id,
         event_id:        event.entity_id,
         shift_id:        shift.entity_id,
         talent_id:       talent.entity_id,

@@ -415,6 +415,36 @@ function sendContractExpiredEmail(to, nome, eventData, ctx) {
     Object.assign({ mailType: 'CONTRACT_EXPIRED', priority: true }, ctx || {})).ok;
 }
 
+/** Contratto SENT annullato (candidatura revocata o turno cambiato). NON prioritaria. */
+function sendContractVoidedEmail(to, nome, eventData, ctx) {
+  var body = [
+    '<p style="margin:0 0 16px;">Il contratto che ti avevamo inviato per questo incarico è stato <strong>annullato</strong>:</p>',
+    contractMailSummary_(eventData, {}),
+    '<p style="margin:0 0 16px;">Non devi firmarlo. Se l\'incarico viene confermato, riceverai un contratto aggiornato.</p>',
+    '<p style="margin:0;font-size:13px;color:#6B6B6B;">Per dubbi rispondi a questa email.</p>'
+  ].join('');
+  var html = buildEmailTemplate('Contratto annullato', 'Ciao ' + escapeHtml_(nome) + ',', body);
+  var text = 'Ciao ' + nome + ',\n\nIl contratto per ' + ((eventData && eventData.titolo) || 'il tuo incarico') + ' è stato annullato: non devi firmarlo. Se l\'incarico viene confermato, riceverai un contratto aggiornato.\n\n— MADE EVENTS';
+  return sendEmail_(to, 'Contratto annullato — ' + ((eventData && eventData.titolo) || 'MADE EVENTS'), html, text,
+    Object.assign({ mailType: 'CONTRACT_VOIDED', priority: false }, ctx || {})).ok;
+}
+
+/** Riepilogo all'admin dei contratti SENT annullati da una singola operazione. NON prioritaria. */
+function sendAdminContractVoidedEmail(to, motivo, items, ctx) {
+  var li = (items || []).map(function(i) {
+    return '<li>' + escapeHtml_(i.talent + ' — ' + i.evento + ' (v' + (i.version || '?') + ')') + '</li>';
+  }).join('');
+  var body = [
+    '<p style="margin:0 0 12px;"><strong>' + (items || []).length + '</strong> contratti già inviati sono stati annullati (' + escapeHtml_(motivo || '') + '). Ai talent è partita una mail:</p>',
+    '<ul style="margin:0 0 16px;padding-left:20px;">' + li + '</ul>',
+    '<p style="margin:0;font-size:13px;color:#6B6B6B;">Rigenera e reinvia il contratto se l\'incarico resta valido.</p>'
+  ].join('');
+  var html = buildEmailTemplate('Contratti annullati', '', body);
+  var text = (items || []).length + ' contratti inviati annullati (' + (motivo || '') + '):\n' + (items || []).map(function(i) { return '- ' + i.talent + ' — ' + i.evento; }).join('\n');
+  return sendEmail_(to, 'Contratti annullati (' + (items || []).length + ')', html, text,
+    Object.assign({ mailType: 'ADMIN_CONTRACT_VOIDED', priority: false }, ctx || {})).ok;
+}
+
 /** Un'unica mail riepilogativa all'admin per tutti i contratti scaduti nella stessa esecuzione del job. */
 function sendAdminContractExpiredDigestEmail(to, items, ctx) {
   var li = (items || []).map(function(i) {
@@ -937,7 +967,7 @@ function sendAccountEsistenteEmail(to, nome, loginUrl) {
   var body = [
     '<p style="margin:0 0 20px;">',
     'Hai già un account attivo su MADE EVENTS. ',
-    'Ecco il link per accedere alla tua area riservata — se non ricordi la password potrai reimpostarla dall\'interno.',
+    'Accedi alla tua area riservata con la tua email e la tua password: se non la ricordi puoi reimpostarla dalla pagina di accesso.',
     '</p>',
     buildEmailButton_('Accedi alla tua area riservata', loginUrl),
   ].join('');

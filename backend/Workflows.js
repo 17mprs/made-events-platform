@@ -250,6 +250,9 @@ function sideEffect_ApplicationRevoked_(application, auth) {
     transitionEntityStatus('ASSIGNMENT', assignment, ENTITY_STATUS.ASSIGNMENT.CANCELLED, auth);
   }
 
+  // I contratti ancora vivi (GENERATED/SENT) non valgono più: VOID automatico + avvisi
+  contractVoidForApplication_(application.entity_id, auth.tenant_id, 'candidatura revocata', auth);
+
   return successResponse({ application_id: application.entity_id });
 }
 
@@ -1022,7 +1025,18 @@ function handleApplicationRevoke(payload, auth) {
       return errorResponse('WF_002', 'Transizione PENDING non consentita dallo stato: ' + freshApp.status);
     }
 
-    return transitionEntityStatus('APPLICATION', freshApp, ENTITY_STATUS.APPLICATION.PENDING, auth);
+    var liveContractIds = listContractsByApplication_(freshApp.entity_id, auth.tenant_id)
+      .filter(function(c) { return c.status === ENTITY_STATUS.CONTRATTO.GENERATED || c.status === ENTITY_STATUS.CONTRATTO.SENT; })
+      .map(function(c) { return c.entity_id; });
+    var revokeResult = transitionEntityStatus('APPLICATION', freshApp, ENTITY_STATUS.APPLICATION.PENDING, auth);
+    if (revokeResult.success) {
+      // contratti annullati da questa revoca (effetto collaterale), per il riepilogo lato admin
+      revokeResult.data.contracts_voided = liveContractIds.filter(function(id) {
+        var c = getEntityById(id, auth.tenant_id);
+        return c && c.status === ENTITY_STATUS.CONTRATTO.VOID;
+      });
+    }
+    return revokeResult;
 
   } catch (e) {
     return errorResponse('SYS_001', 'Impossibile acquisire lock: ' + e.message);
@@ -1085,7 +1099,13 @@ function handleApplicationAssignShift(payload, auth) {
   if (oldShiftId && oldShiftId !== newShiftId) checkShiftFullness_(oldShiftId, auth.tenant_id);
   if (newShiftId) checkShiftFullness_(newShiftId, auth.tenant_id);
 
-  return successResponse({ application_id: application.entity_id, shift_id: newShiftId });
+  // Cambio turno: i contratti vivi (GENERATED/SENT) descrivono il turno precedente → VOID automatico + avvisi
+  var contractsVoided = [];
+  if (oldShiftId !== newShiftId) {
+    contractsVoided = contractVoidForApplication_(application.entity_id, auth.tenant_id, 'turno cambiato', auth);
+  }
+
+  return successResponse({ application_id: application.entity_id, shift_id: newShiftId, contracts_voided: contractsVoided });
 }
 
 function handleApplicationReject(payload, auth) {

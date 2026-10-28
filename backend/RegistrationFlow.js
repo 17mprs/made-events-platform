@@ -38,8 +38,9 @@ function handleRegisterStep1(payload) {
     return successResponse({ message: 'LEAD_ESISTENTE', email_sent: resumeMailOk });
   }
 
-  // CASO 2 — account talent già attivo (Users): niente nuova registrazione,
-  // si invia un link di accesso diretto con token temporaneo.
+  // CASO 2 — account talent già attivo (Users): niente nuova registrazione, si invia
+  // il link alla pagina di accesso. NESSUN token di sessione nel link: chi riceve (o
+  // inoltra) la mail deve comunque conoscere la password.
   var users = getAllRows('Users');
   for (var i = 0; i < users.length; i++) {
     if (String(users[i].email).toLowerCase() === emailLower) {
@@ -47,7 +48,7 @@ function handleRegisterStep1(payload) {
       var portalPath = talentUser.role === 'CLIENTE' ? '/cliente'
                       : (talentUser.role === 'ADMIN' || talentUser.role === 'SUPER_ADMIN') ? '/admin'
                       : '/portale';
-      var loginUrl = getFrontendUrl() + portalPath + '?token=' + encodeURIComponent(generateToken_(talentUser));
+      var loginUrl = getFrontendUrl() + portalPath;
       var talentLead = findLeadByEmail_(emailLower);
       var accountMailOk = false;
       try {

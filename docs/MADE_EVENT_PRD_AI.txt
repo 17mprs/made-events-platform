@@ -94,7 +94,7 @@ ASSIGNMENT.data:
   reminder_24h_sent(bool), reminder_2h_sent(bool)
 
 CONTRATTO.data:
-  application_id, event_id, shift_id, talent_id, talent_user_id,
+  application_id, assignment_id, event_id, shift_id, talent_id, talent_user_id,
   pdf_file_id, doc_file_id (Drive, cartella evento, mai condivisi), filename,
   sha256 (impronta del PDF, esadecimale), version (progressiva per application_id),
   generato_il, generato_da, forzato(bool), campi_mancanti[],
@@ -171,6 +171,13 @@ CONTRATTO  (una riga per versione; nessuna scrittura diretta dello stato)
   SENT      -> EXPIRED   (sistema, jobContractReminders: incarico annullato, APPLICATION -> PENDING)
   SENT      -> VOID      (ADMIN contract.void | rigenerazione)
   # SIGNED, DECLINED, EXPIRED, VOID: terminali
+  # VOID AUTOMATICO dei GENERATED/SENT della candidatura quando la candidatura è revocata
+  # (APPROVED -> PENDING) o il turno cambia (application.assignShift). Per i SENT: mail non
+  # prioritaria al talent ("contratto annullato") e un riepilogo all'admin (ADMIN_EMAIL).
+  # COERENZA: il contratto è legato a assignment_id + shift_id. send, requestCode, accept e
+  # decline rifiutano se l'incarico attuale è un altro (CT_STALE); contratti senza assignment_id
+  # (generati prima del controllo) sono "non verificabili": CT_LEGACY, vanno rigenerati.
+  # Scadenza e void non liberano mai il posto di un incarico diverso da quello del contratto.
 ################################################################################
 
 
@@ -228,7 +235,7 @@ ASSIGNMENT
 
 CONTRACT
   contract.check              Y  Y  N  N   # sola lettura: dati mancanti
-  contract.generate           Y  Y  N  N   # nuova versione; VOID dei GENERATED/SENT precedenti
+  contract.generate           Y  Y  N  N   # richiede un incarico attivo sul turno; nuova versione; VOID dei GENERATED/SENT precedenti
   contract.send               Y  Y  N  N   # GENERATED -> SENT, mail senza allegato né token
   contract.get                Y  Y  O  N   # USER solo proprio, solo SENT/SIGNED; ritorna pdf_base64
   contract.requestCode        N  N  O  N   # codice a 6 cifre via mail, 10 min, hash soltanto

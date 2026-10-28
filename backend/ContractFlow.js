@@ -90,6 +90,24 @@ function contractTalentName_(profileData) {
   return [(profileData && profileData.nome) || '', (profileData && profileData.cognome) || ''].join(' ').trim();
 }
 
+/**
+ * Verifica che l'incarico attuale della candidatura sia quello per cui il contratto è stato
+ * generato (stesso assignment_id e stesso shift_id). Contratti senza assignment_id (generati
+ * prima di questo controllo) sono "non verificabili": CT_LEGACY, vanno rigenerati.
+ * @returns {null|object} null se coerente, altrimenti errorResponse
+ */
+function contractBindingError_(d, assignment) {
+  if (!d.assignment_id) {
+    return errorResponse('CT_LEGACY', 'Contratto generato con una versione precedente del sistema: va rigenerato prima della firma');
+  }
+  if (!assignment) return errorResponse('WF_002', 'Incarico non più attivo: contatta il team');
+  if (String(assignment.entity_id) !== String(d.assignment_id) ||
+      String(assignment.data.shift_id || '') !== String(d.shift_id || '')) {
+    return errorResponse('CT_STALE', "Il contratto non corrisponde più all'incarico attuale (incarico o turno cambiati): contatta il team");
+  }
+  return null;
+}
+
 /** Metadati esposti al client: mai hash del codice, tentativi o user-agent. */
 function contractMeta_(c) {
   var d = c.data || {};
@@ -188,7 +206,7 @@ function handleContractSend(payload, auth) {
       return errorResponse('WF_002', 'Il contratto deve essere GENERATED per essere inviato. Stato attuale: ' + c.status);
     }
     var d = c.data || {};
-    if (!d.sha256) {
+    if (!d.sha256 || !d.assignment_id) {
       return errorResponse('CT_LEGACY', 'Contratto generato con una versione precedente del sistema: rigeneralo prima di inviarlo');
     }
     if (d.forzato === true) {
@@ -206,6 +224,8 @@ function handleContractSend(payload, auth) {
 
     var assignment = findAssignmentByApplicationId_(d.application_id, auth.tenant_id);
     if (!assignment) return errorResponse('WF_002', 'Nessun incarico attivo per questa candidatura');
+    var bindErr = contractBindingError_(d, assignment);
+    if (bindErr) return bindErr;
 
     var to = talentContractEmail_(ctx.td);
     if (!to) return errorResponse('VAL_002', 'Il talent non ha un indirizzo email', 'email');
@@ -297,6 +317,8 @@ function handleContractRequestCode(payload, auth) {
     if (!c || c.status !== ENTITY_STATUS.CONTRATTO.SENT) return errorResponse('WF_002', 'Il contratto non è in attesa di firma');
     var d = c.data || {};
     if (contractIsExpired_(d)) return errorResponse('CT_EXPIRED', 'Il contratto è scaduto: contatta il team');
+    var bindErrRc = contractBindingError_(d, findAssignmentByApplicationId_(d.application_id, auth.tenant_id));
+    if (bindErrRc) return bindErrRc;
 
     var requests = Number(d.code_requests) || 0;
     if (requests >= CONTRACT_FLOW.CODE_MAX_REQUESTS) {
@@ -357,6 +379,11 @@ function handleContractAccept(payload, auth) {
     var d = c.data || {};
     if (contractIsExpired_(d)) return errorResponse('CT_EXPIRED', 'Il contratto è scaduto: contatta il team');
 
+    // --- il contratto deve riferirsi all'incarico attuale (prima del codice: nessun tentativo consumato)
+    var assignment = findAssignmentByApplicationId_(d.application_id, auth.tenant_id);
+    var bindErrAcc = contractBindingError_(d, assignment);
+    if (bindErrAcc) return bindErrAcc;
+
     // --- codice di firma
     var codeExpires = d.code_expires_at ? new Date(d.code_expires_at).getTime() : 0;
     if (!d.code_hash || !codeExpires) return errorResponse('CT_CODE_REQUIRED', 'Richiedi prima il codice di firma', 'codice');
@@ -389,9 +416,6 @@ function handleContractAccept(payload, auth) {
       return errorResponse('CT_INTEGRITY', 'Contratto non verificabile: contatta il team');
     }
     if (d.sha256 && acceptedHash !== d.sha256) return errorResponse('CT_INTEGRITY', 'Contratto non verificabile: contatta il team');
-
-    var assignment = findAssignmentByApplicationId_(d.application_id, auth.tenant_id);
-    if (!assignment) return errorResponse('WF_002', 'Incarico non più attivo: contatta il team');
 
     var now = new Date().toISOString();
     updateEntityData(c.entity_id, {
@@ -467,6 +491,8 @@ function handleContractDecline(payload, auth) {
     var c = getEntityById(payload.entity_id, auth.tenant_id);
     if (!c || c.status !== ENTITY_STATUS.CONTRATTO.SENT) return errorResponse('WF_002', 'Il contratto non è in attesa di firma');
     var d = c.data || {};
+    var bindErrDec = contractBindingError_(d, d.application_id ? findAssignmentByApplicationId_(d.application_id, auth.tenant_id) : null);
+    if (bindErrDec) return bindErrDec;   // non si ritira una candidatura in base a un contratto non più coerente
 
     updateEntityData(c.entity_id, { declined_at: new Date().toISOString(), declined_by: auth.user_id, decline_reason: motivo },
       auth.tenant_id, auth.user_id);
@@ -526,7 +552,7 @@ function handleContractVoid(payload, auth) {
 
     // Libera il posto solo se l'incarico era in attesa di firma (gli incarichi già confermati restano).
     var released = false;
-    if (assignment && assignment.status === ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE) {
+    if (assignment && assignment.status === ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE && !contractBindingError_(d, assignment)) {
       released = contractReleaseSeat_(d.application_id, auth, false);
     }
     return successResponse({ entity_id: c.entity_id, stato: ENTITY_STATUS.CONTRATTO.VOID, posto_liberato: released });
@@ -550,7 +576,8 @@ function contractExpireOne_(c, authSystem) {
   var r = transitionEntityStatus('CONTRATTO', c, ENTITY_STATUS.CONTRATTO.EXPIRED, authSystem);
   if (!r.success) return null;
 
-  if (assignment && assignment.status === ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE) {
+  // Il posto si libera solo se l'incarico attuale è proprio quello del contratto (mai uno diverso).
+  if (assignment && assignment.status === ENTITY_STATUS.ASSIGNMENT.AWAITING_SIGNATURE && !contractBindingError_(d, assignment)) {
     contractReleaseSeat_(d.application_id, authSystem, false);
   }
 
@@ -564,4 +591,62 @@ function contractExpireOne_(c, authSystem) {
     nome:      td.nome || '',
     eventData: event ? event.data : {}
   };
+}
+
+// ---------------------------------------------------------------------------
+// VOID AUTOMATICO — candidatura revocata o turno cambiato
+// ---------------------------------------------------------------------------
+
+/**
+ * Annulla (VOID) i contratti GENERATED/SENT di una candidatura. Non tocca incarico né candidatura.
+ * Per i contratti già inviati (SENT) avvisa il talent (mail NON prioritaria) e manda all'admin
+ * (ADMIN_EMAIL) un'unica mail di riepilogo. Non lancia mai: è chiamata da effetti collaterali
+ * che non devono fallire per un contratto.
+ * @returns {Array<{entity_id:string, version:(number|null), stato_precedente:string}>} contratti annullati
+ */
+function contractVoidForApplication_(applicationId, tenantId, motivo, auth) {
+  var voided = [];
+  var sentItems = [];
+  try {
+    var live = listContractsByApplication_(applicationId, tenantId).filter(function(c) {
+      return c.status === ENTITY_STATUS.CONTRATTO.GENERATED || c.status === ENTITY_STATUS.CONTRATTO.SENT;
+    });
+    live.forEach(function(c) {
+      var prev = c.status;
+      var d = c.data || {};
+      try {
+        updateEntityData(c.entity_id, { voided_at: new Date().toISOString(), voided_by: auth.user_id, void_reason: motivo }, tenantId, auth.user_id);
+        var r = transitionEntityStatus('CONTRATTO', c, ENTITY_STATUS.CONTRATTO.VOID, auth);
+        if (!r.success) throw new Error(r.error && r.error.message);
+        voided.push({ entity_id: c.entity_id, version: d.version || null, stato_precedente: prev });
+        if (prev === ENTITY_STATUS.CONTRATTO.SENT) sentItems.push(d);
+      } catch (e) {
+        logError_({ severity: 'ERROR', module: 'CONTRACT_FLOW', action: 'contract.autoVoid', entity_type: 'CONTRATTO', entity_id: c.entity_id,
+          actor: auth.user_id, tenant_id: tenantId, message: 'VOID automatico fallito: ' + e.message, stack: e.stack || '' });
+      }
+    });
+
+    var adminItems = [];
+    sentItems.forEach(function(d) {
+      try {
+        var profile = d.talent_id ? getEntityById(d.talent_id, tenantId) : null;
+        var event = d.event_id ? getEntityById(d.event_id, tenantId) : null;
+        var td = profile ? profile.data : {};
+        var to = talentContractEmail_(td);
+        if (to) sendContractVoidedEmail(to, td.nome || '', event ? event.data : {}, { entity_type: 'CONTRATTO', entity_id: d.application_id, tenant_id: tenantId });
+        adminItems.push({ talent: contractTalentName_(td), evento: event ? (event.data.titolo || '') : '', version: d.version });
+      } catch (mailErr) {
+        logError_({ severity: 'ERROR', module: 'CONTRACT_FLOW', action: 'contract.autoVoid.mail', tenant_id: tenantId, actor: auth.user_id,
+          message: 'Mail annullo contratto: ' + mailErr.message, stack: mailErr.stack || '' });
+      }
+    });
+    var admin = contractAdminEmail_();
+    if (admin && adminItems.length) {
+      sendAdminContractVoidedEmail(admin, motivo, adminItems, { entity_type: 'APPLICATION', entity_id: applicationId, tenant_id: tenantId });
+    }
+  } catch (e2) {
+    logError_({ severity: 'ERROR', module: 'CONTRACT_FLOW', action: 'contract.autoVoid', tenant_id: tenantId, actor: auth.user_id,
+      message: e2.message, stack: e2.stack || '' });
+  }
+  return voided;
 }
